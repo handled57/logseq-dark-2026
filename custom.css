@@ -1,0 +1,560 @@
+/*
+ * Dark High Contrast for Logseq
+ * Visual language adapted from Microsoft VS Code's Dark High Contrast theme.
+ */
+
+:root,
+html[data-theme="dark"],
+.dark-theme {
+  color-scheme: dark;
+
+  /* VS Code Dark High Contrast palette */
+  --vscode-hc-black: #000000;
+  --vscode-hc-white: #ffffff;
+  --vscode-hc-focus: #f38518;
+  --vscode-hc-border: #6fc3df;
+  --vscode-hc-blue: #569cd6;
+  --vscode-hc-bright-blue: #1aebff;
+  --vscode-hc-link: #3794ff;
+  --vscode-hc-green: #7ca668;
+  --vscode-hc-string: #ce9178;
+  --vscode-hc-purple: #c586c0;
+  --vscode-hc-cyan: #9cdcfe;
+  --vscode-hc-type: #4ec9b0;
+  --vscode-hc-yellow: #ffff00;
+  --vscode-hc-error: #f48771;
+  --vscode-hc-muted: #d7d7d7;
+  --vscode-hc-disabled: #a0a0a0;
+  --vscode-hc-panel: #0c0c0c;
+  --vscode-hc-elevated: #151515;
+
+  /* Logseq theme contract */
+  --ls-primary-background-color: var(--vscode-hc-black);
+  --ls-secondary-background-color: var(--vscode-hc-panel);
+  --ls-tertiary-background-color: var(--vscode-hc-elevated);
+  --ls-quaternary-background-color: #1f1f1f;
+  --ls-table-tr-even-background-color: #101010;
+  --ls-active-primary-color: var(--vscode-hc-focus);
+  --ls-active-secondary-color: var(--vscode-hc-border);
+  --ls-block-properties-background-color: var(--vscode-hc-panel);
+  --ls-page-properties-background-color: var(--vscode-hc-panel);
+  --ls-search-background-color: var(--vscode-hc-black);
+  --ls-border-color: var(--vscode-hc-white);
+  --ls-secondary-border-color: var(--vscode-hc-border);
+  --ls-guideline-color: var(--vscode-hc-white);
+  --ls-menu-hover-color: var(--vscode-hc-black);
+  --ls-primary-text-color: var(--vscode-hc-white);
+  --ls-secondary-text-color: var(--vscode-hc-muted);
+  --ls-title-text-color: var(--vscode-hc-white);
+  --ls-link-text-color: var(--vscode-hc-link);
+  --ls-link-text-hover-color: var(--vscode-hc-bright-blue);
+  --ls-link-ref-text-color: var(--vscode-hc-cyan);
+  --ls-link-ref-text-hover-color: var(--vscode-hc-bright-blue);
+  --ls-block-ref-link-text-color: var(--vscode-hc-cyan);
+  --ls-tag-text-color: var(--vscode-hc-blue);
+  --ls-tag-text-hover-color: var(--vscode-hc-bright-blue);
+  --ls-slide-background-color: var(--vscode-hc-black);
+  --ls-block-bullet-border-color: var(--vscode-hc-white);
+  --ls-block-bullet-color: var(--vscode-hc-white);
+  --ls-block-highlight-color: #1f1f1f;
+  --ls-selection-background-color: var(--vscode-hc-white);
+  --ls-selection-text-color: var(--vscode-hc-black);
+  --ls-page-checkbox-color: var(--vscode-hc-black);
+  --ls-page-checkbox-border-color: var(--vscode-hc-white);
+  --ls-page-blockquote-color: var(--vscode-hc-white);
+  --ls-page-blockquote-bg-color: var(--vscode-hc-panel);
+  --ls-page-blockquote-border-color: var(--vscode-hc-border);
+  --ls-page-inline-code-color: var(--vscode-hc-string);
+  --ls-page-inline-code-bg-color: var(--vscode-hc-panel);
+  --ls-scrollbar-foreground-color: var(--vscode-hc-white);
+  --ls-scrollbar-background-color: var(--vscode-hc-black);
+  --ls-cloze-text-color: var(--vscode-hc-yellow);
+  --ls-icon-color: var(--vscode-hc-white);
+  --ls-search-icon-color: var(--vscode-hc-white);
+  --ls-a-chosen-bg: var(--vscode-hc-white);
+  --ls-right-sidebar-code-bg-color: var(--vscode-hc-panel);
+  --ls-pie-bg-color: var(--vscode-hc-white);
+  --ls-pie-fg-color: var(--vscode-hc-black);
+  --ls-highlight-color-yellow: #5a5200;
+  --ls-highlight-color-red: #661d1d;
+  --ls-highlight-color-blue: #003e6b;
+  --ls-highlight-color-green: #164a22;
+  --ls-highlight-color-purple: #522251;
+  --ls-highlight-color-pink: #66224c;
+  --ls-highlight-color-gray: #454545;
+  --ls-color-level-1: var(--vscode-hc-panel);
+  --ls-color-level-2: var(--vscode-hc-elevated);
+  --ls-color-level-3: #1f1f1f;
+  --ls-color-level-4: #282828;
+  --ls-color-level-5: #333333;
+  --ls-color-level-6: #3d3d3d;
+}
+
+html,
+body,
+#app-container,
+#root,
+.app-container {
+  background: var(--ls-primary-background-color);
+  color: var(--ls-primary-text-color);
+}
+
+body {
+  accent-color: var(--vscode-hc-white);
+}
+
+::selection {
+  color: var(--vscode-hc-black);
+  background: var(--vscode-hc-white);
+}
+
+/* Keyboard focus mirrors VS Code's active contrast border. */
+:where(a, button, input, textarea, select, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--vscode-hc-focus) !important;
+  outline-offset: 2px;
+}
+
+a,
+.external-link {
+  color: var(--ls-link-text-color);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+}
+
+a:hover,
+.external-link:hover {
+  color: var(--ls-link-text-hover-color);
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.title,
+.page-title {
+  color: var(--vscode-hc-white);
+}
+
+hr {
+  border-color: var(--vscode-hc-white);
+}
+
+/* Workbench chrome */
+#head,
+.cp__header,
+.cp__sidebar-main-layout,
+.cp__right-sidebar,
+.left-sidebar-inner,
+.right-sidebar-inner {
+  background: var(--vscode-hc-black);
+  color: var(--vscode-hc-white);
+}
+
+.left-sidebar-inner,
+.cp__right-sidebar,
+.cp__right-sidebar .sidebar-item-list {
+  border-color: var(--vscode-hc-white) !important;
+}
+
+.left-sidebar-inner {
+  border-right: 1px solid var(--vscode-hc-white);
+}
+
+.cp__right-sidebar {
+  border-left: 1px solid var(--vscode-hc-white);
+}
+
+.left-sidebar-inner .nav-content-item,
+.left-sidebar-inner a,
+.cp__right-sidebar .sidebar-item,
+.cp__right-sidebar .sidebar-item-header {
+  color: var(--vscode-hc-white);
+}
+
+.left-sidebar-inner .nav-content-item:hover,
+.left-sidebar-inner a:hover {
+  color: var(--vscode-hc-white) !important;
+  background: transparent !important;
+  text-decoration: none !important;
+}
+
+.cp__right-sidebar .sidebar-item-header:hover,
+.menu-link:hover,
+.dropdown-wrapper a:hover {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+}
+
+.left-sidebar-inner .nav-content-item.is-active,
+.left-sidebar-inner .active,
+.chosen,
+.ui__ac-group-name + .chosen {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+  outline: 2px solid var(--vscode-hc-focus);
+  outline-offset: -2px;
+}
+
+.cp__right-sidebar .sidebar-item {
+  border: 1px solid var(--vscode-hc-border);
+  background: var(--vscode-hc-black);
+}
+
+/* Editor blocks and references */
+.ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper,
+.ls-block.selected > .flex > .block-content-wrapper,
+.block-highlight {
+  background: var(--ls-block-highlight-color);
+  outline: 1px solid var(--vscode-hc-border);
+  outline-offset: 1px;
+}
+
+.block-control-wrap .bullet-container .bullet,
+.bullet-container .bullet {
+  background-color: var(--vscode-hc-white);
+  box-shadow: 0 0 0 1px var(--vscode-hc-black), 0 0 0 2px var(--vscode-hc-white);
+}
+
+.block-control-wrap:hover .bullet-container .bullet,
+.bullet-container:hover .bullet {
+  background-color: var(--vscode-hc-focus);
+}
+
+/* Indicate the hovered block's ancestry without outlining every parent block. */
+.ls-block:hover:has(.ls-block:hover) > .flex > .block-control-wrap .bullet-container .bullet {
+  background-color: var(--vscode-hc-border);
+  box-shadow: 0 0 0 1px var(--vscode-hc-black), 0 0 0 2px var(--vscode-hc-border);
+}
+
+.block-children,
+.block-children-left-border {
+  border-left-color: var(--vscode-hc-white) !important;
+}
+
+.page-reference,
+a.tag,
+.tag {
+  color: var(--vscode-hc-blue);
+  font-weight: 650;
+}
+
+.page-reference:hover,
+a.tag:hover,
+.tag:hover {
+  color: var(--vscode-hc-bright-blue);
+  text-decoration: underline;
+}
+
+.block-ref,
+.block-reference {
+  color: var(--vscode-hc-cyan);
+  border-bottom: 1px solid var(--vscode-hc-cyan);
+}
+
+.block-ref:hover,
+.block-reference:hover {
+  color: var(--vscode-hc-bright-blue);
+  background: var(--vscode-hc-panel);
+}
+
+.block-properties,
+.page-properties,
+.properties {
+  color: var(--vscode-hc-muted);
+  background: var(--vscode-hc-panel);
+  border: 1px solid var(--vscode-hc-border);
+}
+
+.ls-block:hover > .flex > .block-content-wrapper .block-properties {
+  border-color: transparent;
+}
+
+.page-properties .page-property-key,
+.block-properties .page-property-key,
+.property-key {
+  color: var(--vscode-hc-cyan);
+}
+
+.form-checkbox,
+input[type="checkbox"] {
+  accent-color: var(--vscode-hc-white);
+  border-color: var(--vscode-hc-white) !important;
+}
+
+.marker-switch,
+.todo {
+  color: var(--vscode-hc-yellow) !important;
+}
+
+.doing,
+.now {
+  color: var(--vscode-hc-bright-blue) !important;
+}
+
+.done {
+  color: var(--vscode-hc-green) !important;
+}
+
+.waiting,
+.later {
+  color: var(--vscode-hc-purple) !important;
+}
+
+.canceled,
+.cancelled {
+  color: var(--vscode-hc-disabled) !important;
+  text-decoration: line-through;
+}
+
+/* Editing surfaces */
+textarea,
+input,
+select,
+.form-input,
+.form-select,
+.search-input,
+.editor-inner textarea,
+textarea.block-editor {
+  color: var(--vscode-hc-white) !important;
+  caret-color: var(--vscode-hc-white);
+  background: var(--vscode-hc-black) !important;
+  border-color: var(--vscode-hc-white) !important;
+}
+
+textarea::placeholder,
+input::placeholder {
+  color: var(--vscode-hc-disabled) !important;
+  opacity: 1;
+}
+
+button,
+.button,
+.ui__button,
+.form-button {
+  color: var(--vscode-hc-white);
+  background: var(--vscode-hc-black);
+  border: 1px solid var(--vscode-hc-white);
+}
+
+button:hover,
+.button:hover,
+.ui__button:hover,
+.form-button:hover {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+}
+
+button:disabled,
+.button:disabled,
+[aria-disabled="true"] {
+  color: var(--vscode-hc-disabled) !important;
+  border-color: var(--vscode-hc-disabled) !important;
+  background: var(--vscode-hc-black) !important;
+}
+
+/* Menus, dialogs, autocomplete, and notifications */
+.dropdown-wrapper,
+.dropdown-menu,
+.menu-links-wrapper,
+.ui__ac,
+.ui__modal-panel,
+.ui__dialog-panel,
+[role="dialog"],
+[role="menu"],
+.tippy-box,
+.notifications .notification-area {
+  color: var(--vscode-hc-white) !important;
+  background: var(--vscode-hc-black) !important;
+  border: 1px solid var(--vscode-hc-white) !important;
+  box-shadow: none !important;
+}
+
+[role="menuitem"]:hover,
+.ui__ac-item:hover,
+.ui__ac .chosen {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+}
+
+.ui__modal-overlay,
+.ui__dialog-overlay {
+  background: rgb(0 0 0 / 78%);
+}
+
+.notification-content.warning,
+.warning {
+  border-color: var(--vscode-hc-yellow) !important;
+}
+
+.notification-content.error,
+.error {
+  border-color: var(--vscode-hc-error) !important;
+}
+
+/* Quotes, code, tables, and queries */
+blockquote {
+  color: var(--vscode-hc-white);
+  background: var(--vscode-hc-panel);
+  border-left: 4px solid var(--vscode-hc-border);
+}
+
+code,
+kbd,
+.inline-code {
+  color: var(--vscode-hc-string);
+  background: var(--vscode-hc-panel);
+  border: 1px solid var(--vscode-hc-border);
+}
+
+pre > code,
+pre.code > code {
+  display: block;
+  color: inherit;
+  background: transparent;
+  border: 0;
+}
+
+pre,
+pre.code,
+.CodeMirror,
+.cm-editor,
+.hljs {
+  color: var(--vscode-hc-white) !important;
+  background: var(--vscode-hc-black) !important;
+  border: 1px solid var(--vscode-hc-white);
+}
+
+.cm-comment,
+.hljs-comment,
+.token.comment {
+  color: var(--vscode-hc-green) !important;
+}
+
+.cm-string,
+.hljs-string,
+.token.string {
+  color: var(--vscode-hc-string) !important;
+}
+
+.cm-keyword,
+.hljs-keyword,
+.token.keyword {
+  color: var(--vscode-hc-blue) !important;
+}
+
+.cm-variable,
+.cm-property,
+.hljs-variable,
+.token.variable,
+.token.property {
+  color: var(--vscode-hc-cyan) !important;
+}
+
+.cm-number,
+.hljs-number,
+.token.number {
+  color: #b5cea8 !important;
+}
+
+.cm-typeName,
+.hljs-type,
+.token.class-name {
+  color: var(--vscode-hc-type) !important;
+}
+
+.cm-operator,
+.hljs-operator,
+.token.operator {
+  color: var(--vscode-hc-yellow) !important;
+}
+
+table,
+th,
+td {
+  border-color: var(--vscode-hc-white) !important;
+}
+
+th {
+  color: var(--vscode-hc-black);
+  background: var(--vscode-hc-white);
+}
+
+tr:nth-child(even) td {
+  background: var(--ls-table-tr-even-background-color);
+}
+
+.custom-query,
+.query-result,
+.references-blocks {
+  border-color: var(--vscode-hc-border) !important;
+}
+
+/* Date picker and graph affordances */
+.datepicker,
+.datepicker-controls,
+.react-datepicker,
+.graph-filters {
+  color: var(--vscode-hc-white) !important;
+  background: var(--vscode-hc-black) !important;
+  border-color: var(--vscode-hc-white) !important;
+}
+
+.datepicker-day:hover,
+.react-datepicker__day:hover,
+.react-datepicker__day--selected {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+}
+
+/* Scrollbars stay visible without dominating the page. */
+* {
+  scrollbar-color: var(--vscode-hc-white) var(--vscode-hc-black);
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+  background: var(--vscode-hc-black);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--vscode-hc-white);
+  border: 3px solid var(--vscode-hc-black);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-hc-focus);
+}
+
+/* Windows forced-colors users keep the platform's own contrast choices. */
+@media (forced-colors: active) {
+  :root,
+  html[data-theme="dark"],
+  .dark-theme {
+    --ls-primary-background-color: Canvas;
+    --ls-primary-text-color: CanvasText;
+    --ls-border-color: CanvasText;
+    --ls-link-text-color: LinkText;
+    --ls-active-primary-color: Highlight;
+    --ls-selection-background-color: Highlight;
+    --ls-selection-text-color: HighlightText;
+  }
+
+  :where(a, button, input, textarea, select, [role="button"], [tabindex]):focus-visible {
+    outline-color: Highlight !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
