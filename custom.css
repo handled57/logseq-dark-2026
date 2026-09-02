@@ -223,6 +223,19 @@ hr {
   background-color: var(--vscode-hc-focus);
 }
 
+/* Keep bullets quiet until a block is hovered or focused.
+ * Because :hover and :focus-within also match containing blocks, the direct-child
+ * selector reveals only the current block's bullet and those of its ancestors. */
+.ls-block > .block-main-container > .block-control-wrap .bullet-container:not(.typed-list) {
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.ls-block:hover > .block-main-container > .block-control-wrap .bullet-container:not(.typed-list),
+.ls-block:focus-within > .block-main-container > .block-control-wrap .bullet-container:not(.typed-list) {
+  opacity: 1;
+}
+
 /* Indicate the hovered block's ancestry without outlining every parent block. */
 .ls-block:hover:has(.ls-block:hover) > .flex > .block-control-wrap .bullet-container .bullet {
   background-color: var(--vscode-hc-border);
