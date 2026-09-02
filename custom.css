@@ -203,6 +203,14 @@ hr {
   background: var(--vscode-hc-black);
 }
 
+/* Keep the primary editor centered at 80% of the available desktop canvas. */
+@media (min-width: 768px) {
+  #main-content-container > .cp__sidebar-main-content:not([data-is-full-width="true"]) {
+    width: 80%;
+    max-width: 80%;
+  }
+}
+
 /* Editor blocks and references */
 .ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper,
 .ls-block.selected > .flex > .block-content-wrapper,
