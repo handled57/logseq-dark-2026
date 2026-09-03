@@ -23,6 +23,7 @@ html[data-theme="dark"],
   --vscode-hc-cyan: #9cdcfe;
   --vscode-hc-type: #4ec9b0;
   --vscode-hc-yellow: #ffff00;
+  --vscode-hc-orange: #f38518;
   --vscode-hc-error: #f48771;
   --vscode-hc-warning: #cca700;
   --vscode-hc-info: #75beff;
@@ -257,6 +258,14 @@ h6,
   font-weight: 400 !important;
 }
 
+/* Space each header from the block above it by its own font size. Because `em`
+ * resolves against the element's own font-size, one rule covers every level and
+ * keeps view and edit modes aligned. */
+.ls-block :is(h1, h2, h3, h4, h5, h6),
+.editor-inner .uniline-block:is(.h1, .h2, .h3, .h4, .h5, .h6) {
+  margin-top: 1em !important;
+}
+
 hr {
   border-color: var(--vscode-hc-white);
 }
@@ -444,7 +453,7 @@ input[type="checkbox"] {
 
 .marker-switch,
 .todo {
-  color: var(--vscode-hc-yellow) !important;
+  color: var(--vscode-hc-orange) !important;
 }
 
 .doing,
