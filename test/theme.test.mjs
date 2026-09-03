@@ -131,6 +131,15 @@ test('focused layout and nested-block behavior remain part of the theme', () => 
   assert.match(css, /\.ls-block:hover:not\(:has\(\.ls-block:hover\)\)/)
 })
 
+test('interactive chrome stays black with one-pixel orange borders', () => {
+  assert.match(css, /#search-button,[\s\S]*?border-color:\s*transparent\s*!important/)
+  assert.match(css, /#search-button:hover,[\s\S]*?border-color:\s*var\(--vscode-hc-focus\)\s*!important/)
+  assert.match(css, /\.left-sidebar-inner a\.item:hover,[\s\S]*?border-color:\s*var\(--vscode-hc-focus\)/)
+  assert.match(css, /textarea\.block-editor:focus\s*\{[\s\S]*?border:\s*1px solid var\(--vscode-hc-focus\)\s*!important[\s\S]*?box-shadow:\s*none\s*!important/)
+  assert.match(css, /th\s*\{[\s\S]*?background:\s*var\(--vscode-hc-black\)\s*!important/)
+  assert.match(css, /kbd\s*\{[\s\S]*?background:\s*var\(--vscode-hc-black\)/)
+})
+
 test('fenced code has a single outer border', () => {
   assert.match(css, /pre\s*>\s*code[\s\S]*?background:\s*transparent[\s\S]*?border:\s*0/)
 })
