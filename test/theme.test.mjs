@@ -129,6 +129,7 @@ test('focused layout and nested-block behavior remain part of the theme', () => 
   assert.match(css, /\.bullet-container:not\(\.typed-list\)/)
   assert.match(css, /\.ls-block:hover:has\(\.ls-block:hover\)/)
   assert.match(css, /\.ls-block:hover:not\(:has\(\.ls-block:hover\)\)/)
+  assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left-color:\s*transparent\s*!important/)
 })
 
 test('interactive chrome stays black with one-pixel orange borders', () => {

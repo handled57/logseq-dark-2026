@@ -385,7 +385,7 @@ hr {
 
 .block-children,
 .block-children-left-border {
-  border-left-color: var(--vscode-hc-white) !important;
+  border-left-color: transparent !important;
 }
 
 .page-reference,
