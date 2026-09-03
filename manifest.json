@@ -1,0 +1,13 @@
+{
+  "title": "Dark High Contrast",
+  "description": "A CSS-only adaptation of Visual Studio Code's Dark High Contrast workbench for Logseq classic graphs.",
+  "author": "Peter Cole",
+  "repo": "handled57/logseq-dark-2026",
+  "icon": "icon.svg",
+  "theme": true,
+  "effect": false,
+  "web": false,
+  "supportsDB": false,
+  "supportsDBOnly": false,
+  "id": "logseq-dark-high-contrast-theme"
+}
