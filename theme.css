@@ -1,6 +1,7 @@
 /*
  * Dark High Contrast for Logseq
  * Visual language adapted from Microsoft VS Code's Dark High Contrast theme.
+ * Canonical theme stylesheet for Logseq 0.10.15 classic/file graphs.
  */
 
 :root,
@@ -23,16 +24,48 @@ html[data-theme="dark"],
   --vscode-hc-type: #4ec9b0;
   --vscode-hc-yellow: #ffff00;
   --vscode-hc-error: #f48771;
+  --vscode-hc-warning: #cca700;
+  --vscode-hc-info: #75beff;
   --vscode-hc-muted: #d7d7d7;
   --vscode-hc-disabled: #a0a0a0;
   --vscode-hc-panel: #0c0c0c;
   --vscode-hc-elevated: #151515;
+
+  /* Logseq's newer controls use HSL component tokens. Keep those controls in
+   * the same palette instead of allowing the active accent theme to leak in. */
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 0%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 0%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 0 0% 100%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 5%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 8%;
+  --muted-foreground: 0 0% 84%;
+  --accent: 195 65% 65%;
+  --accent-foreground: 0 0% 0%;
+  --destructive: 9 87% 70%;
+  --destructive-foreground: 0 0% 0%;
+  --border: 0 0% 100%;
+  --input: 0 0% 100%;
+  --ring: 29 90% 52%;
+  --radius: 2px;
 
   /* Logseq theme contract */
   --ls-primary-background-color: var(--vscode-hc-black);
   --ls-secondary-background-color: var(--vscode-hc-panel);
   --ls-tertiary-background-color: var(--vscode-hc-elevated);
   --ls-quaternary-background-color: #1f1f1f;
+  --ls-quinary-background-color: #282828;
+  --ls-senary-background-color: #333333;
+  --ls-primary-background-color1: var(--vscode-hc-black);
+  --ls-secondary-background-color1: var(--vscode-hc-panel);
+  --ls-tertiary-background-color1: var(--vscode-hc-elevated);
+  --ls-quaternary-background-color1: #1f1f1f;
+  --ls-bg-quaternary: #1f1f1f;
   --ls-table-tr-even-background-color: #101010;
   --ls-active-primary-color: var(--vscode-hc-focus);
   --ls-active-secondary-color: var(--vscode-hc-border);
@@ -41,7 +74,9 @@ html[data-theme="dark"],
   --ls-search-background-color: var(--vscode-hc-black);
   --ls-border-color: var(--vscode-hc-white);
   --ls-secondary-border-color: var(--vscode-hc-border);
+  --ls-tertiary-border-color: var(--vscode-hc-muted);
   --ls-guideline-color: var(--vscode-hc-white);
+  --ls-focus-ring-color: var(--vscode-hc-focus);
   --ls-menu-hover-color: var(--vscode-hc-black);
   --ls-primary-text-color: var(--vscode-hc-white);
   --ls-secondary-text-color: var(--vscode-hc-muted);
@@ -56,6 +91,8 @@ html[data-theme="dark"],
   --ls-slide-background-color: var(--vscode-hc-black);
   --ls-block-bullet-border-color: var(--vscode-hc-white);
   --ls-block-bullet-color: var(--vscode-hc-white);
+  --ls-block-bullet-active-color: var(--vscode-hc-focus);
+  --ls-block-left-color: var(--vscode-hc-border);
   --ls-block-highlight-color: #1f1f1f;
   --ls-selection-background-color: var(--vscode-hc-white);
   --ls-selection-text-color: var(--vscode-hc-black);
@@ -68,11 +105,45 @@ html[data-theme="dark"],
   --ls-page-inline-code-bg-color: var(--vscode-hc-panel);
   --ls-scrollbar-foreground-color: var(--vscode-hc-white);
   --ls-scrollbar-background-color: var(--vscode-hc-black);
+  --ls-scrollbar-thumb-hover-color: var(--vscode-hc-focus);
+  --ls-scrollbar-width: 12px;
   --ls-cloze-text-color: var(--vscode-hc-yellow);
   --ls-icon-color: var(--vscode-hc-white);
   --ls-search-icon-color: var(--vscode-hc-white);
+  --ls-search-icon-hover-color: var(--vscode-hc-bright-blue);
   --ls-a-chosen-bg: var(--vscode-hc-white);
   --ls-right-sidebar-code-bg-color: var(--vscode-hc-panel);
+  --ls-right-sidebar-topbar-color: var(--vscode-hc-black);
+  --ls-left-sidebar-border-color: var(--vscode-hc-white);
+  --ls-left-sidebar-text-color: var(--vscode-hc-white);
+  --ls-left-sidebar-bottom-gradient: linear-gradient(transparent, var(--vscode-hc-black));
+  --ls-header-button-background: transparent;
+  --ls-button-background: var(--vscode-hc-black);
+  --ls-button-background-hsl: 0 0% 0%;
+  --ls-create-button-color: var(--vscode-hc-black);
+  --ls-create-button-color-focus: var(--vscode-hc-focus);
+  --ls-create-button-color-sm: var(--vscode-hc-black);
+  --ls-create-button-color-sm-focus: var(--vscode-hc-focus);
+  --ls-settings-header-border-color: var(--vscode-hc-white);
+  --ls-notification-background: var(--vscode-hc-black);
+  --ls-notification-text-color: var(--vscode-hc-white);
+  --ls-error-background-color: #3b0d08;
+  --ls-error-text-color: var(--vscode-hc-error);
+  --ls-warning-background-color: #332a00;
+  --ls-warning-text-color: var(--vscode-hc-yellow);
+  --ls-success-background-color: #14240f;
+  --ls-success-text-color: #b7d6a8;
+  --ls-color-file-sync-error: var(--vscode-hc-error);
+  --ls-color-file-sync-pending: var(--vscode-hc-yellow);
+  --ls-color-file-sync-idle: var(--vscode-hc-green);
+  --ls-page-mark-bg-color: var(--vscode-hc-yellow);
+  --ls-page-mark-color: var(--vscode-hc-black);
+  --ls-tag-text-opacity: 1;
+  --ls-tag-text-hover-opacity: 1;
+  --ls-border-radius-low: 2px;
+  --ls-border-radius-medium: 2px;
+  --ls-font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ls-headbar-height: 44px;
   --ls-pie-bg-color: var(--vscode-hc-white);
   --ls-pie-fg-color: var(--vscode-hc-black);
   --ls-highlight-color-yellow: #5a5200;
@@ -88,6 +159,45 @@ html[data-theme="dark"],
   --ls-color-level-4: #282828;
   --ls-color-level-5: #333333;
   --ls-color-level-6: #3d3d3d;
+
+  /* PDF viewer and whiteboard surfaces */
+  --ph-highlight-color-yellow: #5a5200;
+  --ph-highlight-color-blue: #003e6b;
+  --ph-highlight-color-green: #164a22;
+  --ph-highlight-color-red: #661d1d;
+  --ph-highlight-color-purple: #522251;
+  --ph-highlight-scroll-into-color: var(--vscode-hc-focus);
+  --ph-link-color: var(--vscode-hc-link);
+  --ls-whiteboard-logseq-button-border: var(--vscode-hc-border);
+  --ls-whiteboard-quick-links-background: #003e6b;
+  --ls-whiteboard-quick-links-background-hover: var(--vscode-hc-link);
+  --ls-whiteboard-select-background-selected: var(--vscode-hc-white);
+  --ls-whiteboard-tooltip-background: var(--vscode-hc-black);
+  --ls-whiteboard-tooltip-text: var(--vscode-hc-white);
+  --ls-wb-stroke-color-default: var(--vscode-hc-white);
+  --ls-wb-stroke-color-gray: var(--vscode-hc-muted);
+  --ls-wb-stroke-color-red: var(--vscode-hc-error);
+  --ls-wb-stroke-color-yellow: var(--vscode-hc-yellow);
+  --ls-wb-stroke-color-green: #b7d6a8;
+  --ls-wb-stroke-color-blue: var(--vscode-hc-link);
+  --ls-wb-stroke-color-purple: var(--vscode-hc-purple);
+  --ls-wb-stroke-color-pink: #ff9ed2;
+  --ls-wb-text-color-default: var(--vscode-hc-white);
+  --ls-wb-text-color-gray: var(--vscode-hc-white);
+  --ls-wb-text-color-red: var(--vscode-hc-white);
+  --ls-wb-text-color-yellow: var(--vscode-hc-white);
+  --ls-wb-text-color-green: var(--vscode-hc-white);
+  --ls-wb-text-color-blue: var(--vscode-hc-white);
+  --ls-wb-text-color-purple: var(--vscode-hc-white);
+  --ls-wb-text-color-pink: var(--vscode-hc-white);
+  --ls-wb-background-color-default: var(--vscode-hc-black);
+  --ls-wb-background-color-gray: #282828;
+  --ls-wb-background-color-red: #3b0d08;
+  --ls-wb-background-color-yellow: #332a00;
+  --ls-wb-background-color-green: #14240f;
+  --ls-wb-background-color-blue: #003e6b;
+  --ls-wb-background-color-purple: #3b193a;
+  --ls-wb-background-color-pink: #4a1735;
 }
 
 html,
@@ -136,6 +246,7 @@ h6,
 .title,
 .page-title {
   color: var(--vscode-hc-white);
+  font-weight: 400;
 }
 
 hr {
@@ -212,6 +323,14 @@ hr {
 }
 
 /* Editor blocks and references */
+.ls-block {
+  margin-bottom: 2px;
+}
+
+.ls-block:focus-visible {
+  outline-width: 1px !important;
+}
+
 .ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper,
 .ls-block.selected > .flex > .block-content-wrapper,
 .block-highlight {
@@ -376,6 +495,18 @@ button:disabled,
   background: var(--vscode-hc-black) !important;
 }
 
+#create-button {
+  color: var(--vscode-hc-white) !important;
+  background: var(--vscode-hc-black) !important;
+  border: 1px solid var(--vscode-hc-white) !important;
+}
+
+#create-button:hover,
+#create-button:focus-visible {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+}
+
 /* Menus, dialogs, autocomplete, and notifications */
 .dropdown-wrapper,
 .dropdown-menu,
@@ -499,8 +630,8 @@ td {
 }
 
 th {
-  color: var(--vscode-hc-black);
-  background: var(--vscode-hc-white);
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
 }
 
 tr:nth-child(even) td {
@@ -528,6 +659,347 @@ tr:nth-child(even) td {
 .react-datepicker__day--selected {
   color: var(--vscode-hc-black) !important;
   background: var(--vscode-hc-white) !important;
+}
+
+/* Workbench details ------------------------------------------------------- */
+
+/* Title bar and command/search affordances */
+#head,
+.cp__header {
+  border-bottom: 1px solid var(--vscode-hc-white);
+  box-shadow: none !important;
+}
+
+.cp__header > .l,
+.cp__header > .r {
+  min-height: var(--ls-headbar-height);
+}
+
+.cp__header .button,
+.cp__header a.button,
+.cp__header button.button,
+.cp__right-sidebar-topbar .button {
+  color: var(--vscode-hc-white) !important;
+  background: transparent !important;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.cp__header .button:hover,
+.cp__header a.button:hover,
+.cp__header button.button:hover,
+.cp__right-sidebar-topbar .button:hover {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+  border-color: var(--vscode-hc-white);
+}
+
+#search-button,
+.ls-search,
+.cp__header [data-ref="search"],
+.cp__header .search {
+  border-color: var(--vscode-hc-white) !important;
+  border-radius: 2px !important;
+}
+
+/* Explorer-like left navigation */
+.left-sidebar-inner {
+  background: var(--vscode-hc-black) !important;
+  font-size: 13px;
+}
+
+.left-sidebar-inner .nav-content-item .header {
+  color: var(--vscode-hc-muted);
+  background: var(--vscode-hc-black);
+  border-bottom: 1px solid var(--vscode-hc-border);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.left-sidebar-inner a.item,
+.left-sidebar-inner .nav-content-item a,
+.left-sidebar-inner .menu-link {
+  min-height: 26px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  border: 1px solid transparent;
+  border-radius: 0;
+}
+
+.left-sidebar-inner a.item:hover,
+.left-sidebar-inner .nav-content-item a:hover,
+.left-sidebar-inner .menu-link:hover {
+  color: var(--vscode-hc-white) !important;
+  background: var(--vscode-hc-panel) !important;
+  border-color: var(--vscode-hc-border);
+}
+
+.left-sidebar-inner a.item.active,
+.left-sidebar-inner a.item[aria-current="page"] {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+  border-color: var(--vscode-hc-white);
+}
+
+.left-sidebar-inner .nav-contents-container.is-scrolled {
+  border-top-color: var(--vscode-hc-white);
+}
+
+/* Panel-like right sidebar */
+.cp__right-sidebar-inner,
+.cp__right-sidebar-topbar {
+  color: var(--vscode-hc-white);
+  background: var(--vscode-hc-black) !important;
+}
+
+.cp__right-sidebar-topbar {
+  border-bottom: 1px solid var(--vscode-hc-white);
+  box-shadow: none !important;
+}
+
+.cp__right-sidebar .resizer:hover,
+.cp__right-sidebar .resizer:focus,
+.cp__right-sidebar .resizer:active {
+  background: var(--vscode-hc-focus) !important;
+}
+
+.cp__right-sidebar .sidebar-item {
+  margin: 8px;
+  overflow: hidden;
+  border: 1px solid var(--vscode-hc-border);
+  border-radius: 2px;
+  box-shadow: none !important;
+}
+
+.cp__right-sidebar .sidebar-item .sidebar-item-header {
+  min-height: 30px;
+  background: var(--vscode-hc-panel) !important;
+  border-bottom: 1px solid var(--vscode-hc-border);
+}
+
+.cp__right-sidebar .sidebar-item.collapsed .sidebar-item-header {
+  border-bottom: 0;
+}
+
+/* Command palette, menus, dialogs, and settings */
+.cp__cmdk,
+.cp__cmdk .ui__modal-panel,
+.ui__context-menu-content,
+.ui__dropdown-menu-content,
+.ui__select-content,
+.menu-links-outer,
+.absolute-modal[data-modal-name] {
+  color: var(--vscode-hc-white) !important;
+  background: var(--vscode-hc-black) !important;
+  border: 1px solid var(--vscode-hc-white) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.cp__cmdk .form-input,
+.cp__cmdk [cmdk-input] {
+  border: 0 !important;
+  border-bottom: 1px solid var(--vscode-hc-white) !important;
+  border-radius: 0 !important;
+  opacity: 1 !important;
+}
+
+.cp__cmdk > .hints {
+  color: var(--vscode-hc-muted);
+  background: var(--vscode-hc-panel) !important;
+  border-top-color: var(--vscode-hc-white) !important;
+}
+
+[cmdk-item],
+.ui__dropdown-menu-item,
+.ui__context-menu-item,
+.ui__select-item {
+  border: 1px solid transparent;
+  border-radius: 0 !important;
+}
+
+[cmdk-item][aria-selected="true"],
+[cmdk-item]:hover,
+.ui__dropdown-menu-item:focus,
+.ui__dropdown-menu-item:hover,
+.ui__context-menu-item:focus,
+.ui__context-menu-item:hover,
+.ui__select-item:focus,
+.ui__select-item:hover {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+  border-color: var(--vscode-hc-white);
+}
+
+.settings-modal,
+.cp__plugins-settings,
+.cp__settings-inner {
+  color: var(--vscode-hc-white);
+  background: var(--vscode-hc-black) !important;
+  border-radius: 2px !important;
+}
+
+.cp__plugins-settings > header,
+.cp__plugins-settings-inner .heading-item,
+.settings-modal .heading-item {
+  border-color: var(--vscode-hc-white) !important;
+}
+
+.cp__plugins-settings-inner .desc-item:hover,
+.settings-modal .desc-item:hover {
+  background: var(--vscode-hc-panel) !important;
+}
+
+/* Inputs and switch-style controls */
+.form-input:focus,
+.form-select:focus,
+.search-input:focus,
+textarea:focus,
+input:focus,
+select:focus {
+  border-color: var(--vscode-hc-focus) !important;
+  box-shadow: 0 0 0 1px var(--vscode-hc-focus) !important;
+}
+
+.ui__toggle-background-on,
+[data-state="checked"].ui__toggle {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+  outline: 1px solid var(--vscode-hc-white);
+}
+
+.ui__toggle-background-off,
+[data-state="unchecked"].ui__toggle {
+  color: var(--vscode-hc-white) !important;
+  background: var(--vscode-hc-black) !important;
+  outline: 1px solid var(--vscode-hc-white);
+}
+
+/* Content containers */
+.embed,
+.custom-query,
+.query-result,
+.references-blocks-item,
+.cards-review,
+.admonitionblock,
+.ui__card {
+  background: var(--vscode-hc-black);
+  border: 1px solid var(--vscode-hc-border) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+.embed-header,
+.custom-query > .th,
+.admonitionblock .admonition-title {
+  background: var(--vscode-hc-panel) !important;
+  border-bottom-color: var(--vscode-hc-border) !important;
+}
+
+mark {
+  color: var(--ls-page-mark-color);
+  background: var(--ls-page-mark-bg-color);
+}
+
+kbd {
+  color: var(--vscode-hc-black);
+  background: var(--vscode-hc-white);
+  border-color: var(--vscode-hc-white);
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+/* Notifications and state messages */
+.ui__notifications .notification-area,
+.notifications .notification-area {
+  color: var(--vscode-hc-white) !important;
+  background: var(--vscode-hc-black) !important;
+  border: 1px solid var(--vscode-hc-white) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+.notification-content.success,
+.success {
+  border-color: var(--ls-success-text-color) !important;
+}
+
+/* Graph, PDF, and whiteboard tools */
+.graph-filters,
+.graph-filters .form-control,
+.extensions__pdf-toolbar,
+.extensions__pdf-outline > section,
+.tl-toolbar,
+.tl-menu,
+.tl-tooltip-content,
+.whiteboard-page-title-root,
+.whiteboard-page-title {
+  color: var(--vscode-hc-white) !important;
+  background: var(--vscode-hc-black) !important;
+  border-color: var(--vscode-hc-white) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+.extensions__pdf-toolbar > .inner > .r a.button.is-active {
+  color: var(--vscode-hc-black) !important;
+  background: var(--vscode-hc-white) !important;
+  border-bottom-color: var(--vscode-hc-focus);
+}
+
+.extensions__pdf-outline-item > .inner > a,
+.extensions__pdf-outline-item > .inner > a > i svg {
+  color: var(--vscode-hc-white);
+}
+
+.extensions__pdf-outline-item > .inner > a:hover {
+  color: var(--vscode-hc-bright-blue);
+  background: var(--vscode-hc-panel);
+}
+
+.extensions__pdf-outline-item > .inner > a:focus,
+.extensions__pdf-outline-item > .inner > a:active {
+  color: var(--vscode-hc-black);
+  background: var(--vscode-hc-white);
+}
+
+.whiteboard-page-title:focus-within {
+  border-color: var(--vscode-hc-focus) !important;
+  box-shadow: 0 0 0 1px var(--vscode-hc-focus) !important;
+}
+
+/* Compatibility with host-DOM UI supplied by the user's installed plugins. */
+.logseq-tab-wrapper,
+.panel-wrap,
+.panel-content {
+  color: var(--vscode-hc-white);
+  background: var(--vscode-hc-black);
+  border-color: var(--vscode-hc-white) !important;
+  box-shadow: none !important;
+}
+
+.logseq-tab {
+  color: var(--vscode-hc-muted);
+  background: var(--vscode-hc-panel);
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.logseq-tab.active,
+.logseq-tab[aria-selected="true"] {
+  color: var(--vscode-hc-white);
+  background: var(--vscode-hc-black);
+  border-top-color: var(--vscode-hc-focus) !important;
+}
+
+body[data-awpr-page-props-icons] .block-properties .page-property-key::before,
+body[data-awpr-block-props-icons] .block-properties .page-property-key::before {
+  color: var(--vscode-hc-cyan) !important;
+  opacity: 1;
 }
 
 /* Scrollbars stay visible without dominating the page. */

@@ -1,0 +1,54 @@
+{
+  "name": "logseq-dark-high-contrast-theme",
+  "version": "1.0.0",
+  "description": "A CSS-only Logseq port of Visual Studio Code's Dark High Contrast workbench.",
+  "author": "Peter Cole",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/handled57/logseq-dark-2026.git"
+  },
+  "homepage": "https://github.com/handled57/logseq-dark-2026#readme",
+  "bugs": "https://github.com/handled57/logseq-dark-2026/issues",
+  "keywords": [
+    "logseq",
+    "theme",
+    "dark",
+    "high-contrast",
+    "accessibility",
+    "vscode"
+  ],
+  "scripts": {
+    "test": "node --test test/theme.test.mjs",
+    "build": "node scripts/build-release.mjs",
+    "verify:release": "node scripts/verify-release.mjs",
+    "check": "npm test && npm run build && npm run verify:release"
+  },
+  "files": [
+    "theme.css",
+    "icon.svg",
+    "screenshots",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "manifest.json"
+  ],
+  "repo": "handled57/logseq-dark-2026",
+  "title": "Dark High Contrast",
+  "effect": false,
+  "theme": true,
+  "logseq": {
+    "id": "logseq-dark-high-contrast-theme",
+    "title": "Dark High Contrast",
+    "icon": "./icon.svg",
+    "themes": [
+      {
+        "name": "Dark High Contrast",
+        "url": "./theme.css",
+        "mode": "dark",
+        "description": "VS Code's Dark High Contrast workbench, adapted for Logseq classic graphs."
+      }
+    ]
+  }
+}

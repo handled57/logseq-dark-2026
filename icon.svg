@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Dark High Contrast for Logseq</title>
+  <desc id="desc">A white outlined page with cyan text and orange focus corners on black</desc>
+  <rect width="128" height="128" rx="12" fill="#000000"/>
+  <path d="M31 24h66v80H31z" fill="none" stroke="#ffffff" stroke-width="7"/>
+  <path d="M45 44h38M45 62h29M45 80h38" fill="none" stroke="#6fc3df" stroke-width="7" stroke-linecap="square"/>
+  <path d="M18 43V18h25M85 18h25v25M110 85v25H85M43 110H18V85" fill="none" stroke="#f38518" stroke-width="7"/>
+</svg>
