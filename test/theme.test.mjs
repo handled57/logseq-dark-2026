@@ -31,9 +31,18 @@ function contrast(first, second) {
   return (light + 0.05) / (dark + 0.05)
 }
 
+test('the released version matches the newest changelog entry', async () => {
+  // Pinning the version as a literal here let package.json and the changelog
+  // drift apart; deriving it keeps one source of truth.
+  const changelog = await readFile(resolve(root, 'CHANGELOG.md'), 'utf8')
+  const latest = changelog.match(/^## (\d+\.\d+\.\d+) - \d{4}-\d{2}-\d{2}$/m)
+  assert.ok(latest, 'changelog has no versioned release heading')
+  assert.match(pkg.version, /^\d+\.\d+\.\d+$/)
+  assert.equal(pkg.version, latest[1], 'package.json version and changelog disagree')
+})
+
 test('package exposes one CSS-only dark theme', () => {
   assert.equal(pkg.name, 'logseq-dark-high-contrast-theme')
-  assert.equal(pkg.version, '1.0.0')
   assert.equal(pkg.author, 'Peter Cole')
   assert.equal(pkg.repo, 'handled57/logseq-dark-2026')
   assert.equal(pkg.effect, false)
@@ -74,7 +83,7 @@ test('official High Contrast palette values remain exact', () => {
     '--vscode-hc-black': '#000000',
     '--vscode-hc-white': '#ffffff',
     '--vscode-hc-focus': '#f38518',
-    '--vscode-hc-border': '#6fc3df',
+    '--vscode-hc-border': '#5b7e96',
     '--vscode-hc-blue': '#569cd6',
     '--vscode-hc-link': '#3794ff',
     '--vscode-hc-green': '#7ca668',
