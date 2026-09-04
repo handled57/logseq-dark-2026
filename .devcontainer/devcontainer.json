@@ -1,6 +1,9 @@
 {
   "name": "logseq-dark-2026",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "containerEnv": { 
+    "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+  },
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
@@ -9,7 +12,8 @@
       "extensions": [
         "dbaeumer.vscode-eslint",
         "stylelint.vscode-stylelint",
-        "editorconfig.editorconfig"
+        "editorconfig.editorconfig",
+        "Anthropic.claude-code"
       ],
       "settings": {
         "css.validate": true
