@@ -61,6 +61,9 @@ const expected = [
   `${prefix}README.md`,
   `${prefix}THIRD_PARTY_NOTICES.md`,
   `${prefix}icon.svg`,
+  `${prefix}index.html`,
+  `${prefix}index.js`,
+  `${prefix}lib/lsplugin.user.js`,
   `${prefix}manifest.json`,
   `${prefix}package.json`,
   `${prefix}screenshots/logseq-dark-high-contrast.png`,
@@ -78,6 +81,13 @@ assert.equal(
   entries.get(`${prefix}theme.css`).toString('utf8'),
   sourceCss,
   'archived theme.css differs from the canonical stylesheet'
+)
+
+const sourceScript = await readFile(resolve(root, 'index.js'), 'utf8')
+assert.equal(
+  entries.get(`${prefix}index.js`).toString('utf8'),
+  sourceScript,
+  'archived index.js differs from the canonical plugin script'
 )
 
 const sourceScreenshot = await readFile(resolve(root, 'screenshots', 'logseq-dark-high-contrast.png'))
