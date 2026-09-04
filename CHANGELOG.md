@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## 1.4.0 - 2026-09-04
+
+- Keep bullets visible for ordinary prose while hiding them for empty,
+  property-only, heading, reference, embed, command/macro, query, media, code,
+  namespace, math, ClojureScript-eval, slide, flashcard, Zotero, quote, and
+  advanced `<`-menu blocks in both rendered and edit states.
+- Stop descendant hover and focus from revealing or recoloring ancestor
+  bullets, and suppress both the border and hover fill of connector threads.
+- Classify mounted blocks in the existing entry script so source-only forms
+  remain distinguishable after Logseq renders them.
+
 ## 1.3.0 - 2026-09-04
 
 - Accept any number of `key: value` pairs for property hiding instead of a

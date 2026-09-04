@@ -245,3 +245,57 @@ test('the entry provides the one style rule that does the hiding', async () => {
     '.block-properties[data-hc-hidden] { display: none; }'
   )
 })
+
+function bulletBlock({ raw = '', text = '', special = false } = {}) {
+  const wrapper = {
+    textContent: text,
+    querySelector(selector) {
+      if (selector === 'textarea.block-editor, textarea') return raw ? { value: raw } : null
+      return special ? {} : null
+    },
+    cloneNode() {
+      return {
+        textContent: text,
+        querySelectorAll: () => []
+      }
+    }
+  }
+
+  return {
+    querySelector: () => wrapper
+  }
+}
+
+test('only ordinary prose keeps its bullet', async () => {
+  const context = await render({}, [])
+
+  assert.equal(context.shouldHideBullet(bulletBlock({ text: 'ordinary prose' })), false)
+  assert.equal(context.shouldHideBullet(bulletBlock()), true)
+  assert.equal(context.shouldHideBullet(bulletBlock({ special: true })), true)
+})
+
+test('special source forms remain bulletless while editing', async () => {
+  const context = await render({}, [])
+  const special = [
+    '# Heading',
+    'type:: source',
+    '((65f00000-0000-0000-0000-000000000000))',
+    '[[Reference]]',
+    '{{embed [[Page]]}}',
+    '{{query (property :status "done")}}',
+    '{{namespace [[Parent]]}}',
+    '{{eval (+ 1 2)}}',
+    '{{renderer :slide, [[Deck]]}}',
+    '{{zotero-imported-file item}}',
+    '```clojure\n(+ 1 2)\n```',
+    '$$x^2$$',
+    '> quotation',
+    '#+BEGIN_QUOTE\nquotation\n#+END_QUOTE',
+    'prompt #card'
+  ]
+
+  for (const raw of special) {
+    assert.equal(context.shouldHideBullet(bulletBlock({ raw })), true, raw)
+  }
+  assert.equal(context.shouldHideBullet(bulletBlock({ raw: 'ordinary prose' })), false)
+})

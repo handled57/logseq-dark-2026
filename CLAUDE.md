@@ -28,7 +28,7 @@ Read `README.md` and `CHANGELOG.md` before changing public behavior. Keep both s
 - Keep `package.json` `effect: true`. Logseq otherwise moves the entry to the `lsp://logseq.io/` origin, preventing `index.js` from reading `parent.document`.
 - Preserve classic/file-graph support. DB graphs and mobile are not advertised targets.
 - Preserve the full-width route while keeping the intentional 80% desktop editor width for ordinary pages.
-- Untyped bullets remain hidden until hover/focus. The current block and ancestor bullets reveal hierarchy; nested connector/thread lines remain transparent.
+- Untyped bullets are always visible for ordinary prose blocks. Structural and special blocks are marked with `data-hc-hide-bullet` and remain bulletless in every interaction state; child hover never reveals ancestor bullets. Nested connector/thread lines remain transparent.
 - Keep proportional typography for notes and monospace limited to code and keyboard-oriented UI.
 - Property rules are case-insensitive `key: value` pairs separated by commas, semicolons, or newlines. Matching any pair hides the table. Bare keys and `key: *` are wildcards. Configuration order determines the `data-hc-block-type` precedence.
 - Do not claim a visual behavior is confirmed from source or automated tests alone. Render in Logseq or an appropriate browser fixture when visual acceptance matters, and state clearly when that check was not possible.
