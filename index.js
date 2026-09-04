@@ -33,7 +33,8 @@ const SPECIAL_CONTENT_SELECTOR = [
   '.custom-query', '.query-result', '.references-blocks',
   '.asset-container', '.asset-ref', 'audio', 'video', 'img', 'iframe',
   'pre', '.src', '.org-src-container', '.cp__fenced-code-block', '.extensions__code', '.extensions__code-calc',
-  'center', '.center', '.CENTER', '.org-center', '.verse', '.VERSE', '.org-verse',
+  'center', '.center', '.CENTER', '.org-center', '[style*="text-align: center"]', '[style*="text-align:center"]',
+  '.verse', '.VERSE', '.org-verse',
   '.katex-display', '.slides', '.reveal', '.cards-review',
   '.zotero-search', 'blockquote', '.admonitionblock'
 ].join(', ')
