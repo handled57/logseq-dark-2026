@@ -39,7 +39,7 @@ Automate the complete lifecycle when the user asks for an implementation and rep
 
 1. Start from a clean, current `main`. Inspect and preserve unrelated user changes.
 2. Create a GitHub issue describing the change and acceptance criteria.
-3. Create a topic branch linked to the issue; do not develop directly on `main`.
+3. Create a topic branch and formally link it to the related issue in GitHub's Development section; a matching branch name, commit reference, or issue comment is not sufficient. Do not develop directly on `main`.
 4. Make the smallest coherent change. For a bug, search for other occurrences of the same root cause and fix in-scope instances.
 5. Add or update regression tests for changed behavior.
 6. Integrate the latest `origin/main`. Resolve conflicts by understanding both sides; never discard user or upstream work automatically.
@@ -71,4 +71,5 @@ Before reporting completion, confirm:
 - the worktree contains no unintended generated or unrelated files;
 - `main` contains the intended commit;
 - `origin/main` and any requested tags point to the expected commits;
+- every topic branch reads back as formally linked to its related GitHub issue;
 - the GitHub issue is closed only after delivery succeeds.
