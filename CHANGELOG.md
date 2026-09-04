@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 1.4.2 - 2026-09-04
+
+- Recognize the uppercase CSS classes emitted by mldoc for rendered
+  `#+BEGIN_CENTER` and `#+BEGIN_VERSE` blocks so their bullets stay hidden.
+
 ## 1.4.1 - 2026-09-04
 
 - Keep `src`, `center`, and `verse` blocks bulletless in both rendered and edit
