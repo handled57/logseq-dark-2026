@@ -29,12 +29,28 @@ for (const file of releaseFiles) {
   await cp(resolve(root, file), resolve(bundle, file), { recursive: true })
 }
 
-const zipped = spawnSync('zip', ['-rq', archive, bundleName], {
-  cwd: dist,
-  stdio: 'inherit'
-})
+/* `zip` ships with the CI runner and every mainstream Unix, but not with
+ * Windows, where Compress-Archive is the built-in equivalent. */
+const archivers = process.platform === 'win32'
+  ? [
+      ['powershell', ['-NoProfile', '-NonInteractive', '-Command',
+        `Compress-Archive -Path '${bundleName}' -DestinationPath '${archive}' -Force`]],
+      ['zip', ['-rq', archive, bundleName]]
+    ]
+  : [
+      ['zip', ['-rq', archive, bundleName]],
+      ['powershell', ['-NoProfile', '-NonInteractive', '-Command',
+        `Compress-Archive -Path '${bundleName}' -DestinationPath '${archive}' -Force`]]
+    ]
+
+let zipped
+for (const [command, args] of archivers) {
+  zipped = spawnSync(command, args, { cwd: dist, stdio: 'inherit' })
+  if (zipped.error?.code === 'ENOENT') continue
+  break
+}
 
 if (zipped.error) throw zipped.error
-if (zipped.status !== 0) throw new Error(`zip exited with status ${zipped.status}`)
+if (zipped.status !== 0) throw new Error(`archiving exited with status ${zipped.status}`)
 
 console.log(`Built dist/${archive}`)
