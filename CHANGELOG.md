@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 1.4.1 - 2026-09-04
+
+- Keep `src`, `center`, and `verse` blocks bulletless in both rendered and edit
+  states.
+
 ## 1.4.0 - 2026-09-04
 
 - Keep bullets visible for ordinary prose while hiding them for empty,
