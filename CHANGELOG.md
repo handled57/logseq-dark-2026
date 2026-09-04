@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here.
 
+## 1.3.0 - 2026-09-04
+
+- Accept any number of `key: value` pairs for property hiding instead of a
+  single key and a list of its values. A block renders bare when its rendered
+  properties match any one pair, so `type: foo, status: done, kind` now hides
+  three unrelated families of block at once. Pairs are separated by commas,
+  semicolons or newlines, and `key: *` (or a bare `key`) matches every value of
+  that key.
+- Replace the `Property key` / `Values that hide properties` settings with one
+  `Properties that hide the property table` field. A graph configured under
+  1.2.0 migrates its two old settings into the new field on first load, before
+  the schema default could overwrite them.
+- Resolve `data-hc-block-type` against the first configured key a block
+  carries, making configuration order the precedence order for the styling
+  hook.
+- Cover the entry script with behavioral tests: `test/properties.test.mjs`
+  runs `index.js` in a `vm` context against a stub host document and asserts
+  the attributes each pass writes.
+
 ## 1.2.0 - 2026-09-03
 
 - Hide a block's rendered property table when its `type` property matches a
