@@ -167,10 +167,11 @@ test('workbench selectors and accessibility fallbacks are present', () => {
 test('focused layout and nested-block behavior remain part of the theme', () => {
   assert.match(css, /\.cp__sidebar-main-content:not\(\[data-is-full-width="true"\]\)/)
   assert.match(css, /width:\s*80%/)
-  assert.match(css, /\.bullet-container:not\(\.typed-list\)/)
-  assert.match(css, /\.ls-block:hover:has\(\.ls-block:hover\)/)
+  assert.match(css, /\.ls-block\[data-hc-hide-bullet\] > \.block-main-container > \.block-control-wrap \.bullet-container:not\(\.typed-list\)\s*\{[\s\S]*?opacity:\s*0\s*!important/)
+  assert.doesNotMatch(css, /\.ls-block:hover:has\(\.ls-block:hover\)/)
+  assert.doesNotMatch(css, /\.ls-block:(?:hover|focus-within)\s*> \.block-main-container > \.block-control-wrap \.bullet-container:not\(\.typed-list\)/)
   assert.match(css, /\.ls-block:hover:not\(:has\(\.ls-block:hover\)\)/)
-  assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left-color:\s*transparent\s*!important/)
+  assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left:\s*0\s*!important[\s\S]*?background-color:\s*transparent\s*!important/)
 })
 
 test('interactive chrome stays black with one-pixel orange borders', () => {

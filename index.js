@@ -19,6 +19,23 @@ const doc = parent.document
 const STYLE_KEY = 'hc-hidden-properties'
 const HIDDEN_ATTR = 'data-hc-hidden'
 const TYPE_ATTR = 'data-hc-block-type'
+const BULLET_ATTR = 'data-hc-hide-bullet'
+
+const SPECIAL_CONTENT_SELECTOR = [
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  '.multiline-block.h1', '.multiline-block.h2', '.multiline-block.h3',
+  '.multiline-block.h4', '.multiline-block.h5', '.multiline-block.h6',
+  '.uniline-block.h1', '.uniline-block.h2', '.uniline-block.h3',
+  '.uniline-block.h4', '.uniline-block.h5', '.uniline-block.h6',
+  '.block-ref', '.block-reference',
+  '.embed', '.embed-block', '.embed-page', '.block-embed', '.page-embed',
+  '.macro', '.macro-renderer', '[data-macro-name]', '[data-slot-id]',
+  '.custom-query', '.query-result', '.references-blocks',
+  '.asset-container', '.asset-ref', 'audio', 'video', 'img', 'iframe',
+  'pre', '.cp__fenced-code-block', '.extensions__code', '.extensions__code-calc',
+  '.katex-display', '.slides', '.reveal', '.cards-review',
+  '.zotero-search', 'blockquote', '.admonitionblock'
+].join(', ')
 
 const RULES_SETTING = 'hiddenProperties'
 const DEFAULT_RULES = 'type: foo'
@@ -128,8 +145,50 @@ function blockType(active, properties) {
   return ''
 }
 
+function rawBlockContent(wrapper) {
+  const editor = wrapper.querySelector('textarea.block-editor, textarea')
+  return typeof editor?.value === 'string' ? editor.value.trim() : ''
+}
+
+function propertyFreeText(wrapper) {
+  if (typeof wrapper.cloneNode !== 'function') return wrapper.textContent?.trim() ?? ''
+
+  const copy = wrapper.cloneNode(true)
+  for (const properties of copy.querySelectorAll('.block-properties')) properties.remove()
+  return copy.textContent.trim()
+}
+
+function specialSource(text) {
+  if (!text) return true
+
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  const propertyOnly = lines.length > 0 && lines.every((line) => /^[\w.-]+::(?:\s|$)/.test(line))
+
+  return propertyOnly ||
+    /^(?:#{1,6}\s|>|```|~~~|\$\$|#\+BEGIN_)/i.test(text) ||
+    /^(?:\(\([^\n]+\)\)|\[\[[^\n]+\]\])$/.test(text) ||
+    /^\{\{[\s\S]+\}\}$/.test(text) ||
+    /^!\[[^\]]*\]\([^)]+\)$/.test(text) ||
+    /(?:^|\s)#card(?:\s|$)|(?:^|\n)card::|zotero/i.test(text)
+}
+
+function shouldHideBullet(block) {
+  const wrapper = block.querySelector(':scope > .block-main-container > .block-content-wrapper')
+  if (!wrapper) return true
+
+  const raw = rawBlockContent(wrapper)
+  if (raw) return specialSource(raw)
+  if (wrapper.querySelector(SPECIAL_CONTENT_SELECTOR)) return true
+  return propertyFreeText(wrapper) === ''
+}
+
 function paint() {
   const active = rules()
+
+  for (const block of doc.querySelectorAll('.ls-block')) {
+    if (shouldHideBullet(block)) block.setAttribute(BULLET_ATTR, '')
+    else block.removeAttribute(BULLET_ATTR)
+  }
 
   for (const table of doc.querySelectorAll('.block-properties')) {
     const properties = propertiesOf(table)

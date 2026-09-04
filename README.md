@@ -80,8 +80,8 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 ## Intentional layout choices
 
 - On desktop, ordinary pages use 80% of the available main column. Logseq's full-width route remains full width.
-- Untyped block bullets stay hidden until their block or an ancestor is hovered or focused.
-- The active block receives a steel-blue outline; matching ancestor bullets show its hierarchy without outlining every parent block.
+- Untyped bullets are always visible for ordinary prose blocks. Empty, property-only, heading, reference, embed, command/macro, query, media, code, namespace, math, ClojureScript-eval, slide, flashcard, Zotero, quote, and advanced `<`-menu blocks remain bulletless.
+- The active block receives a steel-blue outline; hovering a child never reveals or recolors ancestor bullets, and connector/thread lines remain hidden.
 
 ## Development
 
