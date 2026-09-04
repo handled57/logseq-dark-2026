@@ -246,9 +246,12 @@ test('the entry provides the one style rule that does the hiding', async () => {
   )
 })
 
-function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '' } = {}) {
+function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '', wrapperSelector = '' } = {}) {
   const wrapper = {
     textContent: text,
+    matches(selector) {
+      return wrapperSelector && selector.includes(wrapperSelector)
+    },
     querySelector(selector) {
       if (selector === 'textarea.block-editor, textarea') return raw ? { value: raw } : null
       return special || (renderedSelector && selector.includes(renderedSelector)) ? {} : null
@@ -314,6 +317,14 @@ test('rendered src, center, and verse blocks remain bulletless regardless of cus
       context.shouldHideBullet(bulletBlock({ text: 'rendered content', renderedSelector })),
       true,
       renderedSelector
+    )
+  }
+
+  for (const wrapperSelector of ['[style*="text-align: center"]', '[style*="text-align:center"]']) {
+    assert.equal(
+      context.shouldHideBullet(bulletBlock({ text: 'center', wrapperSelector })),
+      true,
+      `wrapper ${wrapperSelector}`
     )
   }
 })

@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 1.4.4 - 2026-09-04
+
+- Hide bullets when Logseq applies `#+BEGIN_CENTER` alignment directly to the
+  block content wrapper rather than to one of its descendants.
+
 ## 1.4.3 - 2026-09-04
 
 - Hide bullets on already-rendered Org `src`, `center`, and `verse` custom

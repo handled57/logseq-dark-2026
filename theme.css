@@ -466,6 +466,8 @@ hr {
 /* Rendered Org custom blocks expose their type in the content DOM. Keep this
  * CSS fallback independent of the behavior script so an already-rendered
  * block is bulletless even before its data attribute is painted. */
+.ls-block:has(> .block-main-container > .block-content-wrapper:is(.center, .CENTER, .org-center, [style*="text-align: center"], [style*="text-align:center"], .verse, .VERSE, .org-verse))
+  > .block-main-container > .block-control-wrap .bullet-container:not(.typed-list),
 .ls-block:has(> .block-main-container > .block-content-wrapper :is(.org-src-container, .src, .center, .CENTER, .org-center, [style*="text-align: center"], [style*="text-align:center"], .verse, .VERSE, .org-verse))
   > .block-main-container > .block-control-wrap .bullet-container:not(.typed-list) {
   opacity: 0 !important;

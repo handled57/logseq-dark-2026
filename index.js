@@ -180,6 +180,7 @@ function shouldHideBullet(block) {
 
   const raw = rawBlockContent(wrapper)
   if (raw) return specialSource(raw)
+  if (typeof wrapper.matches === 'function' && wrapper.matches(SPECIAL_CONTENT_SELECTOR)) return true
   if (wrapper.querySelector(SPECIAL_CONTENT_SELECTOR)) return true
   return propertyFreeText(wrapper) === ''
 }
