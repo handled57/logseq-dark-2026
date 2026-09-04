@@ -303,10 +303,10 @@ test('special source forms remain bulletless while editing', async () => {
   assert.equal(context.shouldHideBullet(bulletBlock({ raw: 'ordinary prose' })), false)
 })
 
-test('rendered src, center, and verse blocks remain bulletless', async () => {
+test('rendered src, center, and verse blocks remain bulletless regardless of custom-block case', async () => {
   const context = await render({}, [])
 
-  for (const renderedSelector of ['.org-src-container', '.org-center', '.org-verse']) {
+  for (const renderedSelector of ['.org-src-container', '.center', '.CENTER', '.org-center', '.verse', '.VERSE', '.org-verse']) {
     assert.equal(
       context.shouldHideBullet(bulletBlock({ text: 'rendered content', renderedSelector })),
       true,
