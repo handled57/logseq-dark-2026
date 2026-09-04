@@ -9,6 +9,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
 const marketplace = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'))
 const css = await readFile(resolve(root, 'theme.css'), 'utf8')
+const entry = await readFile(resolve(root, 'index.html'), 'utf8')
+const script = await readFile(resolve(root, 'index.js'), 'utf8')
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -41,13 +43,19 @@ test('the released version matches the newest changelog entry', async () => {
   assert.equal(pkg.version, latest[1], 'package.json version and changelog disagree')
 })
 
-test('package exposes one CSS-only dark theme', () => {
+test('package exposes one dark theme plus the property-hiding entry', () => {
   assert.equal(pkg.name, 'logseq-dark-high-contrast-theme')
   assert.equal(pkg.author, 'Peter Cole')
   assert.equal(pkg.repo, 'handled57/logseq-dark-2026')
-  assert.equal(pkg.effect, false)
+  // `effect` is load-bearing, not descriptive: a side-effect-free package has
+  // its entry rewritten to lsp://logseq.io/, a different origin from the host
+  // window, which puts `parent.document` out of reach.
+  assert.equal(pkg.effect, true)
   assert.equal(pkg.theme, true)
-  assert.equal(pkg.main, undefined)
+  assert.equal(pkg.main, 'index.html')
+  assert.equal(pkg.logseq.main, 'index.html')
+  // The SDK is vendored under lib/, so installing from a release needs no
+  // install step and no runtime dependency resolution.
   assert.deepEqual(pkg.dependencies, undefined)
   assert.equal(pkg.logseq.id, pkg.name)
   assert.equal(pkg.logseq.themes.length, 1)
@@ -59,12 +67,12 @@ test('package exposes one CSS-only dark theme', () => {
   })
 })
 
-test('marketplace metadata is classic-only and side-effect free', () => {
+test('marketplace metadata is classic-only and agrees with the package', () => {
   assert.equal(marketplace.id, pkg.name)
   assert.equal(marketplace.repo, pkg.repo)
   assert.equal(marketplace.author, pkg.author)
   assert.equal(marketplace.theme, true)
-  assert.equal(marketplace.effect, false)
+  assert.equal(marketplace.effect, pkg.effect)
   assert.equal(marketplace.web, false)
   assert.equal(marketplace.supportsDB, false)
   assert.equal(marketplace.supportsDBOnly, false)
@@ -76,6 +84,30 @@ test('canonical stylesheet and public screenshot exist', async () => {
   assert.equal(screenshot.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'screenshot is not a PNG')
   assert.ok(screenshot.length > 100_000, 'screenshot is unexpectedly small')
   await assert.rejects(access(resolve(root, 'custom.css'), constants.F_OK))
+})
+
+test('the plugin entry loads the vendored SDK before the property script', async () => {
+  const sdk = await readFile(resolve(root, 'lib', 'lsplugin.user.js'), 'utf8')
+  assert.ok(sdk.length > 10_000, 'the vendored SDK is unexpectedly small')
+
+  assert.match(entry, /<script src="\.\/lib\/lsplugin\.user\.js"><\/script>/)
+  assert.match(entry, /<script src="\.\/index\.js"><\/script>/)
+  assert.ok(
+    entry.indexOf('lsplugin.user.js') < entry.indexOf('index.js'),
+    'index.js runs before the SDK defines the logseq global'
+  )
+})
+
+test('the property script reads the host document and hides only its own table', () => {
+  assert.match(script, /parent\.document/)
+  assert.match(script, /\.block-properties\[\$\{HIDDEN_ATTR\}\] \{ display: none; \}/)
+  assert.match(script, /logseq\.ready\(main\)/)
+
+  /* Observing attributes would make each pass schedule the next one, and the
+   * sandbox iframe is never rendered, so its own rAF never fires. */
+  assert.match(script, /\{ childList: true, subtree: true \}/)
+  assert.doesNotMatch(script, /attributes:\s*true/)
+  assert.doesNotMatch(script, /(?<!parent\.)requestAnimationFrame/)
 })
 
 test('official High Contrast palette values remain exact', () => {
@@ -154,6 +186,34 @@ test('fenced code has a single outer border', () => {
   assert.match(css, /pre\s*>\s*code[\s\S]*?background:\s*transparent[\s\S]*?border:\s*0/)
 })
 
+test('workbench chrome is bordered in the contrast border, not white', () => {
+  // Panes, panels, sidebars and controls all draw their edges with
+  // --vscode-hc-border. Two declarations use a border property to paint
+  // something that is not chrome, and stay white on purpose.
+  const allowed = new Set([
+    '--ls-block-bullet-border-color: var(--vscode-hc-white)',
+    'border-left-color: var(--vscode-hc-white) !important'
+  ])
+
+  const offenders = (css.match(/[\w-]*border[\w-]*\s*:\s*[^;{}]*--vscode-hc-white[^;{}]*/g) ?? [])
+    .map((declaration) => declaration.replace(/\s+/g, ' ').trim())
+    .filter((declaration) => !allowed.has(declaration))
+
+  assert.deepEqual(offenders, [], 'chrome border is still painted white')
+
+  // The tokens the rest of the theme and Logseq's ShUI components read.
+  assert.equal(cssValue('--ls-border-color'), 'var(--vscode-hc-border)')
+  assert.equal(cssValue('--ls-left-sidebar-border-color'), 'var(--vscode-hc-border)')
+  assert.equal(cssValue('--ls-settings-header-border-color'), 'var(--vscode-hc-border)')
+  assert.equal(cssValue('--border'), '204 24% 47%')
+  assert.equal(cssValue('--input'), '204 24% 47%')
+
+  // The panes themselves.
+  assert.match(css, /\.left-sidebar-inner\s*\{[\s\S]*?border-right:\s*1px solid var\(--vscode-hc-border\)/)
+  assert.match(css, /\.cp__right-sidebar\s*\{[\s\S]*?border-left:\s*1px solid var\(--vscode-hc-border\)/)
+  assert.match(css, /\.cp__header\s*\{[\s\S]*?border-bottom:\s*1px solid var\(--vscode-hc-border\)/)
+})
+
 test('stylesheet is local, structurally balanced, and avoids global monospace', () => {
   assert.doesNotMatch(css, /@import\s+url\(/i)
   assert.doesNotMatch(css, /https?:\/\//i)
@@ -180,7 +240,9 @@ test('principal foreground/background pairs meet WCAG thresholds', () => {
     ['comment token', '#7ca668', '#000000', 4.5],
     ['warning text', '#ffff00', '#332a00', 4.5],
     ['error text', '#f48771', '#3b0d08', 4.5],
-    ['success text', '#b7d6a8', '#14240f', 4.5]
+    ['success text', '#b7d6a8', '#14240f', 4.5],
+    // A border is a non-text UI component, so 3:1 is the threshold it has to clear.
+    ['pane border', '#5b7e96', '#000000', 3]
   ]) {
     assert.ok(contrast(foreground, background) >= minimum, `${name} contrast is too low`)
   }
