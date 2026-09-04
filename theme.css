@@ -4,8 +4,17 @@
  * Canonical theme stylesheet for Logseq 0.10.15 classic/file graphs.
  */
 
+/* Logseq re-declares the whole `--ls-*` palette on
+ * `html[data-theme=dark][data-color=<accent>]` (0,2,1) and the `--lx-*` Radix
+ * scales on `html[data-color=<accent>] body` (0,1,2). A plain `:root` block
+ * (0,1,1) loses to both, so every variable below would be dead on arrival.
+ * `:root` on the `html` element is a pseudo-class, which lifts these selectors
+ * to (0,3,1)/(0,3,2) and puts the theme back in charge without relying on
+ * stylesheet order. */
 :root,
 html[data-theme="dark"],
+html[data-theme][data-color]:root,
+html[data-theme][data-color]:root body,
 .dark-theme {
   color-scheme: dark;
 
@@ -116,6 +125,7 @@ html[data-theme="dark"],
   --ls-right-sidebar-code-bg-color: var(--vscode-hc-panel);
   --ls-right-sidebar-topbar-color: var(--vscode-hc-black);
   --ls-left-sidebar-border-color: var(--vscode-hc-white);
+  --ls-left-sidebar-container-sm: var(--vscode-hc-black);
   --ls-left-sidebar-text-color: var(--vscode-hc-white);
   --ls-left-sidebar-bottom-gradient: linear-gradient(transparent, var(--vscode-hc-black));
   --ls-header-button-background: transparent;
@@ -160,6 +170,80 @@ html[data-theme="dark"],
   --ls-color-level-4: #282828;
   --ls-color-level-5: #333333;
   --ls-color-level-6: #3d3d3d;
+
+  /* Logseq nests embeds with the unprefixed `--color-level-*` tokens, whose
+   * stock dark values carry a green tint. Flatten them onto the black surface
+   * so embeds are separated by their border alone. */
+  --color-level-1: var(--vscode-hc-black);
+  --color-level-2: var(--vscode-hc-black);
+  --color-level-3: var(--vscode-hc-black);
+  --color-level-4: var(--vscode-hc-black);
+  --color-level-5: var(--vscode-hc-black);
+  --color-level-6: var(--vscode-hc-black);
+
+  /* Logseq consults the Radix `--lx-*` scales BEFORE `--ls-*` in roughly 130
+   * background declarations. They are undefined only while the default
+   * `logseq` accent is selected; every other accent defines all 24 gray tokens
+   * from an rx-mauve/slate/sage/olive/sand ramp, which would repaint the app in
+   * that accent's tint. Pinning the scales here keeps the palette stable no
+   * matter which accent the user picks in Settings.
+   * Radix scale positions: 1-2 page/subtle background, 3-5 component surfaces,
+   * 6-8 borders, 9-10 solid fills, 11-12 text. */
+  --lx-gray-01: var(--vscode-hc-black);
+  --lx-gray-02: var(--vscode-hc-panel);
+  --lx-gray-03: var(--vscode-hc-elevated);
+  --lx-gray-04: #1f1f1f;
+  --lx-gray-05: #282828;
+  --lx-gray-06: #333333;
+  --lx-gray-07: #3d3d3d;
+  --lx-gray-08: var(--vscode-hc-border);
+  --lx-gray-09: var(--vscode-hc-border);
+  --lx-gray-10: #7d9db4;
+  --lx-gray-11: var(--vscode-hc-muted);
+  --lx-gray-12: var(--vscode-hc-white);
+  --lx-gray-01-alpha: rgb(255 255 255 / 0%);
+  --lx-gray-02-alpha: rgb(255 255 255 / 4%);
+  --lx-gray-03-alpha: rgb(255 255 255 / 8%);
+  --lx-gray-04-alpha: rgb(255 255 255 / 12%);
+  --lx-gray-05-alpha: rgb(255 255 255 / 16%);
+  --lx-gray-06-alpha: rgb(255 255 255 / 20%);
+  --lx-gray-07-alpha: rgb(255 255 255 / 26%);
+  --lx-gray-08-alpha: rgb(91 126 150 / 80%);
+  --lx-gray-09-alpha: rgb(91 126 150 / 90%);
+  --lx-gray-10-alpha: rgb(125 157 180 / 92%);
+  --lx-gray-11-alpha: rgb(215 215 215 / 95%);
+  --lx-gray-12-alpha: rgb(255 255 255 / 100%);
+
+  /* The accent scale drives selection, hover, and search-match fills. Positions
+   * 1-6 stay on the theme's dark blue so text keeps white-on-dark contrast;
+   * 7-10 carry the orange active-border color. */
+  --lx-accent-01: var(--vscode-hc-black);
+  --lx-accent-02: #001019;
+  --lx-accent-03: #001d2e;
+  --lx-accent-04: #002a42;
+  --lx-accent-05: #003656;
+  --lx-accent-06: #003e6b;
+  --lx-accent-07: var(--vscode-hc-border);
+  --lx-accent-08: var(--vscode-hc-focus);
+  --lx-accent-09: var(--vscode-hc-focus);
+  --lx-accent-10: #ffa04d;
+  --lx-accent-11: var(--vscode-hc-bright-blue);
+  --lx-accent-12: var(--vscode-hc-white);
+  --lx-accent-01-alpha: rgb(0 62 107 / 8%);
+  --lx-accent-02-alpha: rgb(0 62 107 / 16%);
+  --lx-accent-03-alpha: rgb(0 62 107 / 28%);
+  --lx-accent-04-alpha: rgb(0 62 107 / 40%);
+  --lx-accent-05-alpha: rgb(0 62 107 / 55%);
+  --lx-accent-06-alpha: rgb(0 62 107 / 70%);
+  --lx-accent-07-alpha: rgb(91 126 150 / 60%);
+  --lx-accent-08-alpha: rgb(243 133 24 / 45%);
+  --lx-accent-09-alpha: rgb(243 133 24 / 80%);
+  --lx-accent-10-alpha: rgb(255 160 77 / 85%);
+  --lx-accent-11-alpha: rgb(26 235 255 / 90%);
+  --lx-accent-12-alpha: rgb(255 255 255 / 95%);
+
+  --lx-popover-bg: var(--vscode-hc-black);
+  --lx-pdf-container-dark-bg: var(--vscode-hc-black);
 
   /* PDF viewer and whiteboard surfaces */
   --ph-highlight-color-yellow: #5a5200;
@@ -445,10 +529,26 @@ a.tag:hover,
   color: var(--vscode-hc-cyan);
 }
 
+/* Logseq gives `.form-checkbox`/`.form-radio` a filled background and
+ * `border: none`, so the control has to be rebuilt as a bordered black box.
+ * Both the check and the dot glyphs are white SVGs, so they stay legible. */
 .form-checkbox,
-input[type="checkbox"] {
+.form-radio,
+input[type="checkbox"],
+input[type="radio"] {
   accent-color: var(--vscode-hc-white);
-  border-color: var(--vscode-hc-white) !important;
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+  border: 1px solid var(--vscode-hc-white) !important;
+}
+
+.form-checkbox:checked,
+.form-radio:checked,
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+  border-color: var(--vscode-hc-focus) !important;
 }
 
 .marker-switch,
@@ -584,12 +684,17 @@ blockquote {
   border-left: 4px solid var(--vscode-hc-border);
 }
 
+/* Upstream targets inline code as `:not(pre)>code`, which out-specifies a bare
+ * `code` selector, so the theme has to match that shape. */
 code,
 kbd,
-.inline-code {
+.inline-code,
+:root :not(pre) > code,
+:root :not(pre) > code.inline-code {
   color: var(--vscode-hc-string);
-  background: var(--vscode-hc-panel);
+  background-color: var(--vscode-hc-panel);
   border: 1px solid var(--vscode-hc-border);
+  border-radius: 2px;
 }
 
 pre > code,
@@ -665,8 +770,19 @@ th {
   background: var(--vscode-hc-black) !important;
 }
 
-tr:nth-child(even) td {
+/* Logseq stripes rows with `.block-content tr:nth-child(2n)`, which
+ * out-specifies `tr:nth-child(even) td`. */
+tr:nth-child(even) td,
+.block-content tr:nth-child(even),
+.cp__all_pages-content tr:nth-child(even),
+.cp__shortcut-page tr:nth-child(even) {
   background: var(--ls-table-tr-even-background-color);
+}
+
+.block-content tr:nth-child(odd),
+.cp__all_pages-content tr:nth-child(odd),
+.cp__shortcut-page tr:nth-child(odd) {
+  background: var(--vscode-hc-black);
 }
 
 .custom-query,
@@ -685,6 +801,12 @@ tr:nth-child(even) td {
   border-color: var(--vscode-hc-white) !important;
 }
 
+/* The real markup is `.datepicker td.available` / `th.available`; the
+ * `.datepicker-day` and react-datepicker class names never render in 0.10.x but
+ * are kept so the rule survives a markup change. */
+.datepicker td.available:hover,
+.datepicker th.available:hover,
+.datepicker td.active,
 .datepicker-day:hover,
 .react-datepicker__day:hover,
 .react-datepicker__day--selected {
@@ -930,16 +1052,29 @@ textarea.block-editor:focus {
 
 /* Content containers */
 .embed,
+.embed-block,
+.embed-page,
+.block-embed,
+.page-embed,
 .custom-query,
 .query-result,
 .references-blocks-item,
 .cards-review,
 .admonitionblock,
 .ui__card {
-  background: var(--vscode-hc-black);
+  background: var(--vscode-hc-black) !important;
   border: 1px solid var(--vscode-hc-border) !important;
   border-radius: 2px !important;
   box-shadow: none !important;
+}
+
+/* Blocks inside an embed keep the embed's own surface rather than stacking
+ * another level tint on top of it. */
+.embed-block .color-level,
+.embed-page .color-level,
+.embed .color-level,
+.color-level {
+  background-color: var(--vscode-hc-black) !important;
 }
 
 .embed-header,
@@ -1052,31 +1187,183 @@ body[data-awpr-block-props-icons] .block-properties .page-property-key::before {
   opacity: 1;
 }
 
+/* Screens that carry no other theme rule ---------------------------------- */
+
+/* These panels paint themselves from the Radix scales or from
+ * `--ls-*-background-color` directly. The variable layer above already fixes
+ * most of them; the explicit declarations keep them correct even when a plugin
+ * or a future release raises the upstream specificity again. */
+.cp__all_pages .actions,
+.cp__settings-inner aside,
+.cp__shortcut-conflicts-list-wrap > section,
+.cp__shortcut-page-x,
+.cp__shortcut-page-x-pane-controls .keyboard-filter .keyboard-filter-record > h2,
+.cp__onboarding-setups .inner-card > article.importer,
+.cp__onboarding-setups .inner-card > article > section.a,
+.cp__onboarding-quick-tour.shepherd-element,
+.cp__sidebar-help-btn > .inner,
+.cp__sidebar-help-menu-popup,
+.dashboard-bg-card,
+.dashboard-create-card,
+.dashboard-card-title {
+  color: var(--vscode-hc-white);
+  background-color: var(--vscode-hc-black) !important;
+}
+
+.cp__shortcut-page-x > article > ul li.th,
+.cp__onboarding-setups label.action-input {
+  background-color: var(--vscode-hc-panel) !important;
+}
+
+.cp__sidebar-help-menu-popup,
+.cp__onboarding-quick-tour.shepherd-element,
+.dashboard-create-card,
+.dashboard-bg-card {
+  border: 1px solid var(--vscode-hc-border) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+.cp__sidebar-help-menu-popup > .list-wrap .it:hover,
+.cp__sidebar-help-menu-popup > .list-wrap .it:active,
+.cp__settings-inner aside > ul > li.active,
+.cp__settings-inner .settings-menu-item:hover {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+  outline: 2px solid var(--vscode-hc-focus);
+  outline-offset: -2px;
+}
+
+/* The installed-themes list hovers through an accent-scoped selector, so the
+ * override has to carry the same `html[data-theme][data-color]` prefix. */
+.cp__themes-installed .it.is-active,
+.cp__themes-installed .it:hover,
+html[data-theme][data-color] .cp__themes-installed .it:hover {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+  outline: 2px solid var(--vscode-hc-focus);
+  outline-offset: -2px;
+}
+
+/* The PDF viewer redefines its own background token on the container element,
+ * so a root-level value alone would not reach it. */
+.extensions__pdf-container[data-theme],
+.extensions__pdf-container[data-theme] .textLayer,
+.extensions__pdf-settings-item.theme-picker > button.dark {
+  --lx-pdf-container-dark-bg: var(--vscode-hc-black);
+  background-color: var(--vscode-hc-black) !important;
+}
+
+/* Search and command-palette match highlighting shares `mark`'s treatment. */
+.ui__list-item-highlighted-span {
+  color: var(--vscode-hc-black) !important;
+  background-color: var(--vscode-hc-yellow) !important;
+}
+
+.ui__button-shortcut-key {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+  border: 1px solid var(--vscode-hc-border);
+  border-radius: 2px;
+}
+
+/* Bullets keep a faint halo instead of the solid disc the stock fallback
+ * (`--ls-block-bullet-border-color`) would paint. */
+.bullet-container:not(.typed-list),
+.bullet-container:not(.typed-list).bullet-closed,
+.bullet-link-wrap:hover > .bullet-container {
+  background-color: rgb(255 255 255 / 12%);
+}
+
+.bullet-container:not(.typed-list).bullet-closed {
+  background-color: rgb(255 255 255 / 30%);
+}
+
+/* Logseq's own CodeMirror skin, used by the query builder and code blocks. */
+.cm-s-lsradix.cm-s-dark,
+.cm-s-lsradix.cm-s-light,
+.dark .cm-s-lsradix.cm-s-dark {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+}
+
+.cm-s-lsradix .CodeMirror-gutters,
+.cm-s-lsradix.cm-s-dark .CodeMirror-gutters {
+  background-color: var(--vscode-hc-black) !important;
+  border-right: 1px solid var(--vscode-hc-border) !important;
+}
+
+.cm-s-lsradix.cm-s-dark div.CodeMirror-selected,
+.cm-s-lsradix.cm-s-light div.CodeMirror-selected,
+.cm-s-lsradix.cm-s-dark .CodeMirror-line::selection,
+.cm-s-lsradix.cm-s-dark .CodeMirror-line::-moz-selection,
+.cm-s-lsradix.cm-s-dark.CodeMirror ::selection,
+.cm-s-lsradix.cm-s-dark.CodeMirror ::-moz-selection {
+  background: #264f78 !important;
+}
+
+.cm-s-lsradix .CodeMirror-cursor {
+  border-left-color: var(--vscode-hc-white) !important;
+}
+
+.cm-s-lsradix .cm-fat-cursor .CodeMirror-cursor,
+.cm-s-lsradix.cm-fat-cursor .CodeMirror-cursor {
+  background: var(--vscode-hc-focus) !important;
+}
+
 /* Scrollbars stay visible without dominating the page. */
 * {
   scrollbar-color: var(--vscode-hc-white) var(--vscode-hc-black);
 }
 
-::-webkit-scrollbar {
+/* Logseq scopes its own scrollbar rules under `.visible-scrollbar` and
+ * `html.custom-scrollbar`, which out-specify the bare pseudo-elements. */
+::-webkit-scrollbar,
+.visible-scrollbar ::-webkit-scrollbar,
+html.custom-scrollbar ::-webkit-scrollbar {
   width: 12px;
   height: 12px;
-  background: var(--vscode-hc-black);
+  background-color: var(--vscode-hc-black);
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--vscode-hc-white);
+::-webkit-scrollbar-thumb,
+.visible-scrollbar ::-webkit-scrollbar-thumb,
+html.custom-scrollbar ::-webkit-scrollbar-thumb {
+  background-color: var(--vscode-hc-white);
   border: 3px solid var(--vscode-hc-black);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--vscode-hc-focus);
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active,
+.visible-scrollbar ::-webkit-scrollbar-thumb:hover,
+.visible-scrollbar ::-webkit-scrollbar-thumb:active,
+html.custom-scrollbar ::-webkit-scrollbar-thumb:hover,
+html.custom-scrollbar ::-webkit-scrollbar-thumb:active {
+  background-color: var(--vscode-hc-focus);
+}
+
+::-webkit-scrollbar-corner,
+.visible-scrollbar ::-webkit-scrollbar-corner,
+html.custom-scrollbar ::-webkit-scrollbar-corner {
+  background: var(--vscode-hc-black);
 }
 
 /* Windows forced-colors users keep the platform's own contrast choices. */
 @media (forced-colors: active) {
   :root,
   html[data-theme="dark"],
+  html[data-theme][data-color]:root,
+  html[data-theme][data-color]:root body,
   .dark-theme {
+    --lx-gray-01: Canvas;
+    --lx-gray-02: Canvas;
+    --lx-gray-03: Canvas;
+    --lx-gray-11: CanvasText;
+    --lx-gray-12: CanvasText;
+    --lx-accent-01: Canvas;
+    --lx-accent-09: Highlight;
+    --lx-popover-bg: Canvas;
+    --lx-pdf-container-dark-bg: Canvas;
     --ls-primary-background-color: Canvas;
     --ls-primary-text-color: CanvasText;
     --ls-border-color: CanvasText;

@@ -16,11 +16,11 @@ A CSS-only Logseq theme that adapts the visual language of Visual Studio Code's 
 
 ## Compatibility
 
-Version 1.0.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
+Version 1.1.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
 
 - DB graphs are not supported in this release.
 - Mobile is not an advertised target; narrow desktop windows receive a layout smoke test.
-- Logseq accent colors are overridden so the High Contrast palette stays consistent.
+- Logseq accent colors are overridden, including the Radix `--lx-*` scales the app reads ahead of its own theme variables, so the High Contrast palette stays consistent whichever accent is selected in Settings.
 - Host-DOM surfaces from Awesome UI, Awesome Props, Full House, Panel Coloring, and Toolbar Enhance receive a compatibility smoke test. A plugin rendered inside its own iframe remains responsible for its own colors.
 
 ## Install from the Logseq Marketplace
@@ -55,7 +55,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 
 - On desktop, ordinary pages use 80% of the available main column. Logseq's full-width route remains full width.
 - Untyped block bullets stay hidden until their block or an ancestor is hovered or focused.
-- The active block receives a cyan outline; cyan ancestor bullets show its hierarchy without outlining every parent block.
+- The active block receives a steel-blue outline; matching ancestor bullets show its hierarchy without outlining every parent block.
 
 ## Development
 
@@ -68,6 +68,12 @@ npm run verify:release
 ```
 
 `npm run build` creates a self-contained marketplace ZIP in `dist/`. The theme itself has no production dependencies.
+
+Logseq resolves backgrounds through `var(--lx-…, var(--ls-…, var(--rx-…)))` and re-declares both layers per accent color, so a theme rule only lands when it out-ranks the upstream selector. `test/cascade.test.mjs` asserts that pairing for each surface the theme replaces. Point `LOGSEQ_CSS` at an installed `style.css` to also check the pinned upstream selectors against the shipping app:
+
+```sh
+LOGSEQ_CSS=/path/to/Logseq/resources/app/css/style.css npm test
+```
 
 ## Accessibility
 
