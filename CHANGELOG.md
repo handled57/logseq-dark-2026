@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 1.4.3 - 2026-09-04
+
+- Hide bullets on already-rendered Org `src`, `center`, and `verse` custom
+  blocks directly from their rendered markers, including the inline text
+  alignment Logseq emits for `#+BEGIN_CENTER`.
+
 ## 1.4.2 - 2026-09-04
 
 - Recognize the uppercase CSS classes emitted by mldoc for rendered
