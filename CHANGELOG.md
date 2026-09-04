@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## 1.2.0 - 2026-09-03
+
+- Hide a block's rendered property table when its `type` property matches a
+  configured value, so tagged blocks render as bare content. Clicking into the
+  block still shows the content and its properties as source, because Logseq
+  swaps the whole rendered block for a textarea over the raw block content.
+- Turn the package from a CSS-only theme into a theme that also ships an entry
+  script. `effect` is now `true`, which is what keeps the entry on the host's
+  `file://` origin; a side-effect-free package is served from
+  `lsp://logseq.io/` and cannot read the host document.
+- Expose `data-hc-block-type` on every block that carries the configured
+  property, as a styling hook for rules keyed to a block's type.
+- Vendor `@logseq/libs` under `lib/` so a release installs with no build or
+  install step, and ship it through the release archive gate.
+- Repaint the workbench chrome in the `#5b7e96` contrast border instead of
+  white: both sidebars, the header and right-sidebar topbar, panels, menus,
+  modals, notifications, tooltips, tables, code blocks, the settings and
+  command-palette surfaces, and the resting borders of buttons, inputs and
+  checkboxes. The ShUI `--border` / `--input` tokens move to the same color.
+  Bullets, the editor caret, text and the orange focus ring are unchanged.
+
 ## 1.1.0 - 2026-09-03
 
 - Raise the variable block to `html[data-theme][data-color]:root`, so the theme's

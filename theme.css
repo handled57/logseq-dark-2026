@@ -59,8 +59,8 @@ html[data-theme][data-color]:root body,
   --accent-foreground: 0 0% 0%;
   --destructive: 9 87% 70%;
   --destructive-foreground: 0 0% 0%;
-  --border: 0 0% 100%;
-  --input: 0 0% 100%;
+  --border: 204 24% 47%;
+  --input: 204 24% 47%;
   --ring: 29 90% 52%;
   --radius: 2px;
 
@@ -82,7 +82,7 @@ html[data-theme][data-color]:root body,
   --ls-block-properties-background-color: var(--vscode-hc-panel);
   --ls-page-properties-background-color: var(--vscode-hc-panel);
   --ls-search-background-color: var(--vscode-hc-black);
-  --ls-border-color: var(--vscode-hc-white);
+  --ls-border-color: var(--vscode-hc-border);
   --ls-secondary-border-color: var(--vscode-hc-border);
   --ls-tertiary-border-color: var(--vscode-hc-muted);
   --ls-guideline-color: var(--vscode-hc-white);
@@ -107,7 +107,7 @@ html[data-theme][data-color]:root body,
   --ls-selection-background-color: var(--vscode-hc-white);
   --ls-selection-text-color: var(--vscode-hc-black);
   --ls-page-checkbox-color: var(--vscode-hc-black);
-  --ls-page-checkbox-border-color: var(--vscode-hc-white);
+  --ls-page-checkbox-border-color: var(--vscode-hc-border);
   --ls-page-blockquote-color: var(--vscode-hc-white);
   --ls-page-blockquote-bg-color: var(--vscode-hc-panel);
   --ls-page-blockquote-border-color: var(--vscode-hc-border);
@@ -124,7 +124,7 @@ html[data-theme][data-color]:root body,
   --ls-a-chosen-bg: var(--vscode-hc-black);
   --ls-right-sidebar-code-bg-color: var(--vscode-hc-panel);
   --ls-right-sidebar-topbar-color: var(--vscode-hc-black);
-  --ls-left-sidebar-border-color: var(--vscode-hc-white);
+  --ls-left-sidebar-border-color: var(--vscode-hc-border);
   --ls-left-sidebar-container-sm: var(--vscode-hc-black);
   --ls-left-sidebar-text-color: var(--vscode-hc-white);
   --ls-left-sidebar-bottom-gradient: linear-gradient(transparent, var(--vscode-hc-black));
@@ -135,7 +135,7 @@ html[data-theme][data-color]:root body,
   --ls-create-button-color-focus: var(--vscode-hc-focus);
   --ls-create-button-color-sm: var(--vscode-hc-black);
   --ls-create-button-color-sm-focus: var(--vscode-hc-focus);
-  --ls-settings-header-border-color: var(--vscode-hc-white);
+  --ls-settings-header-border-color: var(--vscode-hc-border);
   --ls-notification-background: var(--vscode-hc-black);
   --ls-notification-text-color: var(--vscode-hc-white);
   --ls-error-background-color: #3b0d08;
@@ -351,7 +351,7 @@ h6,
 }
 
 hr {
-  border-color: var(--vscode-hc-white);
+  border-color: var(--vscode-hc-border);
 }
 
 /* Workbench chrome */
@@ -368,15 +368,15 @@ hr {
 .left-sidebar-inner,
 .cp__right-sidebar,
 .cp__right-sidebar .sidebar-item-list {
-  border-color: var(--vscode-hc-white) !important;
+  border-color: var(--vscode-hc-border) !important;
 }
 
 .left-sidebar-inner {
-  border-right: 1px solid var(--vscode-hc-white);
+  border-right: 1px solid var(--vscode-hc-border);
 }
 
 .cp__right-sidebar {
-  border-left: 1px solid var(--vscode-hc-white);
+  border-left: 1px solid var(--vscode-hc-border);
 }
 
 .left-sidebar-inner .nav-content-item,
@@ -539,7 +539,7 @@ input[type="radio"] {
   accent-color: var(--vscode-hc-white);
   color: var(--vscode-hc-white) !important;
   background-color: var(--vscode-hc-black) !important;
-  border: 1px solid var(--vscode-hc-white) !important;
+  border: 1px solid var(--vscode-hc-border) !important;
 }
 
 .form-checkbox:checked,
@@ -588,7 +588,7 @@ textarea.block-editor {
   color: var(--vscode-hc-white) !important;
   caret-color: var(--vscode-hc-white);
   background: var(--vscode-hc-black) !important;
-  border-color: var(--vscode-hc-white) !important;
+  border-color: var(--vscode-hc-border) !important;
 }
 
 textarea::placeholder,
@@ -603,7 +603,7 @@ button,
 .form-button {
   color: var(--vscode-hc-white);
   background: var(--vscode-hc-black);
-  border: 1px solid var(--vscode-hc-white);
+  border: 1px solid var(--vscode-hc-border);
 }
 
 button:hover,
@@ -626,7 +626,7 @@ button:disabled,
 #create-button {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
-  border: 1px solid var(--vscode-hc-white) !important;
+  border: 1px solid var(--vscode-hc-border) !important;
 }
 
 #create-button:hover,
@@ -649,7 +649,7 @@ button:disabled,
 .notifications .notification-area {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
-  border: 1px solid var(--vscode-hc-white) !important;
+  border: 1px solid var(--vscode-hc-border) !important;
   box-shadow: none !important;
 }
 
@@ -712,7 +712,7 @@ pre.code,
 .hljs {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
-  border: 1px solid var(--vscode-hc-white);
+  border: 1px solid var(--vscode-hc-border);
 }
 
 .cm-comment,
@@ -762,7 +762,7 @@ pre.code,
 table,
 th,
 td {
-  border-color: var(--vscode-hc-white) !important;
+  border-color: var(--vscode-hc-border) !important;
 }
 
 th {
@@ -798,7 +798,7 @@ tr:nth-child(even) td,
 .graph-filters {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
-  border-color: var(--vscode-hc-white) !important;
+  border-color: var(--vscode-hc-border) !important;
 }
 
 /* The real markup is `.datepicker td.available` / `th.available`; the
@@ -821,7 +821,7 @@ tr:nth-child(even) td,
 /* Title bar and command/search affordances */
 #head,
 .cp__header {
-  border-bottom: 1px solid var(--vscode-hc-white);
+  border-bottom: 1px solid var(--vscode-hc-border);
   box-shadow: none !important;
 }
 
@@ -904,11 +904,11 @@ tr:nth-child(even) td,
 .left-sidebar-inner a.item[aria-current="page"] {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
-  border-color: var(--vscode-hc-white);
+  border-color: var(--vscode-hc-border);
 }
 
 .left-sidebar-inner .nav-contents-container.is-scrolled {
-  border-top-color: var(--vscode-hc-white);
+  border-top-color: var(--vscode-hc-border);
 }
 
 /* Panel-like right sidebar */
@@ -919,7 +919,7 @@ tr:nth-child(even) td,
 }
 
 .cp__right-sidebar-topbar {
-  border-bottom: 1px solid var(--vscode-hc-white);
+  border-bottom: 1px solid var(--vscode-hc-border);
   box-shadow: none !important;
 }
 
@@ -957,7 +957,7 @@ tr:nth-child(even) td,
 .absolute-modal[data-modal-name] {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
-  border: 1px solid var(--vscode-hc-white) !important;
+  border: 1px solid var(--vscode-hc-border) !important;
   border-radius: 2px !important;
   box-shadow: none !important;
   opacity: 1 !important;
@@ -966,7 +966,7 @@ tr:nth-child(even) td,
 .cp__cmdk .form-input,
 .cp__cmdk [cmdk-input] {
   border: 0 !important;
-  border-bottom: 1px solid var(--vscode-hc-white) !important;
+  border-bottom: 1px solid var(--vscode-hc-border) !important;
   border-radius: 0 !important;
   opacity: 1 !important;
 }
@@ -974,7 +974,7 @@ tr:nth-child(even) td,
 .cp__cmdk > .hints {
   color: var(--vscode-hc-muted);
   background: var(--vscode-hc-panel) !important;
-  border-top-color: var(--vscode-hc-white) !important;
+  border-top-color: var(--vscode-hc-border) !important;
 }
 
 [cmdk-item],
@@ -1009,7 +1009,7 @@ tr:nth-child(even) td,
 .cp__plugins-settings > header,
 .cp__plugins-settings-inner .heading-item,
 .settings-modal .heading-item {
-  border-color: var(--vscode-hc-white) !important;
+  border-color: var(--vscode-hc-border) !important;
 }
 
 .cp__plugins-settings-inner .desc-item:hover,
@@ -1047,7 +1047,7 @@ textarea.block-editor:focus {
 [data-state="unchecked"].ui__toggle {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
-  outline: 1px solid var(--vscode-hc-white);
+  outline: 1px solid var(--vscode-hc-border);
 }
 
 /* Content containers */
@@ -1092,7 +1092,7 @@ mark {
 kbd {
   color: var(--vscode-hc-white);
   background: var(--vscode-hc-black);
-  border-color: var(--vscode-hc-white);
+  border-color: var(--vscode-hc-border);
   border-radius: 2px;
   box-shadow: none;
 }
@@ -1102,7 +1102,7 @@ kbd {
 .notifications .notification-area {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
-  border: 1px solid var(--vscode-hc-white) !important;
+  border: 1px solid var(--vscode-hc-border) !important;
   border-radius: 2px !important;
   box-shadow: none !important;
 }
@@ -1124,7 +1124,7 @@ kbd {
 .whiteboard-page-title {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
-  border-color: var(--vscode-hc-white) !important;
+  border-color: var(--vscode-hc-border) !important;
   border-radius: 2px !important;
   box-shadow: none !important;
 }
@@ -1164,7 +1164,7 @@ kbd {
 .panel-content {
   color: var(--vscode-hc-white);
   background: var(--vscode-hc-black);
-  border-color: var(--vscode-hc-white) !important;
+  border-color: var(--vscode-hc-border) !important;
   box-shadow: none !important;
 }
 
