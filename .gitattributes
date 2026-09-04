@@ -1,0 +1,18 @@
+# The repository is authored on Windows and built on Linux CI, and `core.autocrlf`
+# is a per-clone setting rather than a property of the project. Without this file
+# a Windows commit renormalizes whatever it happens to touch, so an unrelated
+# one-line change arrives as a whole-file diff. Store text as LF for everyone.
+* text=auto eol=lf
+
+# theme.css is compared byte-for-byte against the copy inside the release archive
+# by scripts/verify-release.mjs, so its checkout must not vary by platform.
+*.css text eol=lf
+*.js  text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.md  text eol=lf
+*.yml text eol=lf
+*.svg text eol=lf
+
+*.png binary
+*.zip binary
