@@ -1,6 +1,6 @@
 {
   "name": "logseq-dark-high-contrast-theme",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "A Logseq port of Visual Studio Code's Dark High Contrast workbench.",
   "author": "Peter Cole",
   "license": "MIT",
@@ -19,7 +19,7 @@
     "vscode"
   ],
   "scripts": {
-    "test": "node --test test/theme.test.mjs test/cascade.test.mjs",
+    "test": "node --test test/theme.test.mjs test/cascade.test.mjs test/properties.test.mjs",
     "build": "node scripts/build-release.mjs",
     "verify:release": "node scripts/verify-release.mjs",
     "check": "npm test && npm run build && npm run verify:release"

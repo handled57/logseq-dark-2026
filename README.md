@@ -12,27 +12,37 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Compact workbench treatment for the header, sidebars, command palette, menus, dialogs, and settings.
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
-- Optionally hides the property table on blocks of a chosen type (see below).
+- Optionally hides the property table on blocks matching any number of property pairs (see below).
 - No build runtime, tracking, remote imports, or network access.
 
-## Hiding properties by type
+## Hiding properties by property value
 
-Blocks whose `type` property matches a configured value render as bare content: the whole property table is hidden. Clicking into such a block still shows its content *and* its properties as source, because Logseq replaces the entire rendered block with a textarea over the raw block content, and custom properties are part of that content — nothing needs to be un-hidden.
+Blocks whose rendered properties match any one of the configured `key: value` pairs render as bare content: the whole property table is hidden. Clicking into such a block still shows its content *and* its properties as source, because Logseq replaces the entire rendered block with a textarea over the raw block content, and custom properties are part of that content — nothing needs to be un-hidden.
 
-Configure it in **Plugins → Dark High Contrast → Settings**:
+Configure it in **Plugins → Dark High Contrast → Settings** under **Properties that hide the property table**. The field takes any number of pairs, separated by commas, semicolons or newlines:
 
-- **Property key** — the property that decides the treatment. Defaults to `type`; leave it empty to render every block normally.
-- **Values that hide properties** — comma-separated values of that property. Defaults to `foo`. Use `*` to hide properties on every block carrying the key.
+```text
+type: foo, status: done, kind: reference
+```
 
-Every block carrying the key also gets `data-hc-block-type` set to that property's value, so `theme.css` can key rules to a block's type:
+- A block is hidden as soon as it matches **any one** pair; the same key may appear as often as you like (`type: foo, type: bar`).
+- Keys and values are matched case-insensitively against the rendered property table.
+- `key: *`, or a bare `key` with no value, matches every value of that key.
+- Leave the field empty to render every block normally.
+
+The default is `type: foo`. A graph configured under 1.2.0 keeps its behavior: the old **Property key** and **Values that hide properties** settings are folded into this field the first time 1.3.0 loads.
+
+Every block carrying one of the configured keys also gets `data-hc-block-type` set to that property's value, so `theme.css` can key rules to a block's type:
 
 ```css
 .ls-block[data-hc-block-type="foo"] .block-content { opacity: 0.8; }
 ```
 
+When a block carries more than one configured key, the first key in the settings field wins, so configuration order is precedence order.
+
 ## Compatibility
 
-Version 1.2.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
+Version 1.3.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
 
 - DB graphs are not supported in this release.
 - Mobile is not an advertised target; narrow desktop windows receive a layout smoke test.
