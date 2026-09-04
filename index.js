@@ -32,7 +32,8 @@ const SPECIAL_CONTENT_SELECTOR = [
   '.macro', '.macro-renderer', '[data-macro-name]', '[data-slot-id]',
   '.custom-query', '.query-result', '.references-blocks',
   '.asset-container', '.asset-ref', 'audio', 'video', 'img', 'iframe',
-  'pre', '.cp__fenced-code-block', '.extensions__code', '.extensions__code-calc',
+  'pre', '.src', '.org-src-container', '.cp__fenced-code-block', '.extensions__code', '.extensions__code-calc',
+  'center', '.center', '.org-center', '.verse', '.org-verse',
   '.katex-display', '.slides', '.reveal', '.cards-review',
   '.zotero-search', 'blockquote', '.admonitionblock'
 ].join(', ')

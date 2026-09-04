@@ -246,12 +246,12 @@ test('the entry provides the one style rule that does the hiding', async () => {
   )
 })
 
-function bulletBlock({ raw = '', text = '', special = false } = {}) {
+function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '' } = {}) {
   const wrapper = {
     textContent: text,
     querySelector(selector) {
       if (selector === 'textarea.block-editor, textarea') return raw ? { value: raw } : null
-      return special ? {} : null
+      return special || (renderedSelector && selector.includes(renderedSelector)) ? {} : null
     },
     cloneNode() {
       return {
@@ -291,6 +291,9 @@ test('special source forms remain bulletless while editing', async () => {
     '$$x^2$$',
     '> quotation',
     '#+BEGIN_QUOTE\nquotation\n#+END_QUOTE',
+    '#+BEGIN_SRC clojure\n(+ 1 2)\n#+END_SRC',
+    '#+BEGIN_CENTER\ncentered text\n#+END_CENTER',
+    '#+BEGIN_VERSE\na line of verse\n#+END_VERSE',
     'prompt #card'
   ]
 
@@ -298,4 +301,16 @@ test('special source forms remain bulletless while editing', async () => {
     assert.equal(context.shouldHideBullet(bulletBlock({ raw })), true, raw)
   }
   assert.equal(context.shouldHideBullet(bulletBlock({ raw: 'ordinary prose' })), false)
+})
+
+test('rendered src, center, and verse blocks remain bulletless', async () => {
+  const context = await render({}, [])
+
+  for (const renderedSelector of ['.org-src-container', '.org-center', '.org-verse']) {
+    assert.equal(
+      context.shouldHideBullet(bulletBlock({ text: 'rendered content', renderedSelector })),
+      true,
+      renderedSelector
+    )
+  }
 })
