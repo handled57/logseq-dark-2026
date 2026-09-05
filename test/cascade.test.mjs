@@ -233,7 +233,7 @@ test('the passage undoes the page-highlight treatment upstream gives a mark', ()
   assert.ok(rule, '.block-body > .passage mark is missing')
 
   for (const [property, value] of [
-    ['color', 'var(--vscode-hc-orange)'],
+    ['color', 'var(--vscode-hc-cyan)'],
     ['background', 'transparent'],
     ['padding', '0']
   ]) {

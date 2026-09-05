@@ -38,7 +38,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 | `#7ca668` | `--vscode-hc-green` | Comments and idle file-sync status. |
 | `#ce9178` | `--vscode-hc-string` | Inline code and string syntax. |
 | `#c586c0` | `--vscode-hc-purple` | Purple whiteboard strokes and syntax accents. |
-| `#9cdcfe` | `--vscode-hc-cyan` | Page and block references and variable/property syntax. |
+| `#9cdcfe` | `--vscode-hc-cyan` | Page and block references, passage icons and verse numbers, and variable/property syntax. |
 | `#4ec9b0` | `--vscode-hc-type` | Type and class-name syntax. |
 | `#ffff00` | `--vscode-hc-yellow` | Clozes, marks, search matches, warnings, pending sync, and operators. |
 | `#f48771` | `--vscode-hc-error` | Errors, destructive states, failed sync, and red whiteboard strokes. |
@@ -246,7 +246,7 @@ Three checkboxes under the reference field decide how that text is written. Each
 | Option | Writes |
 | --- | --- |
 | **View chapter headings** | `**Genesis 1**` above the verses of every chapter the passage includes, under the book's long name — a single chapter and a partial chapter are headed too |
-| **View verse numbers** | each verse number as a superscript against the front of its own verse, in the theme's orange: `¹⁶For God so loved…` |
+| **View verse numbers** | each verse number as a superscript against the front of its own verse, in the theme's cyan, the color of the passage's own icon: `¹⁶For God so loved…` |
 | **One verse per line** | every verse on a new line, with the line breaks inside a verse left exactly where the edition put them |
 
 All three open unchecked every time the prompt does: they describe the passage in front of you rather than the next one. With none of them checked the passage is written exactly as it is described above.

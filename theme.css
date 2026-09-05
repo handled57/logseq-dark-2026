@@ -1228,7 +1228,7 @@ textarea.block-editor:focus {
  * zero until the block earns it below: every rule here is inert at zero, which
  * is what leaves a passage of running prose with its numbers inline. */
 .block-body > .passage mark {
-  color: var(--vscode-hc-orange);
+  color: var(--vscode-hc-cyan);
   background: transparent;
   padding: 0;
   display: inline-block;
