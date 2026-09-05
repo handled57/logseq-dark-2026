@@ -276,6 +276,75 @@ test('focused layout and nested-block behavior remain part of the theme', () => 
   assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left:\s*0\s*!important[\s\S]*?background-color:\s*transparent\s*!important/)
 })
 
+/* The bullet rail: every block in the page's own tree hangs its bullet on one
+ * vertical line. cascade.test.mjs checks the arithmetic that places it; these
+ * are the rules about where the rail is allowed to reach and what it shows. */
+const railScope =
+  'main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)'
+const railRules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)]
+  .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
+  .filter(([selector]) => selector.includes('#main-content-container .page-blocks-inner'))
+
+test('the rail reaches the page tree in the main editor and nothing else', () => {
+  assert.ok(railRules.length >= 20, 'the rail is missing from the stylesheet')
+
+  for (const [selector] of railRules) {
+    for (const part of selector.split(', ')) {
+      // Sidebars, whiteboards and dialogs render outside the main editor; the
+      // right-hand fold button and document mode re-measure the indentation the
+      // rail is drawn from. All four are out of reach by construction.
+      assert.ok(part.startsWith(railScope), `a rail rule escapes the main editor: "${part.slice(0, 60)}…"`)
+      // Embedded and queried trees render inside a block's content and keep
+      // Logseq's own layout rather than being pulled onto the page's rail.
+      assert.ok(
+        part.includes('.ls-block:not(.block-content-wrapper *)'),
+        `a rail rule reaches an embedded tree: "${part.slice(0, 60)}…"`
+      )
+    }
+  }
+
+  for (const surface of ['.cp__right-sidebar', '#right-sidebar', '.ui__modal', '.whiteboard', '.references']) {
+    assert.ok(
+      railRules.every(([selector]) => !selector.includes(surface)),
+      `the rail names ${surface}, which is not the primary editor`
+    )
+  }
+})
+
+test('every rendered block in the main editor keeps a bullet on the rail', () => {
+  const wrapSelector =
+    `${railScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap`
+  const declarations = (selector) => {
+    const found = railRules.find(([candidate]) => candidate === selector)
+    assert.ok(found, `no rail rule for "${selector}"`)
+    return found[1]
+  }
+
+  // The bullets the theme hides elsewhere — code, centered text, verse,
+  // passages, empty blocks — are all part of the rail.
+  assert.match(declarations(`${wrapSelector} .bullet-container`), /opacity:\s*1\s*!important/)
+
+  // The control column spans its row so the rail line can run the height of a
+  // block, and the bullet stays on the row's first line rather than drifting to
+  // the middle of a tall one.
+  const wrap = declarations(wrapSelector)
+  assert.match(wrap, /align-self:\s*stretch/)
+  assert.match(wrap, /align-items:\s*flex-start/)
+
+  // The nested connector lines the theme hides stay hidden: the rail replaces
+  // them, and this is the rule that keeps them from coming back.
+  assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left:\s*0\s*!important/)
+
+  // The rail reads `.block-children` as the record of how deep a block sits and
+  // declares nothing on those boxes: not a connector line, and not a display
+  // that would reveal the descendants a collapsed block never renders.
+  assert.ok(
+    railRules.every(([selector]) =>
+      selector.split(', ').every((part) => /\.block-control|\.bullet|\.block-main-container$/.test(part))),
+    'a rail rule paints something other than a block\'s own control column'
+  )
+})
+
 test('interactive chrome stays black with one-pixel orange borders', () => {
   assert.match(css, /#search-button,[\s\S]*?border-color:\s*transparent\s*!important/)
   assert.match(css, /#search-button:hover,[\s\S]*?border-color:\s*var\(--vscode-hc-focus\)\s*!important/)

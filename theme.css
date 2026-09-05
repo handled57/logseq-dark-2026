@@ -480,6 +480,241 @@ hr {
   background-color: transparent !important;
 }
 
+/* Bullet rail
+ *
+ * Every block in the primary editor hangs its bullet on one vertical line at
+ * the left of the page tree, the way a transcript hangs its entries on a
+ * thread. Only the bullet moves: `.block-control-wrap` is pulled left by the
+ * indentation Logseq has already applied to the block, and the same distance is
+ * handed back as margin on its other side, so the content column keeps the
+ * 29px-per-level hierarchy it renders with untouched.
+ *
+ * Logseq indents with `.block-children-container { margin-left: 29px }`, which
+ * accumulates through the box tree and cannot be read back in CSS. Counting the
+ * `.block-children` ancestors is the one way to recover a block's depth, hence
+ * one rule per level below.
+ *
+ * The rail line is drawn by `.block-control`, the fold arrow's anchor: it is
+ * the only box that both rides the rail and can be stretched to a block's own
+ * row height, which is what lets each segment end exactly where the next
+ * begins. `.block-main-container` is the positioning root instead, so an
+ * ordered list's number can be laid back beside its content at a fixed offset
+ * no matter how deep the block sits.
+ *
+ * Scope: the page's own tree in the main editor. Sidebars, whiteboards and
+ * dialogs render outside `#main-content-container`; embedded and queried trees
+ * render inside a `.block-content-wrapper` and keep Logseq's own layout;
+ * document mode and the right-hand fold button move the indentation the rail
+ * measures, so both opt out. */
+
+/* The row is the positioning root, and the control column spans it. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container {
+  position: relative;
+  isolation: isolate;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  height: auto;
+  align-self: stretch;
+  align-items: flex-start;
+}
+
+/* Logseq drops the gutter for ordered lists because its number is wider than a
+ * bullet. On the rail the number is not there, so the gutter comes back and
+ * every content column starts at the same offset. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap.is-order-list {
+  padding-right: 6px;
+}
+
+/* The fold arrow keeps its own dimming so the rail line, drawn on this box,
+ * stays at full strength; the arrow keeps its hit area rather than the stretched
+ * column claiming the whole gutter for a fold. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > .block-control {
+  height: auto;
+  align-self: stretch;
+  position: relative;
+  opacity: 1;
+  pointer-events: none;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > .block-control > span {
+  opacity: 0.4;
+  pointer-events: auto;
+}
+
+/* 4px + half of the 16px bullet holds every bullet 12px below its row's top,
+ * where Logseq's own 24px control box would have centered it. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > .bullet-link-wrap {
+  position: static;
+  left: auto;
+  margin-top: 4px;
+}
+
+/* Bullets the theme hides elsewhere — code, centered text, verse, passages,
+ * empty blocks — are part of the rail, so the suppression rules above are
+ * answered here. They still hold everywhere the rail does not reach. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container {
+  opacity: 1 !important;
+}
+
+/* An ordered list's marker is a label inside its bullet. The bullet rides the
+ * rail as a bullet, and the label is laid back where Logseq drew it, measured
+ * from the row rather than from the bullet so it holds at every depth. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container.as-order-list {
+  width: 16px;
+  padding-left: 0;
+  background-color: rgb(255 255 255 / 12%);
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container.typed-list .bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: var(--vscode-hc-white);
+  box-shadow: 0 0 0 1px var(--vscode-hc-black), 0 0 0 2px var(--vscode-hc-white);
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container.typed-list .bullet > label {
+  position: absolute;
+  top: 0;
+  left: 22px;
+  width: 22px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-hc-white);
+}
+
+/* One rule per nesting level: the block's own indentation, taken back off the
+ * bullet and handed to the content column so nothing else moves. Blocks nested
+ * deeper than this hang from the last rail position rather than their own. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -29px;
+  margin-right: 29px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -58px;
+  margin-right: 58px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -87px;
+  margin-right: 87px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -116px;
+  margin-right: 116px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -145px;
+  margin-right: 145px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -174px;
+  margin-right: 174px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -203px;
+  margin-right: 203px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -232px;
+  margin-right: 232px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -261px;
+  margin-right: 261px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -290px;
+  margin-right: 290px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -319px;
+  margin-right: 319px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  margin-left: -348px;
+  margin-right: 348px;
+}
+
+/* The line. Each block paints the stretch of rail its own row is responsible
+ * for: up from the gap above the row to the center of its bullet, and down from
+ * that center to the foot of the row, where the next block's segment starts.
+ * Painted behind the bullets, and never in front of a click. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > .block-control::before,
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > .block-control::after {
+  content: '';
+  position: absolute;
+  left: 30px;
+  width: 1px;
+  z-index: -1;
+  background-color: var(--vscode-hc-cyan);
+  pointer-events: none;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > .block-control::before {
+  top: -10px;
+  height: 22px;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > .block-control::after {
+  top: 12px;
+  bottom: -8px;
+}
+
+/* Both ends of the rail stop at a bullet's center. The first rendered block is
+ * the one with no block above it at any level; the last is the leaf that no
+ * block, and no block's ancestor, follows. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *):not(.ls-block *):not(.ls-block ~ .ls-block)
+  > .block-main-container > .block-control-wrap > .block-control::before {
+  display: none;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *):not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)):not(.ls-block:has(~ .ls-block) *)
+  > .block-main-container > .block-control-wrap > .block-control::after {
+  display: none;
+}
+
 .page-reference,
 a.tag,
 .tag {
