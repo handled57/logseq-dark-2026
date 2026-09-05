@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 1.4.5 - 2026-09-04
+
+- Classify mounted blocks from their canonical stored Logseq source so Org
+  markers such as `#+BEGIN_CENTER` remain detectable after rendering removes
+  them from the content DOM.
+
 ## 1.4.4 - 2026-09-04
 
 - Hide bullets when Logseq applies `#+BEGIN_CENTER` alignment directly to the

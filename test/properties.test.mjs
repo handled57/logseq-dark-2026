@@ -48,8 +48,9 @@ function block(properties) {
   return { host, table }
 }
 
-function load(settings, blocks = []) {
+function load(settings, blocks = [], storedBlocks = {}) {
   const provided = []
+  let blockReads = 0
   const context = {
     console,
     MutationObserver: class {
@@ -69,6 +70,12 @@ function load(settings, blocks = []) {
     logseq: {
       settings,
       provided,
+      Editor: {
+        async getBlock(uuid) {
+          blockReads += 1
+          return storedBlocks[uuid] ?? null
+        }
+      },
       useSettingsSchema(schema) {
         for (const entry of schema) {
           if (!(entry.key in this.settings)) this.settings[entry.key] = entry.default
@@ -91,6 +98,7 @@ function load(settings, blocks = []) {
 
   vm.createContext(context)
   source.runInContext(context)
+  context.blockReads = () => blockReads
 
   return context
 }
@@ -246,7 +254,7 @@ test('the entry provides the one style rule that does the hiding', async () => {
   )
 })
 
-function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '', wrapperSelector = '' } = {}) {
+function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '', wrapperSelector = '', uuid = '' } = {}) {
   const wrapper = {
     textContent: text,
     matches(selector) {
@@ -264,9 +272,15 @@ function bulletBlock({ raw = '', text = '', special = false, renderedSelector = 
     }
   }
 
-  return {
+  const host = Object.assign(element(), {
+    dataset: {},
+    getAttribute(name) {
+      return name === 'blockid' ? uuid : null
+    },
     querySelector: () => wrapper
-  }
+  })
+
+  return host
 }
 
 test('only ordinary prose keeps its bullet', async () => {
@@ -327,4 +341,35 @@ test('rendered src, center, and verse blocks remain bulletless regardless of cus
       `wrapper ${wrapperSelector}`
     )
   }
+})
+
+test('stored source keeps a rendered BEGIN_CENTER block bulletless without DOM markers', async () => {
+  const uuid = '65f00000-0000-0000-0000-000000000000'
+  const context = load({}, [], {
+    [uuid]: { content: '#+BEGIN_CENTER\ncenter\n#+END_CENTER' }
+  })
+  const centered = bulletBlock({ text: 'center', uuid })
+
+  assert.equal(context.shouldHideBullet(centered), false)
+  await context.refreshBulletFromStoredSource(centered)
+  assert.equal(centered.attributes.has('data-hc-hide-bullet'), true)
+})
+
+test('stored ordinary prose does not become bulletless', async () => {
+  const uuid = '65f00000-0000-0000-0000-000000000001'
+  const context = load({}, [], { [uuid]: { content: 'ordinary prose' } })
+  const prose = bulletBlock({ text: 'ordinary prose', uuid })
+
+  await context.refreshBulletFromStoredSource(prose)
+  assert.equal(prose.attributes.has('data-hc-hide-bullet'), false)
+})
+
+test('stored source reads are cached per block UUID', async () => {
+  const uuid = '65f00000-0000-0000-0000-000000000002'
+  const context = load({}, [], { [uuid]: { content: 'ordinary prose' } })
+  const prose = bulletBlock({ text: 'ordinary prose', uuid })
+
+  await context.refreshBulletFromStoredSource(prose)
+  await context.refreshBulletFromStoredSource(prose)
+  assert.equal(context.blockReads(), 1)
 })

@@ -20,6 +20,7 @@ const STYLE_KEY = 'hc-hidden-properties'
 const HIDDEN_ATTR = 'data-hc-hidden'
 const TYPE_ATTR = 'data-hc-block-type'
 const BULLET_ATTR = 'data-hc-hide-bullet'
+const sourceCache = new Map()
 
 const SPECIAL_CONTENT_SELECTOR = [
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -185,12 +186,43 @@ function shouldHideBullet(block) {
   return propertyFreeText(wrapper) === ''
 }
 
+function blockUuid(block) {
+  const wrapper = block.querySelector(':scope > .block-main-container > .block-content-wrapper')
+  const candidate = block.getAttribute?.('blockid') || block.dataset?.uuid ||
+    wrapper?.id?.replace(/^block-content-/, '') || ''
+  return /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(candidate) ? candidate : ''
+}
+
+function setBulletVisibility(block, hidden) {
+  if (hidden) block.setAttribute(BULLET_ATTR, '')
+  else block.removeAttribute(BULLET_ATTR)
+}
+
+async function refreshBulletFromStoredSource(block) {
+  const uuid = blockUuid(block)
+  if (!uuid || typeof logseq.Editor?.getBlock !== 'function') return
+
+  try {
+    let request = sourceCache.get(uuid)
+    if (!request) {
+      request = logseq.Editor.getBlock(uuid)
+      sourceCache.set(uuid, request)
+    }
+    const stored = await request
+    if (typeof stored?.content !== 'string') return
+    setBulletVisibility(block, specialSource(stored.content.trim()) || shouldHideBullet(block))
+  } catch (error) {
+    sourceCache.delete(uuid)
+    console.warn('Dark High Contrast could not classify block source', uuid, error)
+  }
+}
+
 function paint() {
   const active = rules()
 
   for (const block of doc.querySelectorAll('.ls-block')) {
-    if (shouldHideBullet(block)) block.setAttribute(BULLET_ATTR, '')
-    else block.removeAttribute(BULLET_ATTR)
+    setBulletVisibility(block, shouldHideBullet(block))
+    void refreshBulletFromStoredSource(block)
   }
 
   for (const table of doc.querySelectorAll('.block-properties')) {
@@ -228,6 +260,10 @@ function main() {
   logseq.provideStyle({ key: STYLE_KEY, style: `.block-properties[${HIDDEN_ATTR}] { display: none; }` })
   logseq.onSettingsChanged(repaint)
   logseq.App.onRouteChanged(repaint)
+  logseq.DB?.onChanged?.(() => {
+    sourceCache.clear()
+    repaint()
+  })
 
   /* childList/subtree only: this observer must not see its own attribute
    * writes, or every pass would schedule another one. */
