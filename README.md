@@ -193,7 +193,7 @@ Insert one in either of two ways:
 - Type `/passage` and choose **Passage**.
 - Type `<` and choose **Passage**. Logseq has no plugin API for the `<` picker, so this entry is added to the picker's own menu while it is open; it withdraws itself as soon as what you have typed can no longer match.
 
-Both prompt for a reference. Escape or **Cancel** dismisses the prompt without changing the block, and a blank reference cannot be submitted.
+Both prompt for a reference. Enter is **Insert**, the prompt's default action; Escape or **Cancel** dismisses it without changing the block. A blank reference cannot be submitted.
 
 ### References
 

@@ -221,6 +221,7 @@ function bibleRoutes({ files, via = 'fetch' }) {
 
 function load(settings, blocks = [], storedBlocks = {}, host = node('body'), bible = null) {
   const routes = bible ? bibleRoutes(bible) : {}
+  const listeners = []
   const provided = []
   const observers = []
   const commands = []
@@ -255,8 +256,21 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body'), bib
       },
       document: {
         body: host,
+        listeners,
         getElementById: () => element(),
         createElement: (tag) => node(tag),
+        /* The host's own shortcuts are bound here, which is why the dialog
+         * claims its keys here too; only the capturing phase is recorded,
+         * because that is the only phase it uses. */
+        addEventListener(type, handler, capture) {
+          if (capture) listeners.push({ type, handler })
+        },
+        removeEventListener(type, handler) {
+          const index = listeners.findIndex(
+            (entry) => entry.type === type && entry.handler === handler
+          )
+          if (index !== -1) listeners.splice(index, 1)
+        },
         /* The two block collections keep their purpose-built stubs; everything
          * else — the popup, the editor, the dialog — is served by the host
          * stand-in. */
@@ -320,6 +334,25 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body'), bib
         return Promise.resolve(main())
       }
     }
+  }
+
+  /* A key as the host delivers it: to the document's capturing listeners, in
+   * order, before anything nested has seen it. */
+  context.press = (key) => {
+    let stopped = false
+    const event = {
+      key,
+      preventDefault() {},
+      stopPropagation() {
+        stopped = true
+      },
+      stopImmediatePropagation() {
+        stopped = true
+      }
+    }
+
+    for (const { handler } of [...listeners]) handler(event)
+    return stopped
   }
 
   vm.createContext(context)
@@ -1037,4 +1070,57 @@ test('a configured text index is read from its own path, not from the theme fold
 
   assert.match(context.logseq.Editor.updates[0].content, /Indeed, God did not send the Son\./)
   assert.deepEqual(context.messages, [])
+})
+
+test('Enter inserts and Escape cancels ahead of the host, wherever the key lands', async () => {
+  // Logseq binds its editor shortcuts on the document, so a key reaches those
+  // before it reaches the dialog: Enter would open a new block behind the
+  // prompt. The dialog claims Enter and Escape in the same capturing phase.
+  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
+
+  const invocation = context.logseq.Editor.commands[0].action()
+  await flush()
+
+  const dialog = dialogOf(context)
+  // A key the dialog does not own is left to whatever has focus.
+  assert.equal(context.press('a'), false)
+
+  fill(dialog, 'Ex 2-Gen 50')
+  assert.equal(context.press('Enter'), true, 'the host still saw Enter')
+  await flush()
+  assert.ok(dialogOf(context), 'a reference that does not resolve closed the dialog')
+  assert.match(dialog.querySelector('p').textContent, /backwards/)
+
+  fill(dialog, 'John 3:16')
+  context.press('Enter')
+  await invocation
+
+  assert.match(context.logseq.Editor.updates[0].content, /\*\*John 3:16\*\*/)
+  assert.equal(dialogOf(context), null)
+  // The claim lasts exactly as long as the dialog does.
+  assert.equal(context.press('Enter'), false)
+  assert.equal(context.parent.document.listeners.length, 0)
+})
+
+test('the document listener is released however the dialog closes', async () => {
+  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
+  const listeners = context.parent.document.listeners
+
+  for (const dismiss of [
+    () => context.press('Escape'),
+    () => control(dialogOf(context), 'button', 'Cancel').dispatch('click'),
+    async () => (await context.logseq.unloads[0]())
+  ]) {
+    const invocation = context.logseq.Editor.commands[0].action()
+    await flush()
+    assert.equal(listeners.length, 1)
+
+    await dismiss()
+    await invocation
+
+    assert.equal(listeners.length, 0)
+    assert.equal(dialogOf(context), null)
+  }
+
+  assert.deepEqual(context.logseq.Editor.updates, [])
 })
