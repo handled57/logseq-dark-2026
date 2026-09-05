@@ -1030,7 +1030,7 @@ test('a resolved reference is written canonically, with its chapter tags and tex
   assert.equal(
     content,
     'tags:: John/3\ntype:: Passage\n' +
-      '#+BEGIN_PASSAGE\n**John 3:16–17**\n\n' +
+      '#+BEGIN_PASSAGE\n**John 3:16-17**\n\n' +
       'For God so loved the world. Indeed, God did not send the Son.\n' +
       '#+END_PASSAGE'
   )
@@ -1050,7 +1050,7 @@ test('a passage of more than one paragraph is written with a blank line between 
   assert.equal(
     context.logseq.Editor.updates[0].content,
     'tags:: Gen/1\ntype:: Passage\n' +
-      '#+BEGIN_PASSAGE\n**Gen 1:1\u20132**\n\n' +
+      '#+BEGIN_PASSAGE\n**Genesis 1:1-2**\n\n' +
       'In the beginning.\n\nAnd the earth was a formless void.\n' +
       '#+END_PASSAGE'
   )
@@ -1064,7 +1064,7 @@ test('a passage spanning books is tagged with every chapter it covers', async ()
   assert.equal(
     context.logseq.Editor.updates[0].content,
     'tags:: Gen/50, Ex/1, Ex/2\ntype:: Passage\n' +
-      '#+BEGIN_PASSAGE\n**Gen 50–Ex 2**\n\n#+END_PASSAGE'
+      '#+BEGIN_PASSAGE\n**Genesis 50 - Exodus 2**\n\n#+END_PASSAGE'
   )
 })
 
@@ -1111,7 +1111,7 @@ test('without the text index the reference and tags are still written, with a no
 
   assert.equal(
     context.logseq.Editor.updates[0].content,
-    `tags:: Ps/23\ntype:: Passage\n#+BEGIN_PASSAGE\n**Ps 23**\n\n#+END_PASSAGE`
+    `tags:: Ps/23\ntype:: Passage\n#+BEGIN_PASSAGE\n**Psalms 23**\n\n#+END_PASSAGE`
   )
   assert.equal(context.messages.length, 1)
   assert.match(context.messages[0].text, /build-bible-index/)
@@ -1227,7 +1227,7 @@ test('the display options open unchecked, and open unchecked again next time', a
 
 test('each display option formats the passage on its own', async () => {
   const reference = 'jn 3:16-17'
-  const head = 'tags:: John/3\ntype:: Passage\n#+BEGIN_PASSAGE\n**John 3:16\u201317**\n\n'
+  const head = 'tags:: John/3\ntype:: Passage\n#+BEGIN_PASSAGE\n**John 3:16-17**\n\n'
 
   for (const [options, body] of [
     [[], 'For God so loved the world. Indeed, God did not send the Son.'],
@@ -1268,7 +1268,7 @@ test('the three display options are written together, and the cursor still lands
   assert.equal(
     content,
     'tags:: John/3\ntype:: Passage\n' +
-      '#+BEGIN_PASSAGE\n**John 3:16\u201317**\n\n' +
+      '#+BEGIN_PASSAGE\n**John 3:16-17**\n\n' +
       '**John 3**\n\n' +
       '^^\u00b9\u2076^^For God so loved the world.\n' +
       '^^\u00b9\u2077^^Indeed, God did not send the Son.\n' +
@@ -1292,7 +1292,7 @@ test('without the text index the options add nothing to an empty body', async ()
 
   assert.equal(
     context.logseq.Editor.updates[0].content,
-    'tags:: Ps/23\ntype:: Passage\n#+BEGIN_PASSAGE\n**Ps 23**\n\n#+END_PASSAGE'
+    'tags:: Ps/23\ntype:: Passage\n#+BEGIN_PASSAGE\n**Psalms 23**\n\n#+END_PASSAGE'
   )
   assert.equal(context.messages.length, 1)
   assert.match(context.messages[0].text, /build-bible-index/)

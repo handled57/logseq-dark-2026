@@ -197,29 +197,32 @@ Both prompt for a reference and for how the passage should be displayed. Enter i
 
 ### References
 
-The reference you type is resolved against the theme's own index of books, chapters and verse counts, and written back in a canonical short-name form:
+The reference you type is resolved against the theme's own index of books, chapters and verse counts, and written back under the book's full name:
 
 ```text
 tags:: Gen/50, Ex/1, Ex/2
 type:: Passage
 #+BEGIN_PASSAGE
-**Gen 50–Ex 2**
+**Genesis 50 - Exodus 2**
 
 …
 #+END_PASSAGE
 ```
 
-Books are matched on their short or long name, ignoring case, spacing and punctuation, and on the usual abbreviations besides: `Gn`, `Exod`, `Mt`, `Mk`, `Lk`, `Jn`, `Psalms`, `1 Cor`, `1Cor`. A range is written with a hyphen, an en dash or an em dash, spaced or not. All of these are references:
+Books are matched on their short or long name, ignoring case, spacing and punctuation, and on the usual abbreviations besides: `Gn`, `Exod`, `Mt`, `Mk`, `Lk`, `Jn`, `Psalms`, `1 Cor`, `1Cor`. A range is written with a hyphen, an en dash or an em dash, spaced or not. A book named on its own is the whole of that book. All of these are references:
 
-| Written | Means |
-| --- | --- |
-| `John 3:16` | one verse |
-| `Gen 50` | a whole chapter |
-| `Gen 1-3` | whole chapters |
-| `Gen 50 - Ex 2` | chapters across a book boundary |
-| `Genesis 50:1-10` | verses within a chapter |
-| `Gen 1:1-2:3` | verses across a chapter boundary |
-| `Genesis 50:1 - Ex 2:25` | verses across a book boundary |
+| Written | Means | Written back |
+| --- | --- | --- |
+| `Gen` | a whole book | `Genesis` |
+| `John 3:16` | one verse | `John 3:16` |
+| `Gen 50` | a whole chapter | `Genesis 50` |
+| `Gen 1-3` | whole chapters | `Genesis 1-3` |
+| `Gen 50 - Ex 2` | chapters across a book boundary | `Genesis 50 - Exodus 2` |
+| `Genesis 50:1-10` | verses within a chapter | `Genesis 50:1-10` |
+| `Gen 1:1-2:3` | verses across a chapter boundary | `Genesis 1:1 - 2:3` |
+| `Genesis 50:1 - Ex 2:25` | verses across a book boundary | `Genesis 50:1 - Exodus 2:25` |
+
+However it was typed, a reference is written back in full: the book's long name, and a dash that is tight where what follows it is a bare number continuing the book and chapter already named, and spaced where it carries a chapter or a book of its own. The short name stays on the tags, where it is half of a page name your graph already carries.
 
 A bare number after the dash is a verse when the left side named one (`Gen 50:1 - 10`) and a chapter when it did not (`Gen 1 - 3`); name a book beside it and it is always that book's chapter.
 

@@ -89,9 +89,12 @@ const BIBLE_ALIASES = {
   psalm151: 'Ps151'
 }
 
-/* En dash between the endpoints of a written reference; a hyphen or em dash is
- * accepted on the way in and normalized to this on the way out. */
-const BIBLE_DASH = '–'
+/* The two joins a written range is made with: a tight hyphen where what follows
+ * the dash is a bare number continuing the book and chapter already named, and a
+ * spaced one where it carries a chapter or a book of its own. A hyphen, an en
+ * dash or an em dash is accepted on the way in, wherever it falls. */
+const BIBLE_JOIN = '-'
+const BIBLE_SPACED_JOIN = ' - '
 const BIBLE_DASHES = /[-–—]/
 
 function bibleFold(name) {
@@ -173,6 +176,26 @@ function bibleEndpoint(text) {
   }
 }
 
+/* A side of a reference is either a book named on its own — the whole of it —
+ * or a `Book chapter:verse` endpoint. The book is looked for first, so a long
+ * name that ends in a digit reads as the book it names rather than as a chapter
+ * of another: `Psalm 151` is the book, not chapter 151 of the Psalms. */
+function bibleSide(index, text) {
+  const book = index.byName.get(bibleFold(text))
+  if (book) return { whole: true, book }
+
+  const endpoint = bibleEndpoint(text)
+  return endpoint ? { whole: false, ...endpoint } : null
+}
+
+/* A whole book runs from its first chapter to its last. The verse is left open
+ * so the span fills in each chapter's own first and last, which is what keeps
+ * the books that do not begin at verse one, or at chapter one, correct. */
+function bibleWholePoint(book, edge) {
+  const entry = edge === 'end' ? book.chapters.at(-1) : book.chapters[0]
+  return { ok: true, book, chapter: book.chapterMap.get(entry.chapter), verse: undefined }
+}
+
 function bibleVerseId(chapter, verse) {
   const skipped = chapter.missing.filter((number) => number < verse).length
   return chapter.fromVerseId + (verse - chapter.first) - skipped
@@ -222,20 +245,39 @@ function bibleChapterSpan(index, start, end) {
   return span
 }
 
-function bibleCanonical(start, end, verses) {
+/* A reference is written back under the book's full name, in one of six shapes:
+ *
+ *   Genesis                       a whole book
+ *   Genesis 1                     one whole chapter
+ *   Genesis 1-2                   chapters of one book
+ *   Genesis 1:1 - 2:1             chapters and verses of one book
+ *   Genesis 50:20 - Exodus 1:10   across a book boundary
+ *   Genesis 1:1-10                verses of one chapter
+ *
+ * The full name is what a reader reads, and it is what a chapter heading is
+ * already written with, so the two agree. The short name stays on the tags,
+ * where it is half of a page name a graph already carries. */
+function bibleCanonical(start, end, verses, whole) {
   const sameBook = start.book === end.book
   const sameChapter = sameBook && start.chapter.number === end.chapter.number
 
-  if (!verses) {
-    const head = `${start.book.shortName} ${start.chapter.number}`
-    if (sameChapter) return head
-    return `${head}${BIBLE_DASH}${sameBook ? '' : `${end.book.shortName} `}${end.chapter.number}`
+  if (whole) {
+    if (sameBook) return start.book.longName
+    return `${start.book.longName}${BIBLE_SPACED_JOIN}${end.book.longName}`
   }
 
-  const head = `${start.book.shortName} ${start.chapter.number}:${start.verse}`
+  if (!verses) {
+    const head = `${start.book.longName} ${start.chapter.number}`
+    if (sameChapter) return head
+    if (sameBook) return `${head}${BIBLE_JOIN}${end.chapter.number}`
+    return `${head}${BIBLE_SPACED_JOIN}${end.book.longName} ${end.chapter.number}`
+  }
+
+  const head = `${start.book.longName} ${start.chapter.number}:${start.verse}`
   if (sameChapter && start.verse === end.verse) return head
-  if (sameChapter) return `${head}${BIBLE_DASH}${end.verse}`
-  return `${head}${BIBLE_DASH}${sameBook ? '' : `${end.book.shortName} `}` +
+  if (sameChapter) return `${head}${BIBLE_JOIN}${end.verse}`
+  if (sameBook) return `${head}${BIBLE_SPACED_JOIN}${end.chapter.number}:${end.verse}`
+  return `${head}${BIBLE_SPACED_JOIN}${end.book.longName} ` +
     `${end.chapter.number}:${end.verse}`
 }
 
@@ -249,25 +291,32 @@ function parsePassageReference(input, manifest) {
   if (!text) return bibleFailure('Type a reference such as John 3:16.')
 
   const divider = text.search(BIBLE_DASHES)
-  const left = bibleEndpoint(divider === -1 ? text : text.slice(0, divider))
-  const right = divider === -1 ? null : bibleEndpoint(text.slice(divider + 1))
+  const left = bibleSide(index, divider === -1 ? text : text.slice(0, divider))
+  const right = divider === -1 ? null : bibleSide(index, text.slice(divider + 1))
 
-  if (!left || !left.name || (divider !== -1 && !right)) {
+  if (!left || (!left.whole && !left.name) || (divider !== -1 && !right)) {
     return bibleFailure(`“${text}” is not a passage reference.`)
   }
 
   /* A bare left endpoint is `Book chapter`; a bare right endpoint is a verse
    * when the left named one and a chapter when it did not. */
-  const startChapter = left.bare ? left.verse : left.chapter
-  const startVerse = left.bare ? undefined : left.verse
-  const start = bibleResolvePoint(index, left.name, startChapter, startVerse)
+  let start = left.whole ? bibleWholePoint(left.book, 'start') : null
+  if (!start) {
+    const startChapter = left.bare ? left.verse : left.chapter
+    const startVerse = left.bare ? undefined : left.verse
+    start = bibleResolvePoint(index, left.name, startChapter, startVerse)
+  }
   if (!start.ok) return start
 
+  /* A whole book ends where it ends, whether it is named on both sides of a
+   * dash or stands alone as the entire reference. */
   let end = start
-  if (right) {
+  if (right ? right.whole : left.whole) {
+    end = bibleWholePoint((right ?? left).book, 'end')
+  } else if (right) {
     /* A lone number after the dash is a verse only when it stands alone: name a
      * book beside it and it is that book's chapter. */
-    const verses = startVerse !== undefined && !right.name
+    const verses = start.verse !== undefined && !right.name
     const endChapter = right.bare
       ? (verses ? start.chapter.number : right.verse)
       : right.chapter
@@ -276,19 +325,22 @@ function parsePassageReference(input, manifest) {
     if (!end.ok) return end
   }
 
+  /* Named on both sides and numbered on neither, the reference is whole books,
+   * which is the one form written without a number. */
+  const whole = left.whole && (!right || right.whole)
   const verses = start.verse !== undefined || end.verse !== undefined
   const from = { ...start, verse: start.verse ?? start.chapter.first }
   const to = { ...end, verse: end.verse ?? end.chapter.last }
 
   if (bibleVerseId(from.chapter, from.verse) > bibleVerseId(to.chapter, to.verse)) {
-    return bibleFailure(`${bibleCanonical(from, to, verses)} runs backwards.`)
+    return bibleFailure(`${bibleCanonical(from, to, verses, whole)} runs backwards.`)
   }
 
   const span = bibleChapterSpan(index, from, to)
 
   return {
     ok: true,
-    canonical: bibleCanonical(from, to, verses),
+    canonical: bibleCanonical(from, to, verses, whole),
     tags: span.map(({ book, chapter }) => `${book.shortName}/${chapter.number}`),
     chapters: span.map(({ book, chapter }, position) => ({
       shortName: book.shortName,
