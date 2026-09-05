@@ -1141,6 +1141,7 @@ textarea.block-editor:focus {
  * admonition whose content is shorter than its icon. */
 .block-body > .passage {
   --hc-admonition-accent: var(--vscode-hc-cyan);
+  --hc-verse-gutter: 0px;
 
   position: relative;
   margin: 2rem 0;
@@ -1196,6 +1197,7 @@ textarea.block-editor:focus {
  * content but not the passage's own children, so they are restated here. */
 .block-body > .passage > * {
   margin: 0.5rem 0;
+  padding-left: var(--hc-verse-gutter);
 }
 
 .block-body > .passage > :first-child {
@@ -1212,6 +1214,47 @@ textarea.block-editor:focus {
   color: var(--vscode-hc-white);
 }
 
+/* Verse numbers.
+ *
+ * `View verse numbers` writes each number as superscript digits wrapped in
+ * highlight markup, which Logseq renders as a `mark`. That element is the only
+ * handle CSS has on a verse number: mldoc reads a `<` opening a line as
+ * block-level HTML, so the number cannot carry a tag of its own, and a bare run
+ * of digits is unreachable. It is a numeral rather than a highlight, so the
+ * page-highlight background `mark` carries everywhere else is dropped here,
+ * padding included: the padding sits inside the gutter the number is set in.
+ *
+ * `--hc-verse-gutter` is the width of the column the number is set in, and is
+ * zero until the block earns it below: every rule here is inert at zero, which
+ * is what leaves a passage of running prose with its numbers inline. */
+.block-body > .passage mark {
+  color: var(--vscode-hc-orange);
+  background: transparent;
+  padding: 0;
+  display: inline-block;
+  min-width: var(--hc-verse-gutter);
+  margin-left: calc(-1 * var(--hc-verse-gutter));
+}
+
+/* The reference and the chapter headings are bold and open lines of their own,
+ * so they hang out to the passage's own edge rather than sitting in the gutter
+ * the verses are indented by. */
+.block-body > .passage :is(b:first-child, br + b) {
+  margin-left: calc(-1 * var(--hc-verse-gutter));
+}
+
+/* A passage written one verse to a line: `index.js` sets the attribute when the
+ * block's source says every verse number opens a line, which is the only place
+ * a number can be pulled left without landing on the words before it. mldoc
+ * parses the whole passage body as one paragraph of line breaks, so there is no
+ * per-verse box to indent — the gutter is padding on that paragraph and each
+ * number is pulled back out of it, which puts a verse that wraps in line with
+ * its own text rather than under its number. 1.75em holds the widest number in
+ * the canon: Inter's widest superscript digit is 0.44em, so `¹⁷⁶` is about
+ * 1.15em, and the rest of the column is the gap before the text. */
+.ls-block[data-hc-verse-lines] > .block-main-container > .block-content-wrapper .block-body > .passage {
+  --hc-verse-gutter: 1.75em;
+}
 
 mark {
   color: var(--ls-page-mark-color);

@@ -205,6 +205,13 @@ const PLAIN = { headings: false, numbers: false, perLine: false }
 
 const compose = (reference, options) => composePassageText(resolved(reference), textIndex, options)
 
+/* References that between them cover what a verse number has to survive: a whole
+ * chapter of several paragraphs, a single verse, a chapter boundary, poetry
+ * lineation inside a verse, a three-digit number, an edition's numbering gap,
+ * and a book boundary. */
+const NUMBERED = ['Gen 1', 'Gen 1:2', 'Gen 1:3-2:1', 'Ps 23:1-2', 'Ps 119:150',
+  'Matt 17:20-22', 'Obad 1:1-Jonah 1:2']
+
 test('the passage text is prose, with paragraphs kept and verse numbers dropped', () => {
   // A paragraph break is a blank line: without one the paragraphs render as a
   // single run of prose.
@@ -297,23 +304,62 @@ test('verse numbers are superscripts against the verse they open', () => {
 
   assert.equal(
     compose('Gen 1', numbers),
-    '\u00b9In the beginning. \u00b2And the earth.\n\n\u00b3Then God said.'
+    '^^\u00b9^^In the beginning. ^^\u00b2^^And the earth.\n\n^^\u00b3^^Then God said.'
   )
   // A partial chapter is numbered from where it starts, not from one.
-  assert.equal(compose('Gen 1:2', numbers), '\u00b2And the earth.')
+  assert.equal(compose('Gen 1:2', numbers), '^^\u00b2^^And the earth.')
   // A chapter this edition numbers with a gap keeps each number against its own
   // verse: Matthew 17:21 is not in the text, and 22 is not renumbered to 21.
   assert.equal(
     compose('Matt 17:20-22', numbers),
-    '\u00b2\u2070He said to them. \u00b2\u00b2As they were gathering.'
+    '^^\u00b2\u2070^^He said to them. ^^\u00b2\u00b2^^As they were gathering.'
   )
   // Poetry takes the number on the first of its lines and keeps the rest.
   assert.equal(
     compose('Ps 23:1-2', numbers),
-    '\u00b9The LORD is my shepherd;\nI shall not want.\n\u00b2He makes me lie down.'
+    '^^\u00b9^^The LORD is my shepherd;\nI shall not want.\n^^\u00b2^^He makes me lie down.'
   )
   // Every digit of a number has a superscript of its own.
-  assert.equal(compose('Ps 119:150', numbers), '\u00b9\u2075\u2070Those who persecute me draw near.')
+  assert.equal(compose('Ps 119:150', numbers), '^^\u00b9\u2075\u2070^^Those who persecute me draw near.')
+})
+
+test('a verse number carries the markup that gives it an element of its own', () => {
+  // theme.css cannot reach a bare run of digits, and mldoc reads a tag opening a
+  // line as block-level HTML, so the number is wrapped in highlight markup: it
+  // parses as emphasis wherever it falls and Logseq renders it as a `mark`. The
+  // digits stay inside the markup rather than being replaced by it.
+  const highlights = /\^\^([\s\S]*?)\^\^/g
+
+  for (const reference of NUMBERED) {
+    // Nothing writes the markup while the option is off.
+    assert.doesNotMatch(compose(reference, PLAIN), /\^/, reference)
+
+    for (const headings of [false, true]) {
+      for (const perLine of [false, true]) {
+        const composed = compose(reference, { headings, numbers: true, perLine })
+        const marked = [...composed.matchAll(highlights)]
+        assert.ok(marked.length, `${reference} wrote no verse numbers`)
+
+        for (const [, digits] of marked) {
+          assert.match(digits, /^[\u2070\u00b9\u00b2\u00b3\u2074-\u2079]+$/, reference)
+        }
+
+        for (const line of composed.split('\n')) {
+          // A pair that opened on one line and closed on another would take the
+          // text between them into the number.
+          assert.equal((line.match(/\^\^/g) ?? []).length % 2, 0, `${reference}: ${line}`)
+
+          // One verse to a line is what lets `index.js` tell the theme to hang
+          // the numbers in a gutter: every number there opens its own line, and
+          // the lines without one are an edition's poetry inside a verse.
+          const numbers = line.match(highlights)
+          if (!perLine || !numbers) continue
+          assert.equal(numbers.length, 1, `${reference}: ${line}`)
+          assert.ok(line.startsWith(numbers[0]), `${reference}: ${line}`)
+        }
+      }
+    }
+  }
 })
 
 test('a verse number never opens a line with markup', () => {
@@ -322,10 +368,7 @@ test('a verse number never opens a line with markup', () => {
   // written as `<sup>1</sup>` was therefore pushed onto a line of its own
   // wherever it opened one — every paragraph, and with one verse per line every
   // verse. Superscript digits are plain text and parse where they stand.
-  const references = ['Gen 1', 'Gen 1:2', 'Gen 1:3-2:1', 'Ps 23:1-2', 'Ps 119:150',
-    'Matt 17:20-22', 'Obad 1:1-Jonah 1:2']
-
-  for (const reference of references) {
+  for (const reference of NUMBERED) {
     for (const headings of [false, true]) {
       for (const perLine of [false, true]) {
         const composed = compose(reference, { headings, numbers: true, perLine })
@@ -364,22 +407,22 @@ test('the three display options combine', () => {
 
   assert.equal(
     compose('Gen 1', every),
-    '**Genesis 1**\n\n\u00b9In the beginning.\n\u00b2And the earth.\n\n' +
-      '\u00b3Then God said.'
+    '**Genesis 1**\n\n^^\u00b9^^In the beginning.\n^^\u00b2^^And the earth.\n\n' +
+      '^^\u00b3^^Then God said.'
   )
   assert.equal(
     compose('Obad 1:1-Jonah 1:2', every),
-    '**Obadiah 1**\n\n\u00b9The vision of Obadiah.\n\u00b2I will make you least.\n\n' +
-      '**Jonah 1**\n\n\u00b9Now the word of the LORD.\n\u00b2Go at once to Nineveh.'
+    '**Obadiah 1**\n\n^^\u00b9^^The vision of Obadiah.\n^^\u00b2^^I will make you least.\n\n' +
+      '**Jonah 1**\n\n^^\u00b9^^Now the word of the LORD.\n^^\u00b2^^Go at once to Nineveh.'
   )
   // Two of the three, to show the pairs are independent of the third.
   assert.equal(
     compose('Gen 1:2', { ...every, perLine: false }),
-    '**Genesis 1**\n\n\u00b2And the earth.'
+    '**Genesis 1**\n\n^^\u00b2^^And the earth.'
   )
   assert.equal(
     compose('Gen 1', { ...every, headings: false }),
-    '\u00b9In the beginning.\n\u00b2And the earth.\n\n\u00b3Then God said.'
+    '^^\u00b9^^In the beginning.\n^^\u00b2^^And the earth.\n\n^^\u00b3^^Then God said.'
   )
   assert.equal(
     compose('Gen 1', { ...every, numbers: false }),

@@ -374,6 +374,43 @@ test('the passage block reproduces the admonition treatment on its own selectors
   )
 })
 
+test('verse numbers are orange, and hang in a gutter where the block asks for one', () => {
+  // The number is a `mark` because that is the only element the markup can give
+  // it: mldoc reads a `<` opening a line as block-level HTML, so it cannot carry
+  // a tag of its own, and a bare run of digits is nothing CSS can reach.
+  assert.match(
+    css,
+    /\.block-body > \.passage mark \{[\s\S]*?color:\s*var\(--vscode-hc-orange\)[\s\S]*?background:\s*transparent/
+  )
+
+  // One variable carries the gutter: zero on the passage itself, so every rule
+  // reading it is inert, and a width only on a block whose source says every
+  // verse number opens a line. 1.75em clears the widest number in the canon.
+  assert.match(css, /\.block-body > \.passage \{[\s\S]*?--hc-verse-gutter:\s*0px/)
+  assert.match(
+    css,
+    /\.ls-block\[data-hc-verse-lines\] > \.block-main-container > \.block-content-wrapper \.block-body > \.passage \{\s*--hc-verse-gutter:\s*1\.75em/
+  )
+
+  // The verses are indented by the gutter and each number is pulled back out of
+  // it, which is what puts a wrapped verse in line with its own text.
+  assert.match(
+    css,
+    /\.block-body > \.passage > \* \{[\s\S]*?padding-left:\s*var\(--hc-verse-gutter\)/
+  )
+  assert.match(
+    css,
+    /\.block-body > \.passage mark \{[\s\S]*?min-width:\s*var\(--hc-verse-gutter\);\s*\n\s*margin-left:\s*calc\(-1 \* var\(--hc-verse-gutter\)\)/
+  )
+
+  // The reference and the chapter headings open lines of their own, so they
+  // hang out to the passage's edge rather than sitting in the gutter.
+  assert.match(
+    css,
+    /\.block-body > \.passage :is\(b:first-child, br \+ b\) \{\s*margin-left:\s*calc\(-1 \* var\(--hc-verse-gutter\)\)/
+  )
+})
+
 test('workbench chrome is bordered in the contrast border, not white', () => {
   // Panes, panels, sidebars and controls all draw their edges with
   // --vscode-hc-border. Two declarations use a border property to paint
@@ -428,6 +465,7 @@ test('principal foreground/background pairs meet WCAG thresholds', () => {
     ['selection text', '#000000', '#ffffff', 7],
     ['string token', '#ce9178', '#000000', 4.5],
     ['comment token', '#7ca668', '#000000', 4.5],
+    ['verse number', '#f38518', '#000000', 4.5],
     ['warning text', '#ffff00', '#332a00', 4.5],
     ['error text', '#f48771', '#3b0d08', 4.5],
     ['success text', '#b7d6a8', '#14240f', 4.5],

@@ -246,12 +246,14 @@ Three checkboxes under the reference field decide how that text is written. Each
 | Option | Writes |
 | --- | --- |
 | **View chapter headings** | `**Genesis 1**` above the verses of every chapter the passage includes, under the book's long name — a single chapter and a partial chapter are headed too |
-| **View verse numbers** | each verse number as a superscript against the front of its own verse, `¹⁶For God so loved…` |
+| **View verse numbers** | each verse number as a superscript against the front of its own verse, in the theme's orange: `¹⁶For God so loved…` |
 | **One verse per line** | every verse on a new line, with the line breaks inside a verse left exactly where the edition put them |
 
 All three open unchecked every time the prompt does: they describe the passage in front of you rather than the next one. With none of them checked the passage is written exactly as it is described above.
 
-Verse numbers are written as superscript digits rather than as `<sup>` markup. Logseq parses block content with mldoc, which reads a `<` at the start of a line as block-level HTML, so a tag opening a paragraph — or, with one verse per line, opening any verse — was pushed onto a line of its own above the text it belongs to. Digits are plain text and parse the same wherever they fall, and Inter carries all ten.
+Verse numbers are written as superscript digits rather than as `<sup>` markup. Logseq parses block content with mldoc, which reads a `<` at the start of a line as block-level HTML, so a tag opening a paragraph — or, with one verse per line, opening any verse — was pushed onto a line of its own above the text it belongs to. Digits are plain text and parse the same wherever they fall, and Inter carries all ten. The digits are wrapped in highlight markup — `^^¹⁶^^For God so loved…` — because that is what gives the number an element of its own for the theme to color; read anywhere else, the number is still a number.
+
+Where every verse number in a block opens a line, which is what **One verse per line** writes and what poetry set a verse to a paragraph amounts to, each number is set in a gutter of its own beside the text. A verse that wraps then lines up with the start of its own text rather than under its number, and the reference and chapter headings stay flush with the passage's left edge. A passage of running prose keeps its numbers inline where the sentences put them.
 
 The options add to the text and never replace it. Paragraph breaks, poetry lineation and chapter separation stay as they are wherever an option does not override them, verse numbers stay attached to their own verses where an edition omits one — Matthew 17:21 among them — and the edition's own section headings are still left out. Without a local text index the body stays empty and the missing-index notice still appears: a heading or a verse number over a passage that has no text would be metadata standing in for the passage.
 
@@ -261,7 +263,7 @@ The two property lines sit *above* `#+BEGIN_PASSAGE` because a block holds one p
 
 ## Compatibility
 
-Version 1.7.1 targets **Logseq 0.10.15 classic/file graphs on desktop**.
+Version 1.8.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
 
 - DB graphs are not supported in this release.
 - Mobile is not an advertised target; narrow desktop windows receive a layout smoke test.
