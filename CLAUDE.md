@@ -45,7 +45,13 @@ Automate the complete lifecycle when the user asks for an implementation and rep
 6. Integrate the latest `origin/main`. Resolve conflicts by understanding both sides; never discard user or upstream work automatically.
 7. Run the full validation gate.
 8. Update documentation, changelog, and version metadata when the change is user-visible or released.
-9. Merge the completed branch into `main`, tag a release when appropriate, push commits and tags to `origin`, and close the issue with the validating commit or release.
+9. Push the topic branch to `origin` and stop there. Leave the branch unmerged and the issue open, and report what the user should test.
+
+## Delivery handoff
+
+Completed work waits for the user's testing. Do not merge a topic branch into `main`, tag a release, or close an issue until the user says the change is good.
+
+A short confirmation such as `continue`, `close`, `done`, `ship it`, `looks good`, or any similar approval means the change passed their testing. On that signal, finish delivery: merge the topic branch into `main`, tag a release when appropriate, push commits and tags to `origin`, and close the issue with the validating commit or release.
 
 Do not create a release tag for documentation-only or unreleased maintenance unless the user explicitly requests a release. Never rewrite shared history or use destructive Git commands to resolve conflicts.
 
@@ -66,11 +72,15 @@ LOGSEQ_CSS=/path/to/Logseq/resources/app/css/style.css npm test
 
 For CSS changes, inspect the relevant selector cascade and test both the default state and interactive states such as hover, focus, selection, and narrow desktop layouts. For `index.js` changes, test initial rendering, repainting, settings changes, malformed/empty settings, and cleanup of previously written attributes.
 
-Before reporting completion, confirm:
+Before handing work back for testing, confirm:
 
 - the worktree contains no unintended generated or unrelated files;
+- the topic branch contains the intended commit and is pushed to `origin`;
+- every related GitHub issue has appropriate labels and is still open;
+- every topic branch reads back as formally linked to its related GitHub issue.
+
+After the user approves and you complete the merge, confirm:
+
 - `main` contains the intended commit;
 - `origin/main` and any requested tags point to the expected commits;
-- every related GitHub issue has appropriate labels;
-- every topic branch reads back as formally linked to its related GitHub issue;
 - the GitHub issue is closed only after delivery succeeds.
