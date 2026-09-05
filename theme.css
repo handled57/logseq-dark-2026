@@ -1256,6 +1256,53 @@ textarea.block-editor:focus {
   --hc-verse-gutter: 1.75em;
 }
 
+/* Properties below the box they belong to.
+ *
+ * Logseq renders `.block-properties` ahead of `.block-body` inside
+ * `.block-content`, so a block whose body is an admonition or a passage shows
+ * its property table above the box the properties describe, where the table
+ * reads as belonging to whatever came before it. Ordering the table last in a
+ * flex column moves the render only: the DOM, the stored block and the source
+ * order of the properties are untouched, and clicking into the block still
+ * shows them written where Logseq writes them.
+ *
+ * The scope carries both halves of the condition, so the column is built only
+ * for a `.block-content` that holds one of the six rendered admonitions or a
+ * passage *and* a property table that is still visible. `index.js` marks a
+ * table the configuration hides with `data-hc-hidden`, and a hidden table is
+ * left where it is: an ordinary block, and a styled block rendering bare, keep
+ * the flow layout they already have. */
+.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The table's left border stands where the box's own text starts: the 1px edge
+ * the box carries — transparent, but laid out — then the indent its content
+ * sits at, which is the icon's 2rem, the icon column's 1rem `pr-4`, the 4px
+ * divider and the content's own 1rem `ml-4`. That is the 4.25rem the passage
+ * reserves as padding, so the table lines up with the text of either kind of
+ * box and reads as a continuation of it rather than as a second column. The gap
+ * above the table is wider than the 4px Logseq gives a table in flow, so the
+ * table reads as a footnote to the box rather than as another line of it, and
+ * still much narrower than the 2rem tail below, so it stays plainly attached to
+ * the box it names rather than drifting towards the next block. */
+.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties {
+  order: 1;
+  margin-left: calc(4.25rem + 1px);
+  margin-top: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+/* The 2rem tail the box carries is what would otherwise be left between it and
+ * its own table. Flex items do not collapse margins, so the tail moves to the
+ * table instead: the table sits below the block it describes rather than
+ * halfway to the next one, and the block grows only by the gap above the
+ * table. */
+.block-content:has(> .block-properties:not([data-hc-hidden])) > .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage) {
+  margin-bottom: 0;
+}
+
 mark {
   color: var(--ls-page-mark-color);
   background: var(--ls-page-mark-bg-color);
