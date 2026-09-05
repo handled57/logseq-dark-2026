@@ -111,6 +111,11 @@ const pairings = [
     surface: 'rendered admonition icon dividers',
     upstream: '.admonition-icon',
     theme: '.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon'
+  },
+  {
+    surface: 'verse numbers',
+    upstream: 'mark',
+    theme: '.block-body > .passage mark'
   }
 ]
 
@@ -216,6 +221,26 @@ test('every repaired surface still carries a rule', () => {
  * the passage stops lining up with the admonitions beside it. */
 const admonitionMetrics = ['.h-8{height:2rem}', '.w-8{width:2rem}', '.pr-4{padding-right:1rem}', '.ml-4{margin-left:1rem}']
 
+/* A verse number is a `mark`, which upstream dresses as a page highlight. The
+ * passage has to undo all of it — the padding above all, since the number is
+ * set in a gutter whose width the theme, not the highlight, decides. */
+const markDeclaration =
+  'mark{background:var(--ls-page-mark-bg-color,#fef3ac);border-radius:3px;' +
+  'color:var(--ls-page-mark-color,#262626);padding:2px 4px}'
+
+test('the passage undoes the page-highlight treatment upstream gives a mark', () => {
+  const rule = css.match(/\n\.block-body > \.passage mark \{([^}]*)\}/)
+  assert.ok(rule, '.block-body > .passage mark is missing')
+
+  for (const [property, value] of [
+    ['color', 'var(--vscode-hc-orange)'],
+    ['background', 'transparent'],
+    ['padding', '0']
+  ]) {
+    assert.match(rule[1], new RegExp(`\\n\\s*${property}:\\s*${value.replace(/[().*+?^$|[\]\\]/g, '\\$&')};`))
+  }
+})
+
 test('the passage indent reproduces the admonition icon column', () => {
   const rule = (selector) => {
     const match = css.match(new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')} \\{([^}]*)\\}`))
@@ -263,6 +288,7 @@ test(
     for (const declaration of admonitionMetrics) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }
+    assert.ok(upstream.includes(markDeclaration), 'Logseq no longer ships the page-mark rule')
     for (const token of radixTokens) {
       assert.ok(upstream.includes(`var(${token}`), `Logseq no longer reads ${token}`)
     }

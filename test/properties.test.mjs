@@ -639,7 +639,7 @@ test('stored source keeps a rendered BEGIN_CENTER block bulletless without DOM m
   const centered = bulletBlock({ text: 'center', uuid })
 
   assert.equal(context.shouldHideBullet(centered), false)
-  await context.refreshBulletFromStoredSource(centered)
+  await context.refreshFromStoredSource(centered)
   assert.equal(centered.attributes.has('data-hc-hide-bullet'), true)
 })
 
@@ -648,7 +648,7 @@ test('stored ordinary prose does not become bulletless', async () => {
   const context = load({}, [], { [uuid]: { content: 'ordinary prose' } })
   const prose = bulletBlock({ text: 'ordinary prose', uuid })
 
-  await context.refreshBulletFromStoredSource(prose)
+  await context.refreshFromStoredSource(prose)
   assert.equal(prose.attributes.has('data-hc-hide-bullet'), false)
 })
 
@@ -657,8 +657,8 @@ test('stored source reads are cached per block UUID', async () => {
   const context = load({}, [], { [uuid]: { content: 'ordinary prose' } })
   const prose = bulletBlock({ text: 'ordinary prose', uuid })
 
-  await context.refreshBulletFromStoredSource(prose)
-  await context.refreshBulletFromStoredSource(prose)
+  await context.refreshFromStoredSource(prose)
+  await context.refreshFromStoredSource(prose)
   assert.equal(context.blockReads(), 1)
 })
 
@@ -679,8 +679,56 @@ test('stored source keeps a passage block bulletless when the render carries no 
   const passage = bulletBlock({ text: 'John 3:16', uuid })
 
   assert.equal(context.shouldHideBullet(passage), false)
-  await context.refreshBulletFromStoredSource(passage)
+  await context.refreshFromStoredSource(passage)
   assert.equal(passage.attributes.has('data-hc-hide-bullet'), true)
+})
+
+/* theme.css hangs a verse number in a gutter of its own only where the block's
+ * source says every number opens a line, which is the passage written one verse
+ * per line. These are the sources that do and do not earn that. */
+const HANGING_PASSAGE =
+  '#+BEGIN_PASSAGE\n**John 3:16\u201317**\n\n' +
+  '^^\u00b9\u2076^^For God so loved the world.\n' +
+  '^^\u00b9\u2077^^Indeed, God did not send the Son.\n#+END_PASSAGE'
+const PROSE_PASSAGE =
+  '#+BEGIN_PASSAGE\n**John 3:16\u201317**\n\n' +
+  '^^\u00b9\u2076^^For God so loved the world. ^^\u00b9\u2077^^Indeed, God did not send the Son.' +
+  '\n#+END_PASSAGE'
+
+test('a passage written one verse per line asks the theme for a verse gutter', async () => {
+  const uuid = '65f00000-0000-0000-0000-00000000000c'
+  const context = load({}, [], { [uuid]: { content: `${PASSAGE_PROPERTIES}\n${HANGING_PASSAGE}` } })
+  const passage = bulletBlock({ text: 'John 3:16', uuid })
+
+  await context.refreshFromStoredSource(passage)
+  assert.equal(passage.attributes.has('data-hc-verse-lines'), true)
+})
+
+test('a passage that runs its verses together keeps its numbers where they are', async () => {
+  const sources = {
+    // Numbers inside a paragraph: pulling one into a gutter would land it on the
+    // words before it.
+    prose: PROSE_PASSAGE,
+    // No verse numbers at all: there is nothing to hang.
+    plain: PASSAGE_SOURCE,
+    // One passage per line beside one in prose, in a single block: the block
+    // carries one answer, so the prose settles it.
+    both: `${HANGING_PASSAGE}\n${PROSE_PASSAGE}`,
+    // A highlight of the reader's own is not a verse number.
+    highlighted: HANGING_PASSAGE.replace('the world.', 'the ^^world^^.')
+  }
+
+  for (const [position, [name, content]] of Object.entries(sources).entries()) {
+    const uuid = `65f00000-0000-0000-0000-00000000000${position}`
+    const context = load({}, [], { [uuid]: { content } })
+    const passage = bulletBlock({ text: 'John 3:16', uuid })
+    // Set to begin with, so that a passage rewritten as prose is also seen to
+    // give the gutter back rather than merely never asking for it.
+    passage.setAttribute('data-hc-verse-lines', '')
+
+    await context.refreshFromStoredSource(passage)
+    assert.equal(passage.attributes.has('data-hc-verse-lines'), false, name)
+  }
 })
 
 /* The display options, by the id each checkbox carries. */
@@ -909,7 +957,11 @@ test('unloading leaves no injected node or written attribute behind', async () =
 
   const painted = node('div', {
     classes: ['ls-block'],
-    attributes: { 'data-hc-hide-bullet': '', 'data-hc-block-type': 'foo' }
+    attributes: {
+      'data-hc-hide-bullet': '',
+      'data-hc-block-type': 'foo',
+      'data-hc-verse-lines': ''
+    }
   })
   const table = node('div', { classes: ['block-properties'], attributes: { 'data-hc-hidden': '' } })
   host.appendChild(painted)
@@ -926,6 +978,7 @@ test('unloading leaves no injected node or written attribute behind', async () =
   assert.equal(dialogOf(context), null)
   assert.equal(painted.attributes.has('data-hc-hide-bullet'), false)
   assert.equal(painted.attributes.has('data-hc-block-type'), false)
+  assert.equal(painted.attributes.has('data-hc-verse-lines'), false)
   assert.equal(table.attributes.has('data-hc-hidden'), false)
   assert.equal(context.logseq.observers[0].connected, false)
 
@@ -1181,7 +1234,7 @@ test('each display option formats the passage on its own', async () => {
     [['headings'], '**John 3**\n\nFor God so loved the world. Indeed, God did not send the Son.'],
     [
       ['numbers'],
-      '\u00b9\u2076For God so loved the world. \u00b9\u2077Indeed, God did not send the Son.'
+      '^^\u00b9\u2076^^For God so loved the world. ^^\u00b9\u2077^^Indeed, God did not send the Son.'
     ],
     [['perLine'], 'For God so loved the world.\nIndeed, God did not send the Son.']
   ]) {
@@ -1217,8 +1270,8 @@ test('the three display options are written together, and the cursor still lands
     'tags:: John/3\ntype:: Passage\n' +
       '#+BEGIN_PASSAGE\n**John 3:16\u201317**\n\n' +
       '**John 3**\n\n' +
-      '\u00b9\u2076For God so loved the world.\n' +
-      '\u00b9\u2077Indeed, God did not send the Son.\n' +
+      '^^\u00b9\u2076^^For God so loved the world.\n' +
+      '^^\u00b9\u2077^^Indeed, God did not send the Son.\n' +
       '#+END_PASSAGE'
   )
   const [edit] = context.logseq.Editor.edits
