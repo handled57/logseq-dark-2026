@@ -307,8 +307,21 @@ test('the moved property table starts at the divider and takes the box tail', ()
   assert.equal(Number.parseFloat(offset[1]), Number.parseFloat(column[1]))
   assert.equal(Number.parseInt(offset[2], 10), Number.parseInt(edge[1], 10))
 
+  // The table is set off from the box above it: wider than the 4px Logseq gives
+  // a table sitting in flow, and well inside the 2rem tail below it, so the gap
+  // reads as a break between the box and its own table rather than as the space
+  // between two blocks. Both figures are compared at the 16px root the app runs
+  // at.
+  const rem = 16
+  const gap = table.match(/margin-top:\s*([\d.]+)rem;/)
+  assert.ok(gap, 'the table sits flush against the box above it')
+  const flow = Number.parseInt(spacingMetrics[1].match(/(?:^|;|\{)margin:(\d+)px 0/)[1], 10)
+  const above = Number.parseFloat(gap[1]) * rem
+  assert.ok(above > flow, `the gap above the table (${above}px) is no wider than Logseq's ${flow}px flow gap`)
+  assert.ok(above < 2 * rem, 'the gap above the table is not clearly narrower than the tail below it')
+
   // The 2rem tail Logseq gives the box moves to the table below it, so the
-  // block keeps the height it had and the table sits against its own box.
+  // table stays with its own box instead of drifting to the next block.
   assert.ok(spacingMetrics[0].includes('margin:2rem 0'), 'the pinned box tail is no longer 2rem')
   assert.match(table, /margin-bottom:\s*2rem;/)
   assert.match(css, /> \.block-body > :is\([^{]*\.passage\) \{\s*\n\s*margin-bottom:\s*0;/)

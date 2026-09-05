@@ -426,14 +426,15 @@ test('a visible property table renders below the admonition or passage it names'
   )
 
   // Last in the column, and starting at the divider: the box's own 1px edge,
-  // the 2rem icon, and the icon column's 1rem `pr-4`.
+  // the 2rem icon, and the icon column's 1rem `pr-4`. The table is set off from
+  // the box above it and carries the box's 2rem tail below it.
   assert.match(
     css,
-    new RegExp(`${escapeRegExp(scope)} > \\.block-properties \\{[\\s\\S]*?order:\\s*1;[\\s\\S]*?margin-left:\\s*calc\\(3rem \\+ 1px\\);[\\s\\S]*?margin-bottom:\\s*2rem;`)
+    new RegExp(`${escapeRegExp(scope)} > \\.block-properties \\{[\\s\\S]*?order:\\s*1;[\\s\\S]*?margin-left:\\s*calc\\(3rem \\+ 1px\\);[\\s\\S]*?margin-top:\\s*0\\.75rem;[\\s\\S]*?margin-bottom:\\s*2rem;`)
   )
 
   // The 2rem tail moves off the box and onto the table below it, so the table
-  // sits against the block it describes and the block keeps its height.
+  // stays with the block it describes rather than drifting to the next one.
   assert.match(
     css,
     new RegExp(`\\.block-content:has\\(> \\.block-properties:not\\(\\[data-hc-hidden\\]\\)\\) > \\.block-body > ${escapeRegExp(boxes)} \\{\\s*\\n\\s*margin-bottom:\\s*0;`)
