@@ -66,6 +66,8 @@ const expected = [
   `${prefix}lib/lsplugin.user.js`,
   `${prefix}manifest.json`,
   `${prefix}package.json`,
+  // The README embeds the palette chart, so the archive carries it too.
+  `${prefix}screenshots/color-palette.svg`,
   `${prefix}screenshots/logseq-dark-high-contrast.png`,
   `${prefix}theme.css`
 ].sort()
