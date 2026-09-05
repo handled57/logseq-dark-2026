@@ -144,11 +144,58 @@ test('the plugin entry loads the vendored SDK before the property script', async
   assert.ok(sdk.length > 10_000, 'the vendored SDK is unexpectedly small')
 
   assert.match(entry, /<script src="\.\/lib\/lsplugin\.user\.js"><\/script>/)
+  assert.match(entry, /<script src="\.\/bible\.js"><\/script>/)
   assert.match(entry, /<script src="\.\/index\.js"><\/script>/)
   assert.ok(
     entry.indexOf('lsplugin.user.js') < entry.indexOf('index.js'),
     'index.js runs before the SDK defines the logseq global'
   )
+  // Both are classic scripts sharing one global scope, so the parser has to be
+  // defined by the time the entry script calls it.
+  assert.ok(
+    entry.indexOf('bible.js') < entry.indexOf('index.js'),
+    'index.js runs before bible.js defines the reference parser'
+  )
+})
+
+test('the package ships the reference manifest and no verse text', async () => {
+  const parser = await readFile(resolve(root, 'bible.js'), 'utf8')
+  const books = JSON.parse(await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8'))
+  const ignored = await readFile(resolve(root, '.gitignore'), 'utf8')
+
+  assert.ok(pkg.files.includes('bible.js'))
+  assert.ok(pkg.files.includes('resources/bible.books.json'))
+  // The verse text is a licensed edition. It is built locally, never committed,
+  // and the manifest that ships in its place carries counts, not words.
+  assert.deepEqual(
+    pkg.files.filter((file) => file.startsWith('resources')),
+    ['resources/bible.books.json']
+  )
+  assert.match(ignored, /^resources\/\*$/m)
+  assert.match(ignored, /^!resources\/bible\.books\.json$/m)
+
+  assert.deepEqual(books.stats, { books: 84, chapters: 1398, verses: 37758 })
+  // Names, counts and offsets, and nothing else: a stray text field would be
+  // verse text republished under another name.
+  for (const book of books.books) {
+    assert.deepEqual(
+      Object.keys(book).sort(),
+      ['bookId', 'chapters', 'fromVerseId', 'longName', 'shortName'],
+      book.shortName
+    )
+    for (const chapter of book.chapters) {
+      assert.deepEqual(
+        Object.keys(chapter).filter((key) => !['chapter', 'verses', 'first', 'missing'].includes(key)),
+        [],
+        `${book.shortName} ${chapter.chapter}`
+      )
+    }
+  }
+
+  // The parser reaches nothing: no host document, no network, no plugin API.
+  // Its own prose says as much, so the check reads the code without it.
+  const code = parser.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  assert.doesNotMatch(code, /parent\.|document|fetch\(|logseq\./)
 })
 
 test('the property script reads the host document and hides only its own table', () => {

@@ -60,12 +60,16 @@ const expected = [
   `${prefix}LICENSE`,
   `${prefix}README.md`,
   `${prefix}THIRD_PARTY_NOTICES.md`,
+  `${prefix}bible.js`,
   `${prefix}icon.svg`,
   `${prefix}index.html`,
   `${prefix}index.js`,
   `${prefix}lib/lsplugin.user.js`,
   `${prefix}manifest.json`,
   `${prefix}package.json`,
+  /* The manifest, and only the manifest: the verse text it is built alongside
+   * is a licensed edition, and shipping it here would republish it. */
+  `${prefix}resources/bible.books.json`,
   // The README embeds the palette chart, so the archive carries it too.
   `${prefix}screenshots/color-palette.svg`,
   `${prefix}screenshots/logseq-dark-high-contrast.png`,
@@ -91,6 +95,33 @@ assert.equal(
   sourceScript,
   'archived index.js differs from the canonical plugin script'
 )
+
+const sourceParser = await readFile(resolve(root, 'bible.js'), 'utf8')
+assert.equal(
+  entries.get(`${prefix}bible.js`).toString('utf8'),
+  sourceParser,
+  'archived bible.js differs from the canonical reference parser'
+)
+
+/* The archived manifest is the shipped one, and it has to hold no verse text:
+ * every book carries names, counts and offsets only. */
+const archivedBooks = JSON.parse(entries.get(`${prefix}resources/bible.books.json`).toString('utf8'))
+const bookKeys = ['bookId', 'shortName', 'longName', 'fromVerseId', 'chapters']
+const chapterKeys = ['chapter', 'verses', 'first', 'missing']
+for (const book of archivedBooks.books) {
+  assert.deepEqual(
+    Object.keys(book).filter((key) => !bookKeys.includes(key)),
+    [],
+    `${book.shortName} carries fields beyond the manifest's own`
+  )
+  for (const chapter of book.chapters) {
+    assert.deepEqual(
+      Object.keys(chapter).filter((key) => !chapterKeys.includes(key)),
+      [],
+      `${book.shortName} ${chapter.chapter} carries fields beyond the manifest's own`
+    )
+  }
+}
 
 const sourceScreenshot = await readFile(resolve(root, 'screenshots', 'logseq-dark-high-contrast.png'))
 assert.deepEqual(
