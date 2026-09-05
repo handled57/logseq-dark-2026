@@ -1181,7 +1181,7 @@ test('each display option formats the passage on its own', async () => {
     [['headings'], '**John 3**\n\nFor God so loved the world. Indeed, God did not send the Son.'],
     [
       ['numbers'],
-      '<sup>16</sup>For God so loved the world. <sup>17</sup>Indeed, God did not send the Son.'
+      '\u00b9\u2076For God so loved the world. \u00b9\u2077Indeed, God did not send the Son.'
     ],
     [['perLine'], 'For God so loved the world.\nIndeed, God did not send the Son.']
   ]) {
@@ -1217,8 +1217,8 @@ test('the three display options are written together, and the cursor still lands
     'tags:: John/3\ntype:: Passage\n' +
       '#+BEGIN_PASSAGE\n**John 3:16\u201317**\n\n' +
       '**John 3**\n\n' +
-      '<sup>16</sup>For God so loved the world.\n' +
-      '<sup>17</sup>Indeed, God did not send the Son.\n' +
+      '\u00b9\u2076For God so loved the world.\n' +
+      '\u00b9\u2077Indeed, God did not send the Son.\n' +
       '#+END_PASSAGE'
   )
   const [edit] = context.logseq.Editor.edits
