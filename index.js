@@ -20,6 +20,7 @@ const STYLE_KEY = 'hc-hidden-properties'
 const HIDDEN_ATTR = 'data-hc-hidden'
 const TYPE_ATTR = 'data-hc-block-type'
 const BULLET_ATTR = 'data-hc-hide-bullet'
+const VERSE_ATTR = 'data-hc-verse-lines'
 const sourceCache = new Map()
 
 const SPECIAL_CONTENT_SELECTOR = [
@@ -225,7 +226,44 @@ function setBulletVisibility(block, hidden) {
   else block.removeAttribute(BULLET_ATTR)
 }
 
-async function refreshBulletFromStoredSource(block) {
+/* Highlight markup, and the one shape of it the Passage command writes: the
+ * superscript digits of `bibleVerseNumber` wrapped in the markup that gives a
+ * verse number a `mark` element to be colored through. A highlight of the
+ * reader's own is a `mark` too, which is why every one of them is read here
+ * rather than only the numbers. */
+const HIGHLIGHT = /\^\^[\s\S]+?\^\^/g
+const VERSE_NUMBER = /^\^\^[\u2070\u00b9\u00b2\u00b3\u2074-\u2079]+\^\^$/
+
+/* theme.css hangs a verse number in a gutter beside its verse, which is only
+ * right where every number starts a line — the passage written one verse per
+ * line. The render cannot be asked: inside `#+BEGIN_PASSAGE` mldoc parses the
+ * whole body as one paragraph of inline nodes separated by line breaks, and a
+ * number that merely follows a poetry break inside the verse before it is
+ * indistinguishable, in CSS, from one that opens a line. The block's own source
+ * says it plainly, so it is read here and answered once for the block: a block
+ * that holds any number mid-line — prose, or a prose passage beside a
+ * one-verse-per-line one — keeps every number where the text puts it. */
+function versesOpenLines(text) {
+  let seen = false
+
+  for (const line of text.split(/\r?\n/)) {
+    const marked = line.match(HIGHLIGHT)
+    if (!marked) continue
+    if (marked.length > 1 || !VERSE_NUMBER.test(marked[0]) || !line.startsWith(marked[0])) {
+      return false
+    }
+    seen = true
+  }
+
+  return seen
+}
+
+function setVerseLines(block, hanging) {
+  if (hanging) block.setAttribute(VERSE_ATTR, '')
+  else block.removeAttribute(VERSE_ATTR)
+}
+
+async function refreshFromStoredSource(block) {
   const uuid = blockUuid(block)
   if (!uuid || typeof logseq.Editor?.getBlock !== 'function') return
 
@@ -237,7 +275,9 @@ async function refreshBulletFromStoredSource(block) {
     }
     const stored = await request
     if (typeof stored?.content !== 'string') return
-    setBulletVisibility(block, specialSource(stored.content.trim()) || shouldHideBullet(block))
+    const source = stored.content.trim()
+    setBulletVisibility(block, specialSource(source) || shouldHideBullet(block))
+    setVerseLines(block, versesOpenLines(source))
   } catch (error) {
     sourceCache.delete(uuid)
     console.warn('Dark High Contrast could not classify block source', uuid, error)
@@ -824,7 +864,7 @@ function paint() {
 
   for (const block of doc.querySelectorAll('.ls-block')) {
     setBulletVisibility(block, shouldHideBullet(block))
-    void refreshBulletFromStoredSource(block)
+    void refreshFromStoredSource(block)
   }
 
   for (const table of doc.querySelectorAll('.block-properties')) {
@@ -867,6 +907,7 @@ function teardown() {
   for (const node of doc.querySelectorAll(`[${COMMAND_ATTR}], [${DIALOG_ATTR}]`)) node.remove()
   for (const table of doc.querySelectorAll(`[${HIDDEN_ATTR}]`)) table.removeAttribute(HIDDEN_ATTR)
   for (const block of doc.querySelectorAll(`[${BULLET_ATTR}]`)) block.removeAttribute(BULLET_ATTR)
+  for (const block of doc.querySelectorAll(`[${VERSE_ATTR}]`)) block.removeAttribute(VERSE_ATTR)
   for (const block of doc.querySelectorAll(`[${TYPE_ATTR}]`)) block.removeAttribute(TYPE_ATTR)
 }
 
