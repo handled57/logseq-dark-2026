@@ -17,8 +17,8 @@ All notable changes to this project are documented here.
   does not resolve: an unknown book, a chapter or verse the edition does not
   carry, or a range that runs backwards such as `Ex 2-Gen 50`.
 - Write the passage text under the reference as plain prose — no verse numbers,
-  no section headings, and poetry keeps its lineation — when a local text index
-  is present. The index is built by `scripts/build-bible-index.mjs` from an
+  no section headings, a blank line between paragraphs, and poetry keeps its
+  lineation — when a local text index is present. The index is built by `scripts/build-bible-index.mjs` from an
   edition of your own; no verse text is committed here or shipped in the
   release. Without it the command still writes the reference and its tags, so
   the theme is fully usable installed from the Marketplace.
