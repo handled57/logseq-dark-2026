@@ -116,6 +116,12 @@ const pairings = [
     surface: 'verse numbers',
     upstream: 'mark',
     theme: '.block-body > .passage mark'
+  },
+  {
+    surface: 'a property table under an admonition or a passage',
+    upstream: '.block-properties',
+    theme:
+      '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties'
   }
 ]
 
@@ -221,6 +227,14 @@ test('every repaired surface still carries a rule', () => {
  * the passage stops lining up with the admonitions beside it. */
 const admonitionMetrics = ['.h-8{height:2rem}', '.w-8{width:2rem}', '.pr-4{padding-right:1rem}', '.ml-4{margin-left:1rem}']
 
+/* The vertical half of the same geometry. A property table moved under a box
+ * inherits the box's 2rem tail, and keeps the 4px of its own the table has
+ * always carried above it. */
+const spacingMetrics = [
+  '.abstract,.admonitionblock{margin:2rem 0}',
+  '.block-properties,.page-properties{background-color:var(--lx-gray-03,var(--ls-block-properties-background-color,var(--rx-gray-03)));margin:4px 0;padding:4px 8px}'
+]
+
 /* A verse number is a `mark`, which upstream dresses as a page highlight. The
  * passage has to undo all of it — the padding above all, since the number is
  * set in a gutter whose width the theme, not the highlight, decides. */
@@ -271,6 +285,35 @@ test('the passage indent reproduces the admonition icon column', () => {
   assert.equal(indent, column + divider + 1)
 })
 
+test('the moved property table starts at the divider and takes the box tail', () => {
+  const declarations = (selector) => {
+    const start = css.indexOf(`\n${selector} {`)
+    assert.ok(start >= 0, `${selector} is missing`)
+    return css.slice(start, css.indexOf('}', start))
+  }
+
+  const scope =
+    '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden]))'
+  const table = declarations(`${scope} > .block-properties`)
+
+  const offset = table.match(/margin-left:\s*calc\(([\d.]+)rem \+ (\d+)px\)/)
+  assert.ok(offset, 'the table carries no offset to the divider')
+
+  // The divider stands at the end of the icon column, inside the transparent
+  // edge the box is drawn with — the same two figures the passage is built
+  // from, so the table lines up with either kind of box.
+  const column = declarations('.block-body > .passage::before').match(/width:\s*([\d.]+)rem/)
+  const edge = declarations('.block-body > .passage').match(/border:\s*(\d+)px solid transparent/)
+  assert.equal(Number.parseFloat(offset[1]), Number.parseFloat(column[1]))
+  assert.equal(Number.parseInt(offset[2], 10), Number.parseInt(edge[1], 10))
+
+  // The 2rem tail Logseq gives the box moves to the table below it, so the
+  // block keeps the height it had and the table sits against its own box.
+  assert.ok(spacingMetrics[0].includes('margin:2rem 0'), 'the pinned box tail is no longer 2rem')
+  assert.match(table, /margin-bottom:\s*2rem;/)
+  assert.match(css, /> \.block-body > :is\([^{]*\.passage\) \{\s*\n\s*margin-bottom:\s*0;/)
+})
+
 /* Optional: confirm the pinned literals still describe the installed app. */
 const upstreamPath = process.env.LOGSEQ_CSS
 test(
@@ -285,7 +328,7 @@ test(
         `${surface}: upstream no longer ships "${selector}"`
       )
     }
-    for (const declaration of admonitionMetrics) {
+    for (const declaration of [...admonitionMetrics, ...spacingMetrics]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }
     assert.ok(upstream.includes(markDeclaration), 'Logseq no longer ships the page-mark rule')
