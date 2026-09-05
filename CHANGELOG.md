@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## 1.5.0 - 2026-09-05
+
+- Add a passage block: `#+BEGIN_PASSAGE` renders with the black surface, the
+  transparent outer edge and the 4px accent divider of a named admonition, plus
+  a cyan open-book icon the theme supplies inline, because Logseq's admonition
+  list is closed and emits a bare `div.passage` for this block.
+- Insert one from the `/passage` slash command or from a Passage entry added to
+  the `<` command picker. Both prompt for a reference, write it in bold on the
+  first line, and leave the cursor on the blank writing line beneath it.
+- Hide a rendered passage block's bullet from the rendered DOM as well as from
+  the stored source, so it never appears while the source lookup is in flight.
+
 ## 1.4.6 - 2026-09-04
 
 - Remove the visible outer border from rendered tip, note, important, caution,

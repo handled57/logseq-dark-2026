@@ -468,7 +468,7 @@ hr {
  * block is bulletless even before its data attribute is painted. */
 .ls-block:has(> .block-main-container > .block-content-wrapper:is(.center, .CENTER, .org-center, [style*="text-align: center"], [style*="text-align:center"], .verse, .VERSE, .org-verse))
   > .block-main-container > .block-control-wrap .bullet-container:not(.typed-list),
-.ls-block:has(> .block-main-container > .block-content-wrapper :is(.org-src-container, .src, .center, .CENTER, .org-center, [style*="text-align: center"], [style*="text-align:center"], .verse, .VERSE, .org-verse))
+.ls-block:has(> .block-main-container > .block-content-wrapper :is(.org-src-container, .src, .center, .CENTER, .org-center, [style*="text-align: center"], [style*="text-align:center"], .verse, .VERSE, .org-verse, .passage))
   > .block-main-container > .block-control-wrap .bullet-container:not(.typed-list) {
   opacity: 0 !important;
 }
@@ -1120,6 +1120,69 @@ textarea.block-editor:focus {
   color: var(--hc-admonition-accent) !important;
   fill: var(--hc-admonition-accent) !important;
 }
+
+/* `PASSAGE` is not one of the admonition names compiled into mldoc, so
+ * `#+BEGIN_PASSAGE` takes the generic custom-block path and renders as a bare
+ * `div.passage`: no `.admonitionblock` container, no title row, no icon, and
+ * none of the rules above can reach it. These rules reproduce that treatment on
+ * the bare div instead — the same black surface, the same transparent outer
+ * edge, the same 4px divider, driven through the same `--hc-admonition-accent`
+ * vocabulary — and supply the icon the app does not.
+ *
+ * A real admonition wraps its content in `.admonition-content`, so its icon can
+ * be a flex sibling. The passage div has no such wrapper: its paragraphs are
+ * direct children. The icon column is therefore drawn as one stretched
+ * pseudo-element over a reserved indent, which also keeps the divider running
+ * the full height of the block whatever the passage is. */
+.block-body > .passage {
+  --hc-admonition-accent: var(--vscode-hc-cyan);
+
+  position: relative;
+  margin: 0.5rem 0;
+  padding: 0.75rem 1rem 0.75rem 4rem;
+  background: var(--vscode-hc-black) !important;
+  border: 1px solid transparent !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+/* One pseudo-element carries both halves of the icon column: the mask paints
+ * the glyph on the first line, the border draws the divider. `mask-image`
+ * rather than a colored `background-image` keeps the color a palette token.
+ * The SVG is inlined as a `data:` URI, so nothing is fetched. */
+.block-body > .passage::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2.75rem;
+  background-color: var(--hc-admonition-accent);
+  border-right: 4px solid var(--hc-admonition-accent);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11.2 6.6C8.9 5 5.9 4.3 2.8 4.5a.9.9 0 0 0-.8.9v12.7c0 .5.4.9 1 .9 2.7-.2 5.3.4 7.2 1.8.4.3.9 0 .9-.5V7.3a.9.9 0 0 0-.4-.7z'/%3E%3Cpath d='M12.8 6.6C15.1 5 18.1 4.3 21.2 4.5c.4 0 .8.4.8.9v12.7c0 .5-.4.9-1 .9-2.7-.2-5.3.4-7.2 1.8-.4.3-.9 0-.9-.5V7.3c0-.3.1-.5.4-.7z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11.2 6.6C8.9 5 5.9 4.3 2.8 4.5a.9.9 0 0 0-.8.9v12.7c0 .5.4.9 1 .9 2.7-.2 5.3.4 7.2 1.8.4.3.9 0 .9-.5V7.3a.9.9 0 0 0-.4-.7z'/%3E%3Cpath d='M12.8 6.6C15.1 5 18.1 4.3 21.2 4.5c.4 0 .8.4.8.9v12.7c0 .5-.4.9-1 .9-2.7-.2-5.3.4-7.2 1.8-.4.3-.9 0-.9-.5V7.3c0-.3.1-.5.4-.7z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: 50% 0.875rem;
+  mask-position: 50% 0.875rem;
+  -webkit-mask-size: 20px 20px;
+  mask-size: 20px 20px;
+}
+
+.block-body > .passage > * {
+  margin: 0;
+}
+
+.block-body > .passage > * + * {
+  margin-top: 0.35rem;
+}
+
+/* The reference is the bold first line of the source, so it is the first
+ * paragraph of the render. */
+.block-body > .passage .is-paragraph:first-child {
+  color: var(--vscode-hc-white);
+}
+
 
 mark {
   color: var(--ls-page-mark-color);
