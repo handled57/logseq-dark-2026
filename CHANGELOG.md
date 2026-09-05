@@ -28,6 +28,10 @@ All notable changes to this project are documented here.
   Habakkuk, `Psalm` for the Psalms, the thirteen tail books named one
   deuterocanonical book out of step, and section headings and psalm
   superscriptions left at the end of the preceding verse.
+- Make **Insert** the reference prompt's default action: Enter inserts and
+  Escape cancels wherever the key lands, because the dialog now claims those
+  two keys ahead of Logseq's own editor shortcuts, which previously saw Enter
+  first and opened a new block behind the prompt.
 - Add a **Passage text index** setting naming a `bible.text.json` outside the
   theme's own folder.
 

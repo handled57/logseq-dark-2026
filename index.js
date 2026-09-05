@@ -593,6 +593,7 @@ function askForReference() {
 
     function close(reference) {
       dismissDialog = null
+      doc.removeEventListener('keydown', keys, true)
       overlay.remove()
       resolve(reference)
     }
@@ -612,6 +613,23 @@ function askForReference() {
       else message.textContent = resolved.error
     }
 
+    /* Insert is the dialog's default action, and Escape its cancel, for as long
+     * as it is open. The host binds its own editor shortcuts on the document
+     * and sees a key there before it ever reaches the dialog — Enter would open
+     * a new block behind the prompt — so the dialog claims those two keys on
+     * the same document in the same capturing phase, ahead of the host, and
+     * lets everything else through to whatever has focus. */
+    function keys(event) {
+      if (event.key !== 'Enter' && event.key !== 'Escape') return
+
+      event.preventDefault?.()
+      event.stopPropagation()
+      event.stopImmediatePropagation?.()
+
+      if (event.key === 'Escape') close(null)
+      else submit(event)
+    }
+
     input.addEventListener('input', () => {
       insert.disabled = input.value.trim() === ''
       message.textContent = ''
@@ -621,13 +639,13 @@ function askForReference() {
     overlay.addEventListener('mousedown', (event) => {
       if (event.target === overlay) close(null)
     })
-    /* The host binds its own editor shortcuts on the document, so every key the
-     * dialog owns stops here rather than reaching the block behind it. */
+    /* Nothing typed into the dialog belongs to the block behind it. */
     overlay.addEventListener('keydown', (event) => {
       event.stopPropagation()
       if (event.key === 'Escape') close(null)
       else if (event.key === 'Enter') submit(event)
     })
+    doc.addEventListener('keydown', keys, true)
 
     actions.appendChild(cancel)
     actions.appendChild(insert)
