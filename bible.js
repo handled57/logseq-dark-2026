@@ -347,12 +347,19 @@ function bibleDisplay(options) {
  * verse in the passage. Digits are plain text and parse the same wherever they
  * fall, and Inter — the font Logseq ships, and the first this theme names —
  * draws all ten. The number sits against its verse with no space between, so
- * the two never wrap apart. */
+ * the two never wrap apart.
+ *
+ * The digits are wrapped in highlight markup because a bare run of text is
+ * nothing theme.css can reach: `^^…^^` parses as emphasis wherever it falls,
+ * line start included, and Logseq renders it as a `mark` element, which is the
+ * element the theme colors and hangs in its own gutter. The markup holds the
+ * digits rather than replacing them, so a passage read anywhere else — another
+ * theme, a plain editor, the clipboard — still shows the number as a number. */
 const BIBLE_SUPERSCRIPTS = '\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079'
 
 function bibleVerseNumber(number, text) {
   const digits = String(number).replace(/\d/g, (digit) => BIBLE_SUPERSCRIPTS[Number(digit)])
-  return `${digits}${text}`
+  return `^^${digits}^^${text}`
 }
 
 function composePassageText(resolved, textIndex, options) {
