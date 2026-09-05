@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## 1.5.1 - 2026-09-05
+
+- Match the passage block to a rendered admonition exactly: the icon is drawn
+  at the admonition's own 2rem size, vertically centered against the block
+  rather than pinned near its top, and the divider between the icon and the
+  text is restored. The divider is now a second pseudo-element, because the
+  mask that paints the icon was clipping the border off the box that carried
+  both. Passage text also takes the admonition's type size, indent, paragraph
+  spacing and block margin.
+
 ## 1.5.0 - 2026-09-05
 
 - Add a passage block: `#+BEGIN_PASSAGE` renders with the black surface, the

@@ -288,17 +288,34 @@ test('the passage block reproduces the admonition treatment on its own selectors
     /\.block-body > \.passage \{[\s\S]*?background:\s*var\(--vscode-hc-black\)\s*!important[\s\S]*?border:\s*1px solid transparent\s*!important/
   )
 
-  // The icon column: one pseudo-element carrying the masked glyph and the same
-  // four-pixel divider the admonition icons draw.
+  // The indent a real admonition builds out of `w-8` + `pr-4` + the divider +
+  // `ml-4`, restated as padding, and the row height its `h-8` icon forces.
   assert.match(
     css,
-    /\.block-body > \.passage::before \{[\s\S]*?background-color:\s*var\(--hc-admonition-accent\)[\s\S]*?border-right:\s*4px solid var\(--hc-admonition-accent\)/
+    /\.block-body > \.passage \{[\s\S]*?padding:\s*0 0 0 4\.25rem[\s\S]*?min-height:\s*2rem[\s\S]*?font-size:\s*1\.125rem/
   )
+
+  // The divider is its own pseudo-element: a mask clips the border off the box
+  // it is applied to, so the glyph and the line cannot share one element.
+  assert.match(
+    css,
+    /\.block-body > \.passage::before \{[\s\S]*?width:\s*3rem;[\s\S]*?border-right:\s*4px solid var\(--hc-admonition-accent\)/
+  )
+  assert.doesNotMatch(css, /\.block-body > \.passage::before \{[^}]*mask/)
+
+  // The glyph: a full-height box with the icon centered in it, matching the
+  // `flex-col justify-center` column and `h-8 w-8` icon of an admonition.
+  assert.match(
+    css,
+    /\.block-body > \.passage::after \{[\s\S]*?width:\s*2rem;[\s\S]*?background-color:\s*var\(--hc-admonition-accent\)/
+  )
+  assert.match(css, /\.block-body > \.passage::after \{[^}]*?\n\s*mask-position:\s*50% 50%/)
+  assert.match(css, /\.block-body > \.passage::after \{[^}]*?\n\s*mask-size:\s*2rem 2rem/)
   // `mask-image` over a colored `background-image`, so the icon's color stays a
   // palette token rather than being baked into the SVG.
-  assert.match(css, /\.block-body > \.passage::before \{[\s\S]*?\n\s*mask-image:\s*url\("data:image\/svg\+xml,/)
-  assert.match(css, /\.block-body > \.passage::before \{[\s\S]*?-webkit-mask-image:\s*url\("data:image\/svg\+xml,/)
-  assert.doesNotMatch(css, /\.block-body > \.passage::before \{[\s\S]*?background-image:/)
+  assert.match(css, /\.block-body > \.passage::after \{[\s\S]*?\n\s*mask-image:\s*url\("data:image\/svg\+xml,/)
+  assert.match(css, /\.block-body > \.passage::after \{[\s\S]*?-webkit-mask-image:\s*url\("data:image\/svg\+xml,/)
+  assert.doesNotMatch(css, /\.block-body > \.passage::after \{[^}]*background-image:/)
 
   // The bullet must go before the asynchronous stored-source lookup resolves.
   assert.match(

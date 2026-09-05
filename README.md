@@ -182,7 +182,7 @@ A **passage block** holds a quoted passage under a bold reference:
 #+END_PASSAGE
 ```
 
-It renders bulletless, on the black admonition surface, with a cyan open-book icon and the same 4px accent divider the named admonitions carry.
+It renders bulletless, on the black admonition surface, with a cyan open-book icon and the same 4px accent divider the named admonitions carry. The icon is the size a named admonition draws, vertically centered against the block, and the text sits at the same indent, so a passage and an admonition line up beside each other.
 
 `PASSAGE` is not one of the admonition names compiled into Logseq's parser, and that list cannot be extended by a theme, a setting or a plugin. Logseq renders the block as a plain `div.passage` with no icon and no container styling, so the theme reproduces the admonition treatment on its own selectors and supplies the icon itself, inlined as an SVG mask so its color stays a palette token. The block is styled to *match* the admonitions; it is not parsed as one.
 
