@@ -425,12 +425,12 @@ test('a visible property table renders below the admonition or passage it names'
     'the reordering column is missing or is not scoped to a visible table on a rendered box'
   )
 
-  // Last in the column, and starting at the divider: the box's own 1px edge,
-  // the 2rem icon, and the icon column's 1rem `pr-4`. The table is set off from
-  // the box above it and carries the box's 2rem tail below it.
+  // Last in the column, and lined up with the box's text: the box's own 1px
+  // edge, then the 4.25rem indent its content sits at. The table is set off
+  // from the box above it and carries the box's 2rem tail below it.
   assert.match(
     css,
-    new RegExp(`${escapeRegExp(scope)} > \\.block-properties \\{[\\s\\S]*?order:\\s*1;[\\s\\S]*?margin-left:\\s*calc\\(3rem \\+ 1px\\);[\\s\\S]*?margin-top:\\s*0\\.75rem;[\\s\\S]*?margin-bottom:\\s*2rem;`)
+    new RegExp(`${escapeRegExp(scope)} > \\.block-properties \\{[\\s\\S]*?order:\\s*1;[\\s\\S]*?margin-left:\\s*calc\\(4\\.25rem \\+ 1px\\);[\\s\\S]*?margin-top:\\s*0\\.75rem;[\\s\\S]*?margin-bottom:\\s*2rem;`)
   )
 
   // The 2rem tail moves off the box and onto the table below it, so the table

@@ -5,8 +5,8 @@ All notable changes to this project are documented here.
 ## 1.9.0 - 2026-09-05
 
 - Render a visible property table below the block's admonition or passage
-  rather than above it, with the table's left border on the divider between the
-  icon and the content, and a small gap between the two. Logseq renders the
+  rather than above it, with the table's left border lined up with the box's own
+  text and a small gap between the two. Logseq renders the
   table ahead of the block body, which left it sitting above the box it
   describes; the change is to the render only, so the properties stay first in
   the block's source and clicking into the block still shows them where Logseq

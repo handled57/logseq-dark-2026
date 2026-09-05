@@ -1277,19 +1277,19 @@ textarea.block-editor:focus {
   flex-direction: column;
 }
 
-/* The table begins at the divider between the icon column and the content: the
- * 1px edge the box itself carries — transparent, but laid out — then the
- * icon's own 2rem and the icon column's 1rem `pr-4`. That is where a real
- * `.admonition-icon` border sits, and where the passage draws its `::before`,
- * so the table's left border lands on the divider and the line the icon column
- * ends in carries on down the side of the table. The gap above the table is
- * wider than the 4px Logseq gives a table in flow, so the table reads as a
- * footnote to the box rather than as another line of it, and still much
- * narrower than the 2rem tail below, so it stays plainly attached to the box it
- * names rather than drifting towards the next block. */
+/* The table's left border stands where the box's own text starts: the 1px edge
+ * the box carries — transparent, but laid out — then the indent its content
+ * sits at, which is the icon's 2rem, the icon column's 1rem `pr-4`, the 4px
+ * divider and the content's own 1rem `ml-4`. That is the 4.25rem the passage
+ * reserves as padding, so the table lines up with the text of either kind of
+ * box and reads as a continuation of it rather than as a second column. The gap
+ * above the table is wider than the 4px Logseq gives a table in flow, so the
+ * table reads as a footnote to the box rather than as another line of it, and
+ * still much narrower than the 2rem tail below, so it stays plainly attached to
+ * the box it names rather than drifting towards the next block. */
 .block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties {
   order: 1;
-  margin-left: calc(3rem + 1px);
+  margin-left: calc(4.25rem + 1px);
   margin-top: 0.75rem;
   margin-bottom: 2rem;
 }

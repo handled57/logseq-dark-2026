@@ -285,7 +285,7 @@ test('the passage indent reproduces the admonition icon column', () => {
   assert.equal(indent, column + divider + 1)
 })
 
-test('the moved property table starts at the divider and takes the box tail', () => {
+test('the moved property table lines up with the box text and takes the box tail', () => {
   const declarations = (selector) => {
     const start = css.indexOf(`\n${selector} {`)
     assert.ok(start >= 0, `${selector} is missing`)
@@ -297,14 +297,15 @@ test('the moved property table starts at the divider and takes the box tail', ()
   const table = declarations(`${scope} > .block-properties`)
 
   const offset = table.match(/margin-left:\s*calc\(([\d.]+)rem \+ (\d+)px\)/)
-  assert.ok(offset, 'the table carries no offset to the divider')
+  assert.ok(offset, 'the table carries no offset to the box text')
 
-  // The divider stands at the end of the icon column, inside the transparent
-  // edge the box is drawn with — the same two figures the passage is built
-  // from, so the table lines up with either kind of box.
-  const column = declarations('.block-body > .passage::before').match(/width:\s*([\d.]+)rem/)
+  // A box's text starts at the indent the passage reserves as padding — the
+  // icon column, the divider and the content's own `ml-4` — laid inside the
+  // transparent edge the box is drawn with. Both figures are read back off the
+  // passage, so the table lines up with the text of either kind of box.
+  const indent = declarations('.block-body > .passage').match(/padding:\s*0 0 0 ([\d.]+)rem/)
   const edge = declarations('.block-body > .passage').match(/border:\s*(\d+)px solid transparent/)
-  assert.equal(Number.parseFloat(offset[1]), Number.parseFloat(column[1]))
+  assert.equal(Number.parseFloat(offset[1]), Number.parseFloat(indent[1]))
   assert.equal(Number.parseInt(offset[2], 10), Number.parseInt(edge[1], 10))
 
   // The table is set off from the box above it: wider than the 4px Logseq gives
