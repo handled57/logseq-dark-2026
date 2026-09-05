@@ -186,9 +186,22 @@ const textIndex = {
     },
     Matt: {
       17: { verses: ['He said to them.', 'As they were gathering.'], numbers: [20, 22], paragraphs: [20] }
+    },
+    /* Adjacent one- and four-chapter books, which is what makes a span across a
+     * book boundary small enough to write out here. */
+    Obad: {
+      1: { verses: ['The vision of Obadiah.', 'I will make you least.'], paragraphs: [1] }
+    },
+    Jonah: {
+      1: { verses: ['Now the word of the LORD.', 'Go at once to Nineveh.'], paragraphs: [1] }
     }
   }
 }
+
+/* Every display option off, which is what the dialog opens with. */
+const PLAIN = { headings: false, numbers: false, perLine: false }
+
+const compose = (reference, options) => composePassageText(resolved(reference), textIndex, options)
 
 test('the passage text is prose, with paragraphs kept and verse numbers dropped', () => {
   // A paragraph break is a blank line: without one the paragraphs render as a
@@ -229,7 +242,131 @@ test('an absent text index composes nothing rather than failing', () => {
   assert.equal(composePassageText(resolved('Gen 1'), { books: {} }), '')
   assert.equal(composePassageText({ ok: false }, textIndex), '')
   // A book the index does not carry is the same case as no index at all.
-  assert.equal(composePassageText(resolved('Ex 1'), textIndex), '')
+  assert.equal(composePassageText(resolved('Lev 1'), textIndex), '')
+
+  // With no text there is nothing for an option to format, so an empty body
+  // stays empty rather than filling with headings or verse numbers.
+  const every = { headings: true, numbers: true, perLine: true }
+  assert.equal(composePassageText(resolved('Gen 1'), null, every), '')
+  assert.equal(composePassageText(resolved('Lev 1'), textIndex, every), '')
+})
+
+test('with every display option off the passage is composed exactly as before', () => {
+  // The options are additive: unchecked, and however they are passed, the text
+  // is the plain prose the command has always written.
+  for (const reference of ['Gen 1', 'Gen 1:2', 'Gen 1:3-2:1', 'Ps 23:1-2', 'Matt 17:20-22']) {
+    const plain = compose(reference)
+    assert.equal(compose(reference, PLAIN), plain, reference)
+    assert.equal(compose(reference, {}), plain, reference)
+    assert.equal(compose(reference, null), plain, reference)
+  }
+})
+
+test('chapter headings name the book in full above every chapter they head', () => {
+  const headings = { ...PLAIN, headings: true }
+
+  // A whole chapter, and a heading above it even though the reference names
+  // only the one chapter.
+  assert.equal(
+    compose('Gen 1', headings),
+    '**Genesis 1**\n\nIn the beginning. And the earth.\n\nThen God said.'
+  )
+  // A single verse and a partial chapter are headed the same way.
+  assert.equal(compose('Gen 1:2', headings), '**Genesis 1**\n\nAnd the earth.')
+  assert.equal(
+    compose('Gen 1:2-3', headings),
+    '**Genesis 1**\n\nAnd the earth.\n\nThen God said.'
+  )
+  // One heading per chapter across a chapter boundary...
+  assert.equal(
+    compose('Gen 1:3-2:1', headings),
+    '**Genesis 1**\n\nThen God said.\n\n**Genesis 2**\n\nThus the heavens.'
+  )
+  // ...and across a book boundary, each under its own book's long name.
+  assert.equal(
+    compose('Obad 1:1-Jonah 1:2', headings),
+    '**Obadiah 1**\n\nThe vision of Obadiah. I will make you least.\n\n' +
+      '**Jonah 1**\n\nNow the word of the LORD. Go at once to Nineveh.'
+  )
+})
+
+test('verse numbers are superscripts against the verse they open', () => {
+  const numbers = { ...PLAIN, numbers: true }
+
+  assert.equal(
+    compose('Gen 1', numbers),
+    '<sup>1</sup>In the beginning. <sup>2</sup>And the earth.\n\n<sup>3</sup>Then God said.'
+  )
+  // A partial chapter is numbered from where it starts, not from one.
+  assert.equal(compose('Gen 1:2', numbers), '<sup>2</sup>And the earth.')
+  // A chapter this edition numbers with a gap keeps each number against its own
+  // verse: Matthew 17:21 is not in the text, and 22 is not renumbered to 21.
+  assert.equal(
+    compose('Matt 17:20-22', numbers),
+    '<sup>20</sup>He said to them. <sup>22</sup>As they were gathering.'
+  )
+  // Poetry takes the number on the first of its lines and keeps the rest.
+  assert.equal(
+    compose('Ps 23:1-2', numbers),
+    '<sup>1</sup>The LORD is my shepherd;\nI shall not want.\n<sup>2</sup>He makes me lie down.'
+  )
+})
+
+test('one verse per line breaks between verses without flattening poetry', () => {
+  const perLine = { ...PLAIN, perLine: true }
+
+  // Prose that ran together as a paragraph is broken verse by verse, and the
+  // paragraph boundary is still a blank line.
+  assert.equal(
+    compose('Gen 1', perLine),
+    'In the beginning.\nAnd the earth.\n\nThen God said.'
+  )
+  // The line breaks inside a verse are the edition's own lineation and survive
+  // untouched; the option adds breaks, it never removes them.
+  assert.equal(
+    compose('Ps 23:1-2', perLine),
+    'The LORD is my shepherd;\nI shall not want.\nHe makes me lie down.'
+  )
+  // A chapter boundary stays a paragraph boundary rather than becoming one more
+  // verse break.
+  assert.equal(compose('Gen 1:3-2:1', perLine), 'Then God said.\n\nThus the heavens.')
+})
+
+test('the three display options combine', () => {
+  const every = { headings: true, numbers: true, perLine: true }
+
+  assert.equal(
+    compose('Gen 1', every),
+    '**Genesis 1**\n\n<sup>1</sup>In the beginning.\n<sup>2</sup>And the earth.\n\n' +
+      '<sup>3</sup>Then God said.'
+  )
+  assert.equal(
+    compose('Obad 1:1-Jonah 1:2', every),
+    '**Obadiah 1**\n\n<sup>1</sup>The vision of Obadiah.\n<sup>2</sup>I will make you least.\n\n' +
+      '**Jonah 1**\n\n<sup>1</sup>Now the word of the LORD.\n<sup>2</sup>Go at once to Nineveh.'
+  )
+  // Two of the three, to show the pairs are independent of the third.
+  assert.equal(
+    compose('Gen 1:2', { ...every, perLine: false }),
+    '**Genesis 1**\n\n<sup>2</sup>And the earth.'
+  )
+  assert.equal(
+    compose('Gen 1', { ...every, headings: false }),
+    '<sup>1</sup>In the beginning.\n<sup>2</sup>And the earth.\n\n<sup>3</sup>Then God said.'
+  )
+  assert.equal(
+    compose('Gen 1', { ...every, numbers: false }),
+    '**Genesis 1**\n\nIn the beginning.\nAnd the earth.\n\nThen God said.'
+  )
+  // A section heading the index carries is still left out, whatever is on.
+  assert.doesNotMatch(compose('Ps 23:1-2', every), /Trust in God/)
+})
+
+test('the resolved chapters carry the long book name a heading is written with', () => {
+  assert.deepEqual(
+    resolved('Obad 1:1-Jonah 1:2').chapters.map(({ shortName, longName }) => [shortName, longName]),
+    [['Obad', 'Obadiah'], ['Jonah', 'Jonah']]
+  )
 })
 
 test('the whole edition resolves and composes without throwing', () => {

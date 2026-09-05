@@ -13,7 +13,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
-- Adds a passage block that reads as one of Logseq's named admonitions, with commands that resolve a Bible reference and insert one.
+- Adds a passage block that reads as one of Logseq's named admonitions, with commands that resolve a Bible reference and insert one, optionally with chapter headings, verse numbers, or a line per verse.
 - No build runtime, tracking, remote imports, or network access.
 
 ## Color palette
@@ -193,7 +193,7 @@ Insert one in either of two ways:
 - Type `/passage` and choose **Passage**.
 - Type `<` and choose **Passage**. Logseq has no plugin API for the `<` picker, so this entry is added to the picker's own menu while it is open; it withdraws itself as soon as what you have typed can no longer match.
 
-Both prompt for a reference. Enter is **Insert**, the prompt's default action; Escape or **Cancel** dismisses it without changing the block. A blank reference cannot be submitted.
+Both prompt for a reference and for how the passage should be displayed. Enter is **Insert**, the prompt's default action; Escape or **Cancel** dismisses it without changing the block. A blank reference cannot be submitted.
 
 ### References
 
@@ -239,13 +239,27 @@ node scripts/build-bible-index.mjs
 
 That writes two files. `resources/bible.books.json` is the manifest — book names, chapter counts, verse counts and verse-id offsets, no verse text — and it is committed and shipped, which is what makes references resolve with no further setup. `resources/bible.text.json` is the verse text; it is git-ignored, never packaged, and read from the theme's own folder unless the **Passage text index** setting names another path.
 
+### Display options
+
+Three checkboxes under the reference field decide how that text is written. Each works on its own and any combination works together, over a single verse or a range spanning chapters and books:
+
+| Option | Writes |
+| --- | --- |
+| **View chapter headings** | `**Genesis 1**` above the verses of every chapter the passage includes, under the book's long name — a single chapter and a partial chapter are headed too |
+| **View verse numbers** | each verse number as a superscript against the front of its own verse, `<sup>16</sup>For God so loved…` |
+| **One verse per line** | every verse on a new line, with the line breaks inside a verse left exactly where the edition put them |
+
+All three open unchecked every time the prompt does: they describe the passage in front of you rather than the next one. With none of them checked the passage is written exactly as it is described above.
+
+The options add to the text and never replace it. Paragraph breaks, poetry lineation and chapter separation stay as they are wherever an option does not override them, verse numbers stay attached to their own verses where an edition omits one — Matthew 17:21 among them — and the edition's own section headings are still left out. Without a local text index the body stays empty and the missing-index notice still appears: a heading or a verse number over a passage that has no text would be metadata standing in for the passage.
+
 ### Passage properties
 
 The two property lines sit *above* `#+BEGIN_PASSAGE` because a block holds one property drawer, at the very top of its content: Logseq only recognizes a drawer as the first thing in a block, and `#+BEGIN_PASSAGE` is a custom block rather than a title line, so this is where Logseq's own property writer puts them too. Properties written below `#+END_PASSAGE` are not parsed as properties at all. A key the block already declares is left exactly as you wrote it — only the missing one is added.
 
 ## Compatibility
 
-Version 1.6.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
+Version 1.7.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
 
 - DB graphs are not supported in this release.
 - Mobile is not an advertised target; narrow desktop windows receive a layout smoke test.
