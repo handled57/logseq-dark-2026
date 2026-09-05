@@ -116,6 +116,12 @@ const pairings = [
     surface: 'verse numbers',
     upstream: 'mark',
     theme: '.block-body > .passage mark'
+  },
+  {
+    surface: 'a property table under an admonition or a passage',
+    upstream: '.block-properties',
+    theme:
+      '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties'
   }
 ]
 
@@ -221,6 +227,14 @@ test('every repaired surface still carries a rule', () => {
  * the passage stops lining up with the admonitions beside it. */
 const admonitionMetrics = ['.h-8{height:2rem}', '.w-8{width:2rem}', '.pr-4{padding-right:1rem}', '.ml-4{margin-left:1rem}']
 
+/* The vertical half of the same geometry. A property table moved under a box
+ * inherits the box's 2rem tail, and keeps the 4px of its own the table has
+ * always carried above it. */
+const spacingMetrics = [
+  '.abstract,.admonitionblock{margin:2rem 0}',
+  '.block-properties,.page-properties{background-color:var(--lx-gray-03,var(--ls-block-properties-background-color,var(--rx-gray-03)));margin:4px 0;padding:4px 8px}'
+]
+
 /* A verse number is a `mark`, which upstream dresses as a page highlight. The
  * passage has to undo all of it — the padding above all, since the number is
  * set in a gutter whose width the theme, not the highlight, decides. */
@@ -271,6 +285,49 @@ test('the passage indent reproduces the admonition icon column', () => {
   assert.equal(indent, column + divider + 1)
 })
 
+test('the moved property table lines up with the box text and takes the box tail', () => {
+  const declarations = (selector) => {
+    const start = css.indexOf(`\n${selector} {`)
+    assert.ok(start >= 0, `${selector} is missing`)
+    return css.slice(start, css.indexOf('}', start))
+  }
+
+  const scope =
+    '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden]))'
+  const table = declarations(`${scope} > .block-properties`)
+
+  const offset = table.match(/margin-left:\s*calc\(([\d.]+)rem \+ (\d+)px\)/)
+  assert.ok(offset, 'the table carries no offset to the box text')
+
+  // A box's text starts at the indent the passage reserves as padding — the
+  // icon column, the divider and the content's own `ml-4` — laid inside the
+  // transparent edge the box is drawn with. Both figures are read back off the
+  // passage, so the table lines up with the text of either kind of box.
+  const indent = declarations('.block-body > .passage').match(/padding:\s*0 0 0 ([\d.]+)rem/)
+  const edge = declarations('.block-body > .passage').match(/border:\s*(\d+)px solid transparent/)
+  assert.equal(Number.parseFloat(offset[1]), Number.parseFloat(indent[1]))
+  assert.equal(Number.parseInt(offset[2], 10), Number.parseInt(edge[1], 10))
+
+  // The table is set off from the box above it: wider than the 4px Logseq gives
+  // a table sitting in flow, and well inside the 2rem tail below it, so the gap
+  // reads as a break between the box and its own table rather than as the space
+  // between two blocks. Both figures are compared at the 16px root the app runs
+  // at.
+  const rem = 16
+  const gap = table.match(/margin-top:\s*([\d.]+)rem;/)
+  assert.ok(gap, 'the table sits flush against the box above it')
+  const flow = Number.parseInt(spacingMetrics[1].match(/(?:^|;|\{)margin:(\d+)px 0/)[1], 10)
+  const above = Number.parseFloat(gap[1]) * rem
+  assert.ok(above > flow, `the gap above the table (${above}px) is no wider than Logseq's ${flow}px flow gap`)
+  assert.ok(above < 2 * rem, 'the gap above the table is not clearly narrower than the tail below it')
+
+  // The 2rem tail Logseq gives the box moves to the table below it, so the
+  // table stays with its own box instead of drifting to the next block.
+  assert.ok(spacingMetrics[0].includes('margin:2rem 0'), 'the pinned box tail is no longer 2rem')
+  assert.match(table, /margin-bottom:\s*2rem;/)
+  assert.match(css, /> \.block-body > :is\([^{]*\.passage\) \{\s*\n\s*margin-bottom:\s*0;/)
+})
+
 /* Optional: confirm the pinned literals still describe the installed app. */
 const upstreamPath = process.env.LOGSEQ_CSS
 test(
@@ -285,7 +342,7 @@ test(
         `${surface}: upstream no longer ships "${selector}"`
       )
     }
-    for (const declaration of admonitionMetrics) {
+    for (const declaration of [...admonitionMetrics, ...spacingMetrics]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }
     assert.ok(upstream.includes(markDeclaration), 'Logseq no longer ships the page-mark rule')
