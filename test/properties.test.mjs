@@ -134,8 +134,12 @@ function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
 
 const PASSAGE_UUID = '65f00000-0000-0000-0000-00000000000a'
 const PASSAGE_SOURCE = '#+BEGIN_PASSAGE\n**John 3:16**\n\n#+END_PASSAGE'
+/* What the commands actually write: the block's property drawer, then the
+ * markup. The drawer belongs at the top of the block, not beside the marker. */
+const PASSAGE_PROPERTIES = 'tags:: \ntype:: Passage'
+const PASSAGE_BLOCK = `${PASSAGE_PROPERTIES}\n${PASSAGE_SOURCE}`
 /* The blank line under the bold reference: the writing line. */
-const WRITING_LINE = PASSAGE_SOURCE.indexOf('\n\n') + 1
+const WRITING_LINE = PASSAGE_BLOCK.indexOf('\n\n') + 1
 
 function editingArea({ value = '', cursor = value.length, uuid = PASSAGE_UUID } = {}) {
   return node('textarea', {
@@ -373,10 +377,11 @@ test('the block type hook follows the first configured key the block carries', a
 })
 
 test('an unconfigured graph takes the schema default', async () => {
-  const blocks = [block({ type: 'foo' }), block({ type: 'bar' })]
+  // The default hides the drawer on the one block type this theme writes.
+  const blocks = [block({ type: 'Passage' }), block({ type: 'bar' })]
   const context = await render({}, blocks)
 
-  assert.equal(context.logseq.settings.hiddenProperties, 'type: foo')
+  assert.equal(context.logseq.settings.hiddenProperties, 'type: passage')
   assert.deepEqual(hidden(blocks), [true, false])
 })
 
@@ -398,7 +403,7 @@ test('a migrated wildcard and an emptied legacy key both survive', async () => {
   // An empty legacy key was the 1.2.0 way to disable hiding; it must not
   // migrate into a rule, and the new default applies instead.
   const disabled = await render({ hiddenPropertyKey: '', hiddenPropertyValues: 'foo' }, [])
-  assert.equal(disabled.logseq.settings.hiddenProperties, 'type: foo')
+  assert.equal(disabled.logseq.settings.hiddenProperties, 'type: passage')
 })
 
 test('an already-configured graph is not overwritten by migration', async () => {
@@ -483,6 +488,9 @@ test('special source forms remain bulletless while editing', async () => {
     '#+BEGIN_CENTER\ncentered text\n#+END_CENTER',
     '#+BEGIN_VERSE\na line of verse\n#+END_VERSE',
     '#+BEGIN_PASSAGE\n**John 3:16**\n\n#+END_PASSAGE',
+    // A property drawer sits above the marker, so the marker is only the first
+    // line once the drawer is stepped over.
+    PASSAGE_BLOCK,
     'prompt #card'
   ]
 
@@ -490,6 +498,11 @@ test('special source forms remain bulletless while editing', async () => {
     assert.equal(context.shouldHideBullet(bulletBlock({ raw })), true, raw)
   }
   assert.equal(context.shouldHideBullet(bulletBlock({ raw: 'ordinary prose' })), false)
+  // Properties alone do not make a block special enough to lose its bullet.
+  assert.equal(
+    context.shouldHideBullet(bulletBlock({ raw: 'tags:: study\nordinary prose' })),
+    false
+  )
 })
 
 test('rendered src, center, and verse blocks remain bulletless regardless of custom-block case', async () => {
@@ -597,10 +610,31 @@ test('the slash command writes the passage source and leaves the cursor on the w
 
   await invoke(context, () => command.action())
 
-  assert.deepEqual(context.logseq.Editor.updates, [{ uuid: PASSAGE_UUID, content: PASSAGE_SOURCE }])
+  assert.deepEqual(context.logseq.Editor.updates, [{ uuid: PASSAGE_UUID, content: PASSAGE_BLOCK }])
   assert.deepEqual(context.logseq.Editor.edits, [{ uuid: PASSAGE_UUID, pos: WRITING_LINE }])
   // The cursor sits at the start of the blank line, with the terminator below.
-  assert.equal(PASSAGE_SOURCE.slice(WRITING_LINE), '\n#+END_PASSAGE')
+  assert.equal(PASSAGE_BLOCK.slice(WRITING_LINE), '\n#+END_PASSAGE')
+})
+
+test('the passage properties join the drawer the block already has', async () => {
+  // A block holds one property drawer, so a key the user already wrote is left
+  // exactly as it stands and only the missing one is added beneath it.
+  const value = 'type:: Note\n'
+  const { context } = commandContext({ value })
+  await Promise.resolve()
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action())
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    `type:: Note\ntags:: \n${PASSAGE_SOURCE}`
+  )
+  // The cursor still lands on the writing line, one 'tags:: ' line further down.
+  const [edit] = context.logseq.Editor.edits
+  assert.equal(
+    context.logseq.Editor.updates[0].content.slice(edit.pos),
+    '\n#+END_PASSAGE'
+  )
 })
 
 test('only the invocation text is removed, and the text around it is kept', async () => {
@@ -611,7 +645,7 @@ test('only the invocation text is removed, and the text around it is kept', asyn
 
   assert.equal(
     context.logseq.Editor.updates[0].content,
-    `see \n${PASSAGE_SOURCE}\n then`
+    `${PASSAGE_PROPERTIES}\nsee \n${PASSAGE_SOURCE}\n then`
   )
 })
 
@@ -623,7 +657,10 @@ test('a slash that belongs to the prose is never eaten', async () => {
 
   await invoke(context, () => context.logseq.Editor.commands[0].action())
 
-  assert.equal(context.logseq.Editor.updates[0].content, `and/or \n${PASSAGE_SOURCE}`)
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    `${PASSAGE_PROPERTIES}\nand/or \n${PASSAGE_SOURCE}`
+  )
 })
 
 test('the reference dialog autofocuses, and stays open until it has a reference', async () => {
@@ -653,7 +690,7 @@ test('the reference dialog autofocuses, and stays open until it has a reference'
   dialog.dispatch('keydown', { key: 'Enter' })
   await invocation
 
-  assert.equal(context.logseq.Editor.updates[0].content, PASSAGE_SOURCE)
+  assert.equal(context.logseq.Editor.updates[0].content, PASSAGE_BLOCK)
   assert.equal(dialogOf(context), null, 'the dialog outlived the insertion')
 })
 
@@ -728,7 +765,10 @@ test('the picker entry routes through the same insertion path as the slash comma
   await invoke(context, () => entry.dispatch('mousedown'))
 
   // The `<` picker clears nothing itself, so the bridge removes the trigger.
-  assert.equal(context.logseq.Editor.updates[0].content, `note \n${PASSAGE_SOURCE}`)
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    `${PASSAGE_PROPERTIES}\nnote \n${PASSAGE_SOURCE}`
+  )
   assert.deepEqual(context.logseq.Editor.edits, [{ uuid: PASSAGE_UUID, pos: 5 + 1 + WRITING_LINE }])
 })
 

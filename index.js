@@ -42,7 +42,7 @@ const SPECIAL_CONTENT_SELECTOR = [
 ].join(', ')
 
 const RULES_SETTING = 'hiddenProperties'
-const DEFAULT_RULES = 'type: foo'
+const DEFAULT_RULES = 'type: passage'
 const ANY_VALUE = '*'
 
 const settingsSchema = [
@@ -162,17 +162,26 @@ function propertyFreeText(wrapper) {
   return copy.textContent.trim()
 }
 
+const PROPERTY_LINE = /^[\w.-]+::(?:\s|$)/
+
+/* A block's property drawer sits at the top of its content, so a marker such as
+ * `#+BEGIN_PASSAGE` only opens the block once those lines are stepped over — a
+ * passage carries `type:: Passage` above its own marker. A block that is
+ * nothing but properties is special in its own right. */
 function specialSource(text) {
   if (!text) return true
 
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-  const propertyOnly = lines.length > 0 && lines.every((line) => /^[\w.-]+::(?:\s|$)/.test(line))
+  let start = 0
+  while (start < lines.length && PROPERTY_LINE.test(lines[start])) start += 1
+  if (start === lines.length) return true
 
-  return propertyOnly ||
-    /^(?:#{1,6}\s|>|```|~~~|\$\$|#\+BEGIN_)/i.test(text) ||
-    /^(?:\(\([^\n]+\)\)|\[\[[^\n]+\]\])$/.test(text) ||
-    /^\{\{[\s\S]+\}\}$/.test(text) ||
-    /^!\[[^\]]*\]\([^)]+\)$/.test(text) ||
+  const body = lines.slice(start).join('\n')
+
+  return /^(?:#{1,6}\s|>|```|~~~|\$\$|#\+BEGIN_)/i.test(body) ||
+    /^(?:\(\([^\n]+\)\)|\[\[[^\n]+\]\])$/.test(body) ||
+    /^\{\{[\s\S]+\}\}$/.test(body) ||
+    /^!\[[^\]]*\]\([^)]+\)$/.test(body) ||
     /(?:^|\s)#card(?:\s|$)|(?:^|\n)card::|zotero/i.test(text)
 }
 
@@ -291,6 +300,40 @@ function passageSource(reference) {
   return `#+BEGIN_PASSAGE\n**${reference}**\n\n#+END_PASSAGE`
 }
 
+/* Every passage the commands write is also typed and taggable: `type:: Passage`
+ * is what the property rules and `data-hc-block-type` key on, and the empty
+ * `tags::` is left ready to fill in. */
+const PASSAGE_PROPERTIES = [['tags', ''], ['type', 'Passage']]
+
+/* A block holds one property drawer, at the very top of its content, so these
+ * lines go there rather than beside the `#+BEGIN_PASSAGE` the cursor sits on —
+ * and a key the block already declares is left exactly as the user wrote it,
+ * because a second copy would only be dropped. */
+function withPassageProperties(content, cursor) {
+  const lines = content.split('\n')
+  let drawer = 0
+  while (drawer < lines.length && PROPERTY_LINE.test(lines[drawer])) drawer += 1
+
+  const declared = new Set(
+    lines.slice(0, drawer).map((line) => line.slice(0, line.indexOf(':')).toLowerCase())
+  )
+  const added = PASSAGE_PROPERTIES
+    .filter(([key]) => !declared.has(key))
+    .map(([key, value]) => `${key}:: ${value}`)
+
+  if (!added.length) return { content, cursor }
+
+  /* Each drawer line ends in a newline, so that sum is the offset the new lines
+   * are spliced in at; a cursor above it does not move. */
+  const offset = lines.slice(0, drawer).reduce((total, line) => total + line.length + 1, 0)
+  const written = added.join('\n').length + 1
+
+  return {
+    content: [...lines.slice(0, drawer), ...added, ...lines.slice(drawer)].join('\n'),
+    cursor: cursor >= offset ? cursor + written : cursor
+  }
+}
+
 async function writePassage({ uuid, content, cursor, trigger }, reference) {
   const head = content.slice(0, cursor).replace(INVOCATIONS[trigger], '')
   const tail = content.slice(cursor)
@@ -299,9 +342,13 @@ async function writePassage({ uuid, content, cursor, trigger }, reference) {
   const lead = head && !head.endsWith('\n') ? '\n' : ''
   const trail = tail && !tail.startsWith('\n') ? '\n' : ''
   const opening = `#+BEGIN_PASSAGE\n**${reference}**\n`
+  const written = withPassageProperties(
+    `${head}${lead}${passageSource(reference)}${trail}${tail}`,
+    head.length + lead.length + opening.length
+  )
 
-  await logseq.Editor.updateBlock(uuid, `${head}${lead}${passageSource(reference)}${trail}${tail}`)
-  await logseq.Editor.editBlock?.(uuid, { pos: head.length + lead.length + opening.length })
+  await logseq.Editor.updateBlock(uuid, written.content)
+  await logseq.Editor.editBlock?.(uuid, { pos: written.cursor })
   repaint()
 }
 
