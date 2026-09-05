@@ -227,6 +227,36 @@ test('named admonitions share their icon color with a four-pixel divider', () =>
   assert.match(css, /\.notification-content\.warning,\s*\.warning\s*\{[\s\S]*?border-color:\s*var\(--vscode-hc-yellow\)\s*!important/)
 })
 
+test('the passage block reproduces the admonition treatment on its own selectors', () => {
+  // Logseq emits no `.admonitionblock` for `#+BEGIN_PASSAGE`, so `.passage`
+  // must not join the admonition type list; it carries the shared accent
+  // vocabulary instead.
+  assert.doesNotMatch(css, /\.admonitionblock:is\([^)]*passage/)
+  assert.match(css, /\.block-body > \.passage \{[\s\S]*?--hc-admonition-accent:\s*var\(--vscode-hc-cyan\)/)
+  assert.match(
+    css,
+    /\.block-body > \.passage \{[\s\S]*?background:\s*var\(--vscode-hc-black\)\s*!important[\s\S]*?border:\s*1px solid transparent\s*!important/
+  )
+
+  // The icon column: one pseudo-element carrying the masked glyph and the same
+  // four-pixel divider the admonition icons draw.
+  assert.match(
+    css,
+    /\.block-body > \.passage::before \{[\s\S]*?background-color:\s*var\(--hc-admonition-accent\)[\s\S]*?border-right:\s*4px solid var\(--hc-admonition-accent\)/
+  )
+  // `mask-image` over a colored `background-image`, so the icon's color stays a
+  // palette token rather than being baked into the SVG.
+  assert.match(css, /\.block-body > \.passage::before \{[\s\S]*?\n\s*mask-image:\s*url\("data:image\/svg\+xml,/)
+  assert.match(css, /\.block-body > \.passage::before \{[\s\S]*?-webkit-mask-image:\s*url\("data:image\/svg\+xml,/)
+  assert.doesNotMatch(css, /\.block-body > \.passage::before \{[\s\S]*?background-image:/)
+
+  // The bullet must go before the asynchronous stored-source lookup resolves.
+  assert.match(
+    css,
+    /\.ls-block:has\(> \.block-main-container > \.block-content-wrapper :is\([^)]*\.passage\)\)[\s\S]*?> \.block-main-container > \.block-control-wrap \.bullet-container:not\(\.typed-list\)/
+  )
+})
+
 test('workbench chrome is bordered in the contrast border, not white', () => {
   // Panes, panels, sidebars and controls all draw their edges with
   // --vscode-hc-border. Two declarations use a border property to paint
@@ -257,7 +287,9 @@ test('workbench chrome is bordered in the contrast border, not white', () => {
 
 test('stylesheet is local, structurally balanced, and avoids global monospace', () => {
   assert.doesNotMatch(css, /@import\s+url\(/i)
-  assert.doesNotMatch(css, /https?:\/\//i)
+  // The SVG namespace inside the inline passage icon is an XML identifier that
+  // is never dereferenced. Every other absolute URL would be a remote fetch.
+  assert.doesNotMatch(css.replaceAll("http://www.w3.org/2000/svg", ''), /https?:\/\//i)
   assert.doesNotMatch(css, /body\s*\{[^}]*font-family:\s*(?:monospace|[^;]*mono)/i)
 
   const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
