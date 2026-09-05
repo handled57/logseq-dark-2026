@@ -45,6 +45,13 @@ const RULES_SETTING = 'hiddenProperties'
 const DEFAULT_RULES = 'type: passage'
 const ANY_VALUE = '*'
 
+/* The manifest ships with the theme; the verse text does not, and cannot — it
+ * is a licensed edition. This setting is where a reader who has built the text
+ * index points the Passage command at it. */
+const TEXT_SETTING = 'biblePassageText'
+const BIBLE_MANIFEST_PATH = 'resources/bible.books.json'
+const BIBLE_TEXT_PATH = 'resources/bible.text.json'
+
 const settingsSchema = [
   {
     key: RULES_SETTING,
@@ -56,6 +63,16 @@ const settingsSchema = [
       '"type: foo, type: bar, status: done". A block whose properties match any one pair renders ' +
       'bare. Write "key: *", or the bare key, to match every value of that key. Leave empty to ' +
       'render every block normally.'
+  },
+  {
+    key: TEXT_SETTING,
+    type: 'string',
+    default: '',
+    title: 'Passage text index',
+    description:
+      'Full path to a bible.text.json built by scripts/build-bible-index.mjs. Leave empty to read ' +
+      'the one in the theme\u2019s own resources folder. Without it the Passage command still ' +
+      'writes the reference and its chapter tags, and leaves the text to you.'
   }
 ]
 
@@ -294,22 +311,144 @@ async function captureInvocation(trigger) {
   return { uuid, content, cursor: live ? cursorIn(editor, content) : content.length, trigger }
 }
 
-/* The reference is bold on the first line and the line below it is left empty:
- * that blank line is where the passage is typed, and where the cursor lands. */
-function passageSource(reference) {
-  return `#+BEGIN_PASSAGE\n**${reference}**\n\n#+END_PASSAGE`
+/* Reading the Bible data.
+ *
+ * Two files, and neither one is required. `resources/bible.books.json` is the
+ * manifest — book names, chapter counts and verse-id offsets, no verse text —
+ * and it ships with the theme, so references resolve out of the box. The verse
+ * text is a licensed edition that cannot be redistributed here: it is built
+ * locally by `scripts/build-bible-index.mjs` and read from the theme's own
+ * resources folder or from wherever the setting points.
+ *
+ * Every read route below is optional and guarded. A route that is missing or
+ * refuses is simply the next one's turn, and when all of them fail the command
+ * degrades a step at a time: no text index means the reference and its tags
+ * with the body left to the reader, and no manifest at all means the reference
+ * exactly as it was typed. The theme stays fully usable installed from the
+ * Marketplace with no Bible data present.
+ */
+
+function settingPath(key) {
+  const value = logseq.settings?.[key]
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+const ABSOLUTE_PATH = /^(?:[/\\]|[a-z]:[/\\])/i
+
+/* `logseq.baseInfo.lsr` is the plugin's own root as a URL, so a path packaged
+ * with the theme becomes a filesystem path through it. A path the reader
+ * configured is already one. */
+function pluginPath(path) {
+  if (ABSOLUTE_PATH.test(path)) return path
+
+  const root = logseq.baseInfo?.lsr ?? ''
+  return root ? `${String(root).replace(/\/+$/, '')}/${path}` : ''
+}
+
+/* What the SDK's own loader does: `fetch` for an http(s) URL, and the host's
+ * `readFile` action for anything else, because `fetch` cannot read `file://`.
+ * `parent` is reachable at all only because the package declares `effect`. */
+function readUrl(url) {
+  if (!url) return ''
+  if (/^https?:/i.test(url)) return fetch(url).then((response) => (response.ok ? response.text() : ''))
+
+  return parent.apis?.doAction?.(['readFile', decodeURI(url.replace(/^file:\/\//, ''))]) ?? ''
+}
+
+async function readSource(path) {
+  const routes = [
+    /* `resolveResourceFullUrl` joins the plugin root itself, but it takes a
+     * packaged path, not one of the reader's own. */
+    () => (ABSOLUTE_PATH.test(path) ? '' : readUrl(logseq.resolveResourceFullUrl?.(path) ?? '')),
+    () => readUrl(pluginPath(path)),
+    /* A relative fetch answers wherever the sandbox is served over http: a
+     * development host, or a browser fixture. */
+    () => fetch(path).then((response) => (response.ok ? response.text() : '')),
+    () => logseq.Assets?.makeSandboxStorage?.()?.getItem?.(path.split('/').pop())
+  ]
+
+  for (const route of routes) {
+    try {
+      const text = await route()
+      if (typeof text === 'string' && text.trim()) return JSON.parse(text)
+    } catch (error) {
+      /* A route that cannot answer is not a failure; the next one may. */
+    }
+  }
+
+  return null
+}
+
+let bibleManifest = null
+let bibleTextRead = null
+let noticed = false
+
+async function loadBibleManifest() {
+  bibleManifest = await readSource(BIBLE_MANIFEST_PATH)
+  return bibleManifest
+}
+
+/* The text index is several megabytes, so it is read on the first passage
+ * rather than at startup, and the read is remembered either way. */
+function loadBibleText() {
+  if (!bibleTextRead) {
+    const configured = settingPath(TEXT_SETTING)
+    bibleTextRead = (async () => {
+      for (const path of configured ? [configured, BIBLE_TEXT_PATH] : [BIBLE_TEXT_PATH]) {
+        const loaded = await readSource(path)
+        if (loaded?.books) return loaded
+      }
+      return null
+    })()
+  }
+
+  return bibleTextRead
+}
+
+const MISSING_TEXT_NOTICE =
+  'Dark High Contrast wrote the reference and its chapter tags. The passage text needs a local ' +
+  'index: run scripts/build-bible-index.mjs and put bible.text.json beside the theme, or name it ' +
+  'in the theme\u2019s settings.'
+
+async function passageBody(resolved) {
+  if (!resolved.tags?.length) return ''
+
+  const body = composePassageText(resolved, await loadBibleText())
+
+  if (!body && !noticed) {
+    noticed = true
+    logseq.UI?.showMsg?.(MISSING_TEXT_NOTICE, 'warning')
+  }
+
+  return body
+}
+
+/* Without the manifest there is nothing to resolve against, so the reference is
+ * taken exactly as typed and carries no tags. */
+function resolveReference(reference) {
+  if (!bibleManifest) return { ok: true, canonical: reference, tags: [], chapters: [] }
+  return parsePassageReference(reference, bibleManifest)
+}
+
+/* The reference is bold on the first line and the passage follows it a line
+ * below. With no text to write, that line is left empty and the cursor lands on
+ * it; with text, the cursor lands at the end of what was written. */
+function passageSource(reference, body) {
+  return `#+BEGIN_PASSAGE\n**${reference}**\n\n${body ? `${body}\n` : ''}#+END_PASSAGE`
 }
 
 /* Every passage the commands write is also typed and taggable: `type:: Passage`
- * is what the property rules and `data-hc-block-type` key on, and the empty
- * `tags::` is left ready to fill in. */
-const PASSAGE_PROPERTIES = [['tags', ''], ['type', 'Passage']]
+ * is what the property rules and `data-hc-block-type` key on, and `tags::`
+ * carries one namespaced tag per chapter the passage spans. */
+function passageProperties(tags) {
+  return [['tags', tags.join(', ')], ['type', 'Passage']]
+}
 
 /* A block holds one property drawer, at the very top of its content, so these
  * lines go there rather than beside the `#+BEGIN_PASSAGE` the cursor sits on —
  * and a key the block already declares is left exactly as the user wrote it,
  * because a second copy would only be dropped. */
-function withPassageProperties(content, cursor) {
+function withPassageProperties(content, cursor, tags) {
   const lines = content.split('\n')
   let drawer = 0
   while (drawer < lines.length && PROPERTY_LINE.test(lines[drawer])) drawer += 1
@@ -317,7 +456,7 @@ function withPassageProperties(content, cursor) {
   const declared = new Set(
     lines.slice(0, drawer).map((line) => line.slice(0, line.indexOf(':')).toLowerCase())
   )
-  const added = PASSAGE_PROPERTIES
+  const added = passageProperties(tags)
     .filter(([key]) => !declared.has(key))
     .map(([key, value]) => `${key}:: ${value}`)
 
@@ -334,7 +473,9 @@ function withPassageProperties(content, cursor) {
   }
 }
 
-async function writePassage({ uuid, content, cursor, trigger }, reference) {
+async function writePassage({ uuid, content, cursor, trigger }, resolved) {
+  const reference = resolved.canonical
+  const body = await passageBody(resolved)
   const head = content.slice(0, cursor).replace(INVOCATIONS[trigger], '')
   const tail = content.slice(cursor)
   /* `#+BEGIN_PASSAGE` only parses on a line of its own, so surrounding text is
@@ -343,8 +484,9 @@ async function writePassage({ uuid, content, cursor, trigger }, reference) {
   const trail = tail && !tail.startsWith('\n') ? '\n' : ''
   const opening = `#+BEGIN_PASSAGE\n**${reference}**\n`
   const written = withPassageProperties(
-    `${head}${lead}${passageSource(reference)}${trail}${tail}`,
-    head.length + lead.length + opening.length
+    `${head}${lead}${passageSource(reference, body)}${trail}${tail}`,
+    head.length + lead.length + opening.length + (body ? 1 + body.length : 0),
+    resolved.tags ?? []
   )
 
   await logseq.Editor.updateBlock(uuid, written.content)
@@ -377,6 +519,12 @@ const DIALOG_STYLE = `
 }
 
 [${DIALOG_ATTR}] label { font-weight: 600; }
+
+[${DIALOG_ATTR}] p {
+  margin: 0;
+  max-width: 42ch;
+  color: var(--vscode-hc-error, #f48771);
+}
 
 [${DIALOG_ATTR}] input {
   padding: 6px 8px;
@@ -413,9 +561,11 @@ const DIALOG_STYLE = `
 }
 `
 
-/* Resolves with the trimmed reference, or with null when the dialog is
+/* Resolves with the resolved reference, or with null when the dialog is
  * dismissed — the caller writes nothing in that case, so Escape and Cancel
- * both leave the block exactly as it was. */
+ * both leave the block exactly as it was. A reference that does not resolve
+ * leaves the dialog open with the reason under the field, exactly as a blank
+ * one does: the reader is one edit away from a reference that works. */
 let dismissDialog = null
 function askForReference() {
   return new Promise((resolve) => {
@@ -423,6 +573,7 @@ function askForReference() {
     const form = doc.createElement('form')
     const label = doc.createElement('label')
     const input = doc.createElement('input')
+    const message = doc.createElement('p')
     const actions = doc.createElement('div')
     const cancel = doc.createElement('button')
     const insert = doc.createElement('button')
@@ -442,6 +593,7 @@ function askForReference() {
 
     function close(reference) {
       dismissDialog = null
+      doc.removeEventListener('keydown', keys, true)
       overlay.remove()
       resolve(reference)
     }
@@ -454,29 +606,52 @@ function askForReference() {
       event?.preventDefault?.()
       const reference = input.value.trim()
       /* A blank reference is not a passage, so the dialog stays open. */
-      if (reference) close(reference)
+      if (!reference) return
+
+      const resolved = resolveReference(reference)
+      if (resolved.ok) close(resolved)
+      else message.textContent = resolved.error
+    }
+
+    /* Insert is the dialog's default action, and Escape its cancel, for as long
+     * as it is open. The host binds its own editor shortcuts on the document
+     * and sees a key there before it ever reaches the dialog — Enter would open
+     * a new block behind the prompt — so the dialog claims those two keys on
+     * the same document in the same capturing phase, ahead of the host, and
+     * lets everything else through to whatever has focus. */
+    function keys(event) {
+      if (event.key !== 'Enter' && event.key !== 'Escape') return
+
+      event.preventDefault?.()
+      event.stopPropagation()
+      event.stopImmediatePropagation?.()
+
+      if (event.key === 'Escape') close(null)
+      else submit(event)
     }
 
     input.addEventListener('input', () => {
       insert.disabled = input.value.trim() === ''
+      message.textContent = ''
     })
     form.addEventListener('submit', submit)
     cancel.addEventListener('click', () => close(null))
     overlay.addEventListener('mousedown', (event) => {
       if (event.target === overlay) close(null)
     })
-    /* The host binds its own editor shortcuts on the document, so every key the
-     * dialog owns stops here rather than reaching the block behind it. */
+    /* Nothing typed into the dialog belongs to the block behind it. */
     overlay.addEventListener('keydown', (event) => {
       event.stopPropagation()
       if (event.key === 'Escape') close(null)
       else if (event.key === 'Enter') submit(event)
     })
+    doc.addEventListener('keydown', keys, true)
 
     actions.appendChild(cancel)
     actions.appendChild(insert)
     form.appendChild(label)
     form.appendChild(input)
+    form.appendChild(message)
     form.appendChild(actions)
     overlay.appendChild(form)
     doc.body.appendChild(overlay)
@@ -493,10 +668,10 @@ async function insertPassage(trigger) {
     const target = await captureInvocation(trigger)
     if (!target) return
 
-    const reference = await askForReference()
-    if (!reference) return
+    const resolved = await askForReference()
+    if (!resolved) return
 
-    await writePassage(target, reference)
+    await writePassage(target, resolved)
   } catch (error) {
     console.warn('Dark High Contrast could not insert a passage block', error)
   } finally {
@@ -615,10 +790,20 @@ function teardown() {
 function main() {
   migrateLegacySettings()
   logseq.useSettingsSchema(settingsSchema)
+  /* The manifest is small and every reference needs it, so the read starts
+   * here; nothing waits on it, and a passage typed before it lands is written
+   * as it was typed. */
+  void loadBibleManifest().catch(() => null)
   logseq.provideStyle({ key: STYLE_KEY, style: `.block-properties[${HIDDEN_ATTR}] { display: none; }` })
   logseq.provideStyle({ key: DIALOG_STYLE_KEY, style: DIALOG_STYLE })
   logseq.Editor?.registerSlashCommand?.(COMMAND_LABEL, () => insertPassage('slash'))
-  logseq.onSettingsChanged(repaint)
+  /* A new text-index path is a new read, and a reason to say again that there
+   * is nothing at the end of it. */
+  logseq.onSettingsChanged(() => {
+    bibleTextRead = null
+    noticed = false
+    repaint()
+  })
   logseq.App.onRouteChanged(repaint)
   logseq.DB?.onChanged?.(() => {
     sourceCache.clear()

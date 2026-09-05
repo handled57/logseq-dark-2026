@@ -16,6 +16,8 @@ const releaseFiles = [
   'theme.css',
   'index.html',
   'index.js',
+  'bible.js',
+  'resources/bible.books.json',
   'lib',
   'icon.svg',
   'screenshots',

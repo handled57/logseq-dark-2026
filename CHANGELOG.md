@@ -2,6 +2,39 @@
 
 All notable changes to this project are documented here.
 
+## 1.6.0 - 2026-09-05
+
+- Resolve the reference the Passage command asks for. Books are matched on
+  their short or long name — case, spacing and punctuation ignored — plus the
+  usual abbreviations, and a range may be written with a hyphen, an en dash or
+  an em dash across verses, chapters and books alike: `John 3:16`, `Gen 50`,
+  `Gen 1-3`, `Gen 50 - Ex 2`, `Genesis 50:1-10`, `Gen 1:1-2:3`,
+  `Genesis 50:1 - Ex 2:25`.
+- Write the reference back in canonical short-name form, and fill `tags::` with
+  one namespaced tag per chapter the passage spans: `Gen 50 - Ex 2` becomes
+  **Gen 50–Ex 2** under `tags:: Gen/50, Ex/1, Ex/2`.
+- Keep the prompt open, with the reason under the field, for a reference that
+  does not resolve: an unknown book, a chapter or verse the edition does not
+  carry, or a range that runs backwards such as `Ex 2-Gen 50`.
+- Write the passage text under the reference as plain prose — no verse numbers,
+  no section headings, a blank line between paragraphs, and poetry keeps its
+  lineation — when a local text index is present. The index is built by `scripts/build-bible-index.mjs` from an
+  edition of your own; no verse text is committed here or shipped in the
+  release. Without it the command still writes the reference and its tags, so
+  the theme is fully usable installed from the Marketplace.
+- Ship `resources/bible.books.json`, a manifest of 84 books, 1398 chapters and
+  37758 verses carrying names, counts and verse-id offsets and no verse text.
+  The generator repairs four defects in the source it is built from: `Bah` for
+  Habakkuk, `Psalm` for the Psalms, the thirteen tail books named one
+  deuterocanonical book out of step, and section headings and psalm
+  superscriptions left at the end of the preceding verse.
+- Make **Insert** the reference prompt's default action: Enter inserts and
+  Escape cancels wherever the key lands, because the dialog now claims those
+  two keys ahead of Logseq's own editor shortcuts, which previously saw Enter
+  first and opened a new block behind the prompt.
+- Add a **Passage text index** setting naming a `bible.text.json` outside the
+  theme's own folder.
+
 ## 1.5.2 - 2026-09-05
 
 - Write `tags::` and `type:: Passage` into every passage the `/passage` command

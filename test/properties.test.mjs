@@ -14,7 +14,13 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+/* `index.html` loads the reference parser ahead of the entry script, and they
+ * share one global scope; the context below is built the same way. */
+const parser = new vm.Script(await readFile(resolve(root, 'bible.js'), 'utf8'))
 const source = new vm.Script(await readFile(resolve(root, 'index.js'), 'utf8'))
+const BIBLE_MANIFEST = JSON.parse(
+  await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8')
+)
 
 function element() {
   const attributes = new Map()
@@ -177,7 +183,45 @@ function fill(dialog, reference) {
   return input
 }
 
-function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
+/* The Bible files as the loader finds them, by either of the two routes that
+ * can answer: `fetch`, which is what a sandbox served over http has, and the
+ * host's own `readFile` action, which is what the desktop app has because
+ * `fetch` cannot read `file://`. A test that names no files leaves every route
+ * failing, which is the Marketplace install with no Bible data present. */
+const PLUGIN_ROOT = 'file:///plugins/logseq-dark-high-contrast-theme'
+
+function bibleRoutes({ files, via = 'fetch' }) {
+  if (via === 'fetch') {
+    return {
+      fetch: async (path) => ({
+        ok: path in files,
+        async text() {
+          return JSON.stringify(files[path])
+        }
+      })
+    }
+  }
+
+  const read = (path) => {
+    const name = path.replace(`${PLUGIN_ROOT.replace('file://', '')}/`, '')
+    if (!(name in files)) throw new Error(`no such file: ${path}`)
+    return JSON.stringify(files[name])
+  }
+
+  return {
+    lsr: PLUGIN_ROOT,
+    apis: {
+      async doAction([action, path]) {
+        assert.equal(action, 'readFile')
+        return read(path)
+      }
+    }
+  }
+}
+
+function load(settings, blocks = [], storedBlocks = {}, host = node('body'), bible = null) {
+  const routes = bible ? bibleRoutes(bible) : {}
+  const listeners = []
   const provided = []
   const observers = []
   const commands = []
@@ -185,9 +229,12 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   const edits = []
   const unloads = []
   let blockReads = 0
+  const messages = []
   const context = {
     console,
     setImmediate,
+    messages,
+    ...(routes.fetch ? { fetch: routes.fetch } : {}),
     MutationObserver: class {
       constructor() {
         this.connected = false
@@ -203,13 +250,27 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
       }
     },
     parent: {
+      ...(routes.apis ? { apis: routes.apis } : {}),
       requestAnimationFrame(callback) {
         callback()
       },
       document: {
         body: host,
+        listeners,
         getElementById: () => element(),
         createElement: (tag) => node(tag),
+        /* The host's own shortcuts are bound here, which is why the dialog
+         * claims its keys here too; only the capturing phase is recorded,
+         * because that is the only phase it uses. */
+        addEventListener(type, handler, capture) {
+          if (capture) listeners.push({ type, handler })
+        },
+        removeEventListener(type, handler) {
+          const index = listeners.findIndex(
+            (entry) => entry.type === type && entry.handler === handler
+          )
+          if (index !== -1) listeners.splice(index, 1)
+        },
         /* The two block collections keep their purpose-built stubs; everything
          * else — the popup, the editor, the dialog — is served by the host
          * stand-in. */
@@ -222,6 +283,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
     },
     logseq: {
       settings,
+      ...(routes.lsr ? { baseInfo: { lsr: routes.lsr } } : {}),
       provided,
       observers,
       unloads,
@@ -262,6 +324,11 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
         provided.push(style)
       },
       onSettingsChanged() {},
+      UI: {
+        showMsg(text, status) {
+          messages.push({ text, status })
+        }
+      },
       App: { onRouteChanged() {} },
       ready(main) {
         return Promise.resolve(main())
@@ -269,7 +336,27 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
     }
   }
 
+  /* A key as the host delivers it: to the document's capturing listeners, in
+   * order, before anything nested has seen it. */
+  context.press = (key) => {
+    let stopped = false
+    const event = {
+      key,
+      preventDefault() {},
+      stopPropagation() {
+        stopped = true
+      },
+      stopImmediatePropagation() {
+        stopped = true
+      }
+    }
+
+    for (const { handler } of [...listeners]) handler(event)
+    return stopped
+  }
+
   vm.createContext(context)
+  parser.runInContext(context)
   source.runInContext(context)
   context.blockReads = () => blockReads
 
@@ -594,11 +681,11 @@ async function invoke(context, run, reference = 'John 3:16') {
   return dialog
 }
 
-function commandContext({ value = '', cursor, menu = null } = {}) {
+function commandContext({ value = '', cursor, menu = null, bible = null } = {}) {
   const host = node('body')
   if (menu) host.appendChild(menu)
   host.appendChild(editingArea({ value, cursor }))
-  return { host, context: load({}, [], {}, host) }
+  return { host, context: load({}, [], {}, host, bible) }
 }
 
 test('the slash command writes the passage source and leaves the cursor on the writing line', async () => {
@@ -812,5 +899,250 @@ test('unloading leaves no injected node or written attribute behind', async () =
   // The prompt that was open when the plugin unloaded settles as a
   // cancellation rather than hanging, and writes nothing.
   await invocation
+  assert.deepEqual(context.logseq.Editor.updates, [])
+})
+
+/* The Bible files the loader reads, keyed by the paths `index.js` asks for. */
+const MANIFEST_FILE = 'resources/bible.books.json'
+const TEXT_FILE = 'resources/bible.text.json'
+const TEXT_SETTING = 'biblePassageText'
+
+const TEXT_INDEX = {
+  books: {
+    John: {
+      3: {
+        verses: ['For God so loved the world.', 'Indeed, God did not send the Son.'],
+        numbers: [16, 17],
+        paragraphs: [16]
+      }
+    },
+    Gen: {
+      1: {
+        verses: ['In the beginning.', 'And the earth was a formless void.'],
+        paragraphs: [1, 2]
+      }
+    }
+  }
+}
+
+/* The dialog is only reached once the manifest has been read, and the read is a
+ * promise chain, so the whole queue is drained before the invocation starts. */
+async function bibleContext(options) {
+  const { context, host } = commandContext(options)
+  await flush()
+  return { context, host }
+}
+
+test('a resolved reference is written canonically, with its chapter tags and text', async () => {
+  const { context } = await bibleContext({
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
+  })
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'jn 3:16-17')
+
+  const [{ content }] = context.logseq.Editor.updates
+  assert.equal(
+    content,
+    'tags:: John/3\ntype:: Passage\n' +
+      '#+BEGIN_PASSAGE\n**John 3:16–17**\n\n' +
+      'For God so loved the world. Indeed, God did not send the Son.\n' +
+      '#+END_PASSAGE'
+  )
+  // The cursor lands at the end of the text that was written, ready to continue.
+  const [edit] = context.logseq.Editor.edits
+  assert.equal(content.slice(edit.pos), '\n#+END_PASSAGE')
+  assert.deepEqual(context.messages, [])
+})
+
+test('a passage of more than one paragraph is written with a blank line between them', async () => {
+  const { context } = await bibleContext({
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
+  })
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Gen 1:1-2')
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    'tags:: Gen/1\ntype:: Passage\n' +
+      '#+BEGIN_PASSAGE\n**Gen 1:1\u20132**\n\n' +
+      'In the beginning.\n\nAnd the earth was a formless void.\n' +
+      '#+END_PASSAGE'
+  )
+})
+
+test('a passage spanning books is tagged with every chapter it covers', async () => {
+  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Gen 50 - Ex 2')
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    'tags:: Gen/50, Ex/1, Ex/2\ntype:: Passage\n' +
+      '#+BEGIN_PASSAGE\n**Gen 50–Ex 2**\n\n#+END_PASSAGE'
+  )
+})
+
+test('a reference that does not resolve keeps the dialog open with the reason', async () => {
+  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
+
+  const invocation = context.logseq.Editor.commands[0].action()
+  await flush()
+  const dialog = dialogOf(context)
+  const reason = () => dialog.querySelector('p').textContent
+
+  for (const [reference, expected] of [
+    ['Ex 2-Gen 50', /backwards/],
+    ['Gen 51', /50 chapters/],
+    ['John 3:37', /no verse 37/],
+    ['Habbakuk 1', /No book named/],
+    ['nonsense', /not a passage reference/]
+  ]) {
+    fill(dialog, reference)
+    dialog.querySelector('form').dispatch('submit')
+    await flush()
+
+    assert.ok(dialogOf(context), `the dialog closed on ${reference}`)
+    assert.match(reason(), expected)
+    assert.deepEqual(context.logseq.Editor.updates, [], reference)
+  }
+
+  // Typing again clears the message, and a reference that resolves is written.
+  fill(dialog, 'John 3:16')
+  assert.equal(reason(), '')
+  dialog.querySelector('form').dispatch('submit')
+  await invocation
+  await flush()
+
+  assert.equal(context.logseq.Editor.updates.length, 1)
+  assert.match(context.logseq.Editor.updates[0].content, /\*\*John 3:16\*\*/)
+  assert.equal(dialogOf(context), null)
+})
+
+test('without the text index the reference and tags are still written, with a notice', async () => {
+  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Psalms 23')
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    `tags:: Ps/23\ntype:: Passage\n#+BEGIN_PASSAGE\n**Ps 23**\n\n#+END_PASSAGE`
+  )
+  assert.equal(context.messages.length, 1)
+  assert.match(context.messages[0].text, /build-bible-index/)
+
+  // The notice is a standing condition, not something to repeat per passage.
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Ps 24')
+  assert.equal(context.messages.length, 1)
+})
+
+test('with no Bible data at all the reference is written exactly as it was typed', async () => {
+  // A Marketplace install carries the manifest, but a graph that cannot read it
+  // still has a working command: the theme never depends on the Bible files.
+  const { context } = await bibleContext({})
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'my own note')
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    `${PASSAGE_PROPERTIES}\n#+BEGIN_PASSAGE\n**my own note**\n\n#+END_PASSAGE`
+  )
+  assert.deepEqual(context.messages, [])
+})
+
+test('the desktop route reads the Bible files through the host, not through fetch', async () => {
+  // `fetch` cannot read `file://`, and the sandbox runs from `file://` on the
+  // desktop, so the files are read with the host's own action against a path
+  // built from the plugin root. No `fetch` exists in this context at all.
+  const { context } = await bibleContext({
+    bible: {
+      via: 'file',
+      files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX }
+    }
+  })
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'John 3:16')
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    'tags:: John/3\ntype:: Passage\n' +
+      '#+BEGIN_PASSAGE\n**John 3:16**\n\nFor God so loved the world.\n#+END_PASSAGE'
+  )
+})
+
+test('a configured text index is read from its own path, not from the theme folder', async () => {
+  const host = node('body')
+  host.appendChild(editingArea())
+  const context = load(
+    { [TEXT_SETTING]: '/graph/bible.text.json' },
+    [],
+    {},
+    host,
+    { via: 'file', files: { [MANIFEST_FILE]: BIBLE_MANIFEST } }
+  )
+  // The host answers for the configured path alone: an absolute path is never
+  // joined to the plugin root.
+  context.parent.apis.doAction = async ([, path]) => {
+    if (path === '/graph/bible.text.json') return JSON.stringify(TEXT_INDEX)
+    if (path.endsWith(MANIFEST_FILE)) return JSON.stringify(BIBLE_MANIFEST)
+    throw new Error(`no such file: ${path}`)
+  }
+  await flush()
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'John 3:17')
+
+  assert.match(context.logseq.Editor.updates[0].content, /Indeed, God did not send the Son\./)
+  assert.deepEqual(context.messages, [])
+})
+
+test('Enter inserts and Escape cancels ahead of the host, wherever the key lands', async () => {
+  // Logseq binds its editor shortcuts on the document, so a key reaches those
+  // before it reaches the dialog: Enter would open a new block behind the
+  // prompt. The dialog claims Enter and Escape in the same capturing phase.
+  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
+
+  const invocation = context.logseq.Editor.commands[0].action()
+  await flush()
+
+  const dialog = dialogOf(context)
+  // A key the dialog does not own is left to whatever has focus.
+  assert.equal(context.press('a'), false)
+
+  fill(dialog, 'Ex 2-Gen 50')
+  assert.equal(context.press('Enter'), true, 'the host still saw Enter')
+  await flush()
+  assert.ok(dialogOf(context), 'a reference that does not resolve closed the dialog')
+  assert.match(dialog.querySelector('p').textContent, /backwards/)
+
+  fill(dialog, 'John 3:16')
+  context.press('Enter')
+  await invocation
+
+  assert.match(context.logseq.Editor.updates[0].content, /\*\*John 3:16\*\*/)
+  assert.equal(dialogOf(context), null)
+  // The claim lasts exactly as long as the dialog does.
+  assert.equal(context.press('Enter'), false)
+  assert.equal(context.parent.document.listeners.length, 0)
+})
+
+test('the document listener is released however the dialog closes', async () => {
+  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
+  const listeners = context.parent.document.listeners
+
+  for (const dismiss of [
+    () => context.press('Escape'),
+    () => control(dialogOf(context), 'button', 'Cancel').dispatch('click'),
+    async () => (await context.logseq.unloads[0]())
+  ]) {
+    const invocation = context.logseq.Editor.commands[0].action()
+    await flush()
+    assert.equal(listeners.length, 1)
+
+    await dismiss()
+    await invocation
+
+    assert.equal(listeners.length, 0)
+    assert.equal(dialogOf(context), null)
+  }
+
   assert.deepEqual(context.logseq.Editor.updates, [])
 })

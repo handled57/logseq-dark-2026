@@ -8,6 +8,9 @@
     <!-- The sandbox has no UI of its own; it only completes the plugin
          handshake and then works against the host document. -->
     <script src="./lib/lsplugin.user.js"></script>
+    <!-- The reference parser is a plain script loaded ahead of the entry
+         script, so both share one global scope. -->
+    <script src="./bible.js"></script>
     <script src="./index.js"></script>
   </body>
 </html>
