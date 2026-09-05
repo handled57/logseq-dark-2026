@@ -13,6 +13,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
+- Adds a passage block that reads as one of Logseq's named admonitions, with commands to insert one.
 - No build runtime, tracking, remote imports, or network access.
 
 ## Hiding properties by property value
@@ -40,9 +41,31 @@ Every block carrying one of the configured keys also gets `data-hc-block-type` s
 
 When a block carries more than one configured key, the first key in the settings field wins, so configuration order is precedence order.
 
+## Passage blocks
+
+A **passage block** holds a quoted passage under a bold reference:
+
+```text
+#+BEGIN_PASSAGE
+**John 3:16**
+
+#+END_PASSAGE
+```
+
+It renders bulletless, on the black admonition surface, with a cyan open-book icon and the same 4px accent divider the named admonitions carry.
+
+`PASSAGE` is not one of the admonition names compiled into Logseq's parser, and that list cannot be extended by a theme, a setting or a plugin. Logseq renders the block as a plain `div.passage` with no icon and no container styling, so the theme reproduces the admonition treatment on its own selectors and supplies the icon itself, inlined as an SVG mask so its color stays a palette token. The block is styled to *match* the admonitions; it is not parsed as one.
+
+Insert one in either of two ways:
+
+- Type `/passage` and choose **Passage**.
+- Type `<` and choose **Passage**. Logseq has no plugin API for the `<` picker, so this entry is added to the picker's own menu while it is open; it withdraws itself as soon as what you have typed can no longer match.
+
+Both prompt for a reference, write it in bold on the first line, and leave the cursor on the blank line beneath it, which is where the passage goes. Escape or **Cancel** dismisses the prompt without changing the block, and a blank reference cannot be submitted.
+
 ## Compatibility
 
-Version 1.3.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
+Version 1.5.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
 
 - DB graphs are not supported in this release.
 - Mobile is not an advertised target; narrow desktop windows receive a layout smoke test.
@@ -80,7 +103,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 ## Intentional layout choices
 
 - On desktop, ordinary pages use 80% of the available main column. Logseq's full-width route remains full width.
-- Untyped bullets are always visible for ordinary prose blocks. Empty, property-only, heading, reference, embed, command/macro, query, media, code (including `src`), `center`, `verse`, namespace, math, ClojureScript-eval, slide, flashcard, Zotero, quote, and other advanced `<`-menu blocks remain bulletless.
+- Untyped bullets are always visible for ordinary prose blocks. Empty, property-only, heading, reference, embed, command/macro, query, media, code (including `src`), `center`, `verse`, `passage`, namespace, math, ClojureScript-eval, slide, flashcard, Zotero, quote, and other advanced `<`-menu blocks remain bulletless.
 - The active block receives a steel-blue outline; hovering a child never reveals or recolors ancestor bullets, and connector/thread lines remain hidden.
 
 ## Development
