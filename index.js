@@ -259,6 +259,8 @@ async function refreshBulletFromStoredSource(block) {
 const COMMAND_LABEL = 'Passage'
 const COMMAND_ATTR = 'data-hc-command'
 const DIALOG_ATTR = 'data-hc-passage-dialog'
+const OPTIONS_ATTR = 'data-hc-passage-options'
+const ACTIONS_ATTR = 'data-hc-passage-actions'
 const DIALOG_STYLE_KEY = 'hc-passage-dialog'
 const COMMAND_MENU_SELECTORS = ['#ui__ac', '.cp__editor-commands', '#block-commands']
 const COMMAND_ITEM_SELECTOR = '.menu-link, a, li'
@@ -410,10 +412,10 @@ const MISSING_TEXT_NOTICE =
   'index: run scripts/build-bible-index.mjs and put bible.text.json beside the theme, or name it ' +
   'in the theme\u2019s settings.'
 
-async function passageBody(resolved) {
+async function passageBody(resolved, display) {
   if (!resolved.tags?.length) return ''
 
-  const body = composePassageText(resolved, await loadBibleText())
+  const body = composePassageText(resolved, await loadBibleText(), display)
 
   if (!body && !noticed) {
     noticed = true
@@ -473,9 +475,9 @@ function withPassageProperties(content, cursor, tags) {
   }
 }
 
-async function writePassage({ uuid, content, cursor, trigger }, resolved) {
+async function writePassage({ uuid, content, cursor, trigger }, resolved, display) {
   const reference = resolved.canonical
-  const body = await passageBody(resolved)
+  const body = await passageBody(resolved, display)
   const head = content.slice(0, cursor).replace(INVOCATIONS[trigger], '')
   const tail = content.slice(cursor)
   /* `#+BEGIN_PASSAGE` only parses on a line of its own, so surrounding text is
@@ -526,7 +528,7 @@ const DIALOG_STYLE = `
   color: var(--vscode-hc-error, #f48771);
 }
 
-[${DIALOG_ATTR}] input {
+[${DIALOG_ATTR}] input[type="text"] {
   padding: 6px 8px;
   color: inherit;
   background: var(--vscode-hc-black, #000000);
@@ -534,38 +536,91 @@ const DIALOG_STYLE = `
   border-radius: 2px;
 }
 
-[${DIALOG_ATTR}] input:focus {
+[${DIALOG_ATTR}] input[type="text"]:focus {
   outline: none;
   border-color: var(--vscode-hc-focus, #f38518);
 }
 
-[${DIALOG_ATTR}] div { display: flex; justify-content: flex-end; gap: 8px; }
+/* The display options: one checkbox to a row, each label beside its own box and
+ * in the body weight, so only the field above them reads as a heading. */
+[${DIALOG_ATTR}] [${OPTIONS_ATTR}] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[${DIALOG_ATTR}] [${OPTIONS_ATTR}] label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+[${DIALOG_ATTR}] input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--vscode-hc-white, #ffffff);
+}
+
+/* A box is too small to carry the focus on its border, and the dialog is chrome
+ * the plugin owns whichever theme is selected, so it rings its own. */
+[${DIALOG_ATTR}] input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--vscode-hc-focus, #f38518);
+  outline-offset: 2px;
+}
+
+[${DIALOG_ATTR}] [${ACTIONS_ATTR}] { display: flex; justify-content: flex-end; gap: 8px; }
 
 [${DIALOG_ATTR}] button {
   padding: 6px 14px;
-  color: inherit;
-  background: var(--vscode-hc-black, #000000);
   border: 1px solid var(--vscode-hc-border, #5b7e96);
   border-radius: 2px;
   cursor: pointer;
 }
 
+/* A button is black with white text in every state it has: hover, focus, and
+ * the press between them. Only the border answers to focus, which keeps the
+ * orange a ring around the button rather than a fill inside it. The
+ * declarations carry weight because the theme's own button rules do, and those
+ * would otherwise repaint a hovered button from underneath. */
+[${DIALOG_ATTR}] button,
+[${DIALOG_ATTR}] button:hover,
+[${DIALOG_ATTR}] button:focus,
+[${DIALOG_ATTR}] button:focus-visible,
+[${DIALOG_ATTR}] button:active {
+  color: var(--vscode-hc-white, #ffffff) !important;
+  background: var(--vscode-hc-black, #000000) !important;
+}
+
 [${DIALOG_ATTR}] button:hover:not([disabled]),
+[${DIALOG_ATTR}] button:focus,
 [${DIALOG_ATTR}] button:focus-visible {
   border-color: var(--vscode-hc-focus, #f38518);
 }
 
 [${DIALOG_ATTR}] button[disabled] {
-  color: var(--vscode-hc-disabled, #a0a0a0);
+  color: var(--vscode-hc-disabled, #a0a0a0) !important;
+  border-color: var(--vscode-hc-disabled, #a0a0a0);
   cursor: default;
 }
 `
 
-/* Resolves with the resolved reference, or with null when the dialog is
- * dismissed — the caller writes nothing in that case, so Escape and Cancel
- * both leave the block exactly as it was. A reference that does not resolve
- * leaves the dialog open with the reason under the field, exactly as a blank
- * one does: the reader is one edit away from a reference that works. */
+/* The passage display options, in the order they are offered under the field.
+ * Each one is a choice about this passage alone, so all three open unchecked
+ * however the last passage was written; everything unchecked is the plain prose
+ * the command has always inserted. */
+const DISPLAY_OPTIONS = [
+  { key: 'headings', id: 'hc-passage-headings', label: 'View chapter headings' },
+  { key: 'numbers', id: 'hc-passage-numbers', label: 'View verse numbers' },
+  { key: 'perLine', id: 'hc-passage-lines', label: 'One verse per line' }
+]
+
+/* Resolves with the resolved reference and the display options chosen beside
+ * it, or with null when the dialog is dismissed — the caller writes nothing in
+ * that case, so Escape and Cancel both leave the block exactly as it was. A
+ * reference that does not resolve leaves the dialog open with the reason under
+ * the field, exactly as a blank one does: the reader is one edit away from a
+ * reference that works. */
 let dismissDialog = null
 function askForReference() {
   return new Promise((resolve) => {
@@ -573,6 +628,7 @@ function askForReference() {
     const form = doc.createElement('form')
     const label = doc.createElement('label')
     const input = doc.createElement('input')
+    const options = doc.createElement('div')
     const message = doc.createElement('p')
     const actions = doc.createElement('div')
     const cancel = doc.createElement('button')
@@ -585,17 +641,43 @@ function askForReference() {
     input.type = 'text'
     input.placeholder = 'John 3:16'
     input.setAttribute('autocomplete', 'off')
+    options.setAttribute(OPTIONS_ATTR, '')
+    actions.setAttribute(ACTIONS_ATTR, '')
     cancel.type = 'button'
     cancel.textContent = 'Cancel'
     insert.type = 'submit'
     insert.textContent = 'Insert'
     insert.disabled = true
 
-    function close(reference) {
+    /* One row per option: the box, then its name, inside the label that both
+     * describes the box and toggles it. The name is a child of the label rather
+     * than its text, because writing text onto the label would replace the box
+     * it already holds. */
+    const boxes = DISPLAY_OPTIONS.map(({ key, id, label: title }) => {
+      const row = doc.createElement('label')
+      const box = doc.createElement('input')
+      const name = doc.createElement('span')
+
+      box.type = 'checkbox'
+      box.id = id
+      box.checked = false
+      row.setAttribute('for', id)
+      name.textContent = title
+      row.appendChild(box)
+      row.appendChild(name)
+      options.appendChild(row)
+
+      return { key, box }
+    })
+
+    const display = () =>
+      Object.fromEntries(boxes.map(({ key, box }) => [key, box.checked === true]))
+
+    function close(choice) {
       dismissDialog = null
       doc.removeEventListener('keydown', keys, true)
       overlay.remove()
-      resolve(reference)
+      resolve(choice)
     }
 
     /* Unloading mid-prompt has to settle the promise as well as remove the
@@ -609,7 +691,7 @@ function askForReference() {
       if (!reference) return
 
       const resolved = resolveReference(reference)
-      if (resolved.ok) close(resolved)
+      if (resolved.ok) close({ resolved, display: display() })
       else message.textContent = resolved.error
     }
 
@@ -651,6 +733,7 @@ function askForReference() {
     actions.appendChild(insert)
     form.appendChild(label)
     form.appendChild(input)
+    form.appendChild(options)
     form.appendChild(message)
     form.appendChild(actions)
     overlay.appendChild(form)
@@ -668,10 +751,10 @@ async function insertPassage(trigger) {
     const target = await captureInvocation(trigger)
     if (!target) return
 
-    const resolved = await askForReference()
-    if (!resolved) return
+    const choice = await askForReference()
+    if (!choice) return
 
-    await writePassage(target, resolved)
+    await writePassage(target, choice.resolved, choice.display)
   } catch (error) {
     console.warn('Dark High Contrast could not insert a passage block', error)
   } finally {

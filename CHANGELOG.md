@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here.
 
+## 1.7.0 - 2026-09-05
+
+- Offer three passage display options in the reference prompt, under the field
+  and each independently selectable: **View chapter headings** writes
+  `**Genesis 1**` above the verses of every chapter the passage includes,
+  **View verse numbers** puts each verse number in superscript against the verse
+  it opens, and **One verse per line** starts every verse on a new line. The
+  options combine, and work across chapter and book boundaries alike.
+- Open the prompt with all three options unchecked every time: they are a choice
+  about the passage in front of you rather than a setting, and with none of them
+  checked the passage is written exactly as it was before.
+- Keep paragraph breaks, poetry lineation and chapter separation as they were
+  wherever an option does not override them, and keep the edition's own section
+  headings out of the block. Without a local text index the command still writes
+  the reference and its chapter tags and leaves the body empty — an option adds
+  nothing to a passage that has no text.
+- Keep a prompt button black with white text in every state, so a focused button
+  is marked by the orange border alone and never by an orange fill.
+
 ## 1.6.0 - 2026-09-05
 
 - Resolve the reference the Passage command asks for. Books are matched on
