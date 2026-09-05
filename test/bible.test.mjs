@@ -82,22 +82,26 @@ test('the corrected book names are the ones the parser answers to', () => {
     assert.equal(resolved(`${longName} 1:1`).start.shortName, shortName)
   }
 
-  assert.equal(resolved('Habakkuk 3:19').canonical, 'Hab 3:19')
-  assert.equal(resolved('Psalms 150:6').canonical, 'Ps 150:6')
+  assert.equal(resolved('Habakkuk 3:19').canonical, 'Habakkuk 3:19')
+  assert.equal(resolved('Psalms 150:6').canonical, 'Psalms 150:6')
 })
 
 test('every written form of a reference resolves to the same canonical form', () => {
   const forms = {
     'John 3:16': ['John 3:16', 'john 3:16', 'JOHN 3:16', 'Jn 3:16', 'jn3:16', ' John  3 : 16 '],
-    'Gen 50': ['Gen 50', 'Genesis 50', 'gen. 50', 'Gn 50'],
-    'Gen 1–3': ['Gen 1-3', 'Genesis 1 - 3', 'Gen 1–3', 'Gen 1 — 3', 'Gen 1-Gen 3', 'Gen 1 - 3'],
-    'Gen 50–Ex 2': ['Gen 50 - Ex 2', 'Genesis 50-Exodus 2', 'Gen 50–Ex 2', 'Gen 50 — Exod 2'],
-    'Gen 50:1–10': ['Genesis 50:1-10', 'Genesis 50:1 - 10', 'Gen 50:1–10', 'Gen 50:1 — 10'],
-    'Gen 1:1–2:3': ['Gen 1:1-2:3', 'Genesis 1:1 - 2:3', 'Gen 1:1–2:3', 'Gen 1:1 — 2:3'],
-    'Gen 50:1–Ex 2:25': [
+    'Genesis 50': ['Gen 50', 'Genesis 50', 'gen. 50', 'Gn 50'],
+    'Genesis 1-3': ['Gen 1-3', 'Genesis 1 - 3', 'Gen 1–3', 'Gen 1 — 3', 'Gen 1-Gen 3', 'Gen 1 - 3'],
+    'Genesis 50 - Exodus 2': [
+      'Gen 50 - Ex 2', 'Genesis 50-Exodus 2', 'Gen 50–Ex 2', 'Gen 50 — Exod 2'
+    ],
+    'Genesis 50:1-10': ['Genesis 50:1-10', 'Genesis 50:1 - 10', 'Gen 50:1–10', 'Gen 50:1 — 10'],
+    'Genesis 1:1 - 2:3': ['Gen 1:1-2:3', 'Genesis 1:1 - 2:3', 'Gen 1:1–2:3', 'Gen 1:1 — 2:3'],
+    'Genesis 50:1 - Exodus 2:25': [
       'Genesis 50:1 - Ex 2:25', 'Gen 50:1-Exodus 2:25', 'Gen 50:1–Ex 2:25', 'Gen 50:1 — Ex 2:25'
     ],
-    '1Cor 13:1–13': ['1 Cor 13:1-13', '1Cor 13:1-13', '1 Corinthians 13:1 – 13', '1co 13:1-13']
+    '1 Corinthians 13:1-13': [
+      '1 Cor 13:1-13', '1Cor 13:1-13', '1 Corinthians 13:1 – 13', '1co 13:1-13'
+    ]
   }
 
   for (const [canonical, written] of Object.entries(forms)) {
@@ -107,13 +111,59 @@ test('every written form of a reference resolves to the same canonical form', ()
   }
 })
 
+test('a reference is written under the book\u2019s full name, in one of six forms', () => {
+  // The six shapes a reference is written in. The dash is tight where what
+  // follows it is a bare number continuing the book and chapter already named,
+  // and spaced where it carries a chapter or a book of its own.
+  const forms = [
+    ['Gen', 'Genesis'],
+    ['Gen 1', 'Genesis 1'],
+    ['Gen 1-2', 'Genesis 1-2'],
+    ['Gen 1:1-2:1', 'Genesis 1:1 - 2:1'],
+    ['Gen 50:20-Ex 1:10', 'Genesis 50:20 - Exodus 1:10'],
+    ['Gen 1:1-10', 'Genesis 1:1-10']
+  ]
+
+  for (const [written, canonical] of forms) {
+    assert.equal(resolved(written).canonical, canonical, written)
+  }
+
+  // A range of whole books is the one form written with no number at all.
+  assert.equal(resolved('Gen - Ex').canonical, 'Genesis - Exodus')
+  // A name that is itself numbered stays whole: the digits belong to the book.
+  assert.equal(resolved('1 Cor').canonical, '1 Corinthians')
+  assert.equal(resolved('Psalm 151').canonical, 'Psalm 151')
+})
+
+test('a book named on its own is the whole of that book', () => {
+  const whole = resolved('Genesis')
+  assert.equal(whole.canonical, 'Genesis')
+  assert.equal(whole.tags.length, 50)
+  assert.deepEqual([whole.tags[0], whole.tags.at(-1)], ['Gen/1', 'Gen/50'])
+  assert.deepEqual(
+    [whole.start.chapter, whole.start.verse, whole.end.chapter, whole.end.verse],
+    [1, 1, 50, 26]
+  )
+
+  // A whole book runs from each end chapter's own first and last verse, which
+  // is what keeps the books that begin somewhere other than 1:1 correct.
+  const sirach = resolved('Sirach')
+  assert.equal(sirach.canonical, 'Sirach')
+  assert.deepEqual([sirach.start.chapter, sirach.start.verse], [0, 1])
+  assert.deepEqual([sirach.tags[0], sirach.tags.at(-1)], ['Sir/0', 'Sir/51'])
+
+  // One chapter is still the whole book, and is written without its number.
+  assert.equal(resolved('Obadiah').canonical, 'Obadiah')
+  assert.deepEqual(resolved('Obadiah').tags, ['Obad/1'])
+})
+
 test('a bare number after the dash is a verse only when it stands alone', () => {
   // `Gen 50:1 - 10` is verse 10; `Gen 1 - 3` is chapter 3; and a book beside
   // the number makes it that book's chapter however the left side was written.
-  assert.equal(resolved('Gen 50:1 - 10').canonical, 'Gen 50:1–10')
-  assert.equal(resolved('Gen 1 - 3').canonical, 'Gen 1–3')
-  assert.equal(resolved('Gen 50:1 - Ex 2').canonical, 'Gen 50:1–Ex 2:25')
-  assert.equal(resolved('Gen 50 - Ex 2:5').canonical, 'Gen 50:1–Ex 2:5')
+  assert.equal(resolved('Gen 50:1 - 10').canonical, 'Genesis 50:1-10')
+  assert.equal(resolved('Gen 1 - 3').canonical, 'Genesis 1-3')
+  assert.equal(resolved('Gen 50:1 - Ex 2').canonical, 'Genesis 50:1 - Exodus 2:25')
+  assert.equal(resolved('Gen 50 - Ex 2:5').canonical, 'Genesis 50:1 - Exodus 2:5')
 })
 
 test('the tags name every chapter the passage spans, in order', () => {
@@ -132,7 +182,7 @@ test('a backwards range is refused', () => {
   assert.match(rejected('Gen 1:5-1:2'), /backwards/)
   assert.match(rejected('Rev 22-Gen 1'), /backwards/)
   // The endpoints touching is still a range, not a backwards one.
-  assert.equal(resolved('Gen 1:1-1:1').canonical, 'Gen 1:1')
+  assert.equal(resolved('Gen 1:1-1:1').canonical, 'Genesis 1:1')
 })
 
 test('a chapter or verse the edition does not carry is refused', () => {
@@ -150,7 +200,7 @@ test('a chapter or verse the edition does not carry is refused', () => {
 
 test('an unknown or unparseable reference is refused', () => {
   assert.match(rejected('Foo 1'), /No book named/)
-  assert.match(rejected('Gen'), /not a passage reference/)
+  assert.match(rejected('Foo'), /not a passage reference/)
   assert.match(rejected('3:16'), /not a passage reference/)
   assert.match(rejected(''), /John 3:16/)
   assert.match(rejected('   '), /John 3:16/)
@@ -161,9 +211,9 @@ test('an unknown or unparseable reference is refused', () => {
 test('chapters that do not begin at verse one keep their own numbering', () => {
   // The Greek additions to Esther open at 5:3, and Sirach's prologue is
   // numbered chapter 0.
-  assert.equal(resolved('AddEsth 5:3').canonical, 'AddEsth 5:3')
+  assert.equal(resolved('AddEsth 5:3').canonical, 'Additions to Esther 5:3')
   assert.match(rejected('AddEsth 5:1'), /no verse 1/)
-  assert.equal(resolved('Sir 0:1').canonical, 'Sir 0:1')
+  assert.equal(resolved('Sir 0:1').canonical, 'Sirach 0:1')
   assert.deepEqual(resolved('Sir 0-1').tags, ['Sir/0', 'Sir/1'])
 })
 
