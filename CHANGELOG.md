@@ -4,11 +4,12 @@ All notable changes to this project are documented here.
 
 ## 1.8.0 - 2026-09-05
 
-- Set verse numbers in the theme's orange. The number is wrapped in highlight
-  markup, which Logseq renders as a `mark`: a bare run of digits is nothing a
-  stylesheet can reach, and a tag of its own is not available, because mldoc
-  reads a `<` opening a line as block-level HTML. The digits stay inside the
-  markup, so a passage read without the theme still reads as a passage.
+- Set verse numbers in the theme's cyan, the color of the passage's own icon.
+  The number is wrapped in highlight markup, which Logseq renders as a `mark`: a
+  bare run of digits is nothing a stylesheet can reach, and a tag of its own is
+  not available, because mldoc reads a `<` opening a line as block-level HTML.
+  The digits stay inside the markup, so a passage read without the theme still
+  reads as a passage.
 - Set each verse number in a gutter of its own where every number in the block
   opens a line — what **One verse per line** writes, and what poetry set a verse
   to a paragraph already amounts to. A verse that wraps now lines up with the
