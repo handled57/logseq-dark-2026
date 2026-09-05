@@ -189,6 +189,44 @@ test('fenced code has a single outer border', () => {
   assert.match(css, /pre\s*>\s*code[\s\S]*?background:\s*transparent[\s\S]*?border:\s*0/)
 })
 
+test('named admonitions share their icon color with a four-pixel divider', () => {
+  const types = ['tip', 'note', 'important', 'caution', 'pinned', 'warning']
+  const scopedTypes = types.map((type) => `.${type}`).join(', ')
+  const semanticAccents = {
+    tip: 'var(--vscode-hc-focus)',
+    note: '#ebbc00',
+    important: '#eb9091',
+    caution: '#fa934e',
+    pinned: 'currentColor',
+    warning: '#fa934e'
+  }
+
+  for (const type of types) {
+    assert.match(
+      css,
+      new RegExp(`\\.admonitionblock\\.${type}(?:,|\\s*\\{)[\\s\\S]*?--hc-admonition-accent\\s*:\\s*${escapeRegExp(semanticAccents[type])}`),
+      `${type} does not preserve its semantic accent`
+    )
+  }
+
+  assert.match(
+    css,
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
+  )
+  assert.match(
+    css,
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon\\s*\\{[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?border-right:\\s*4px solid var\\(--hc-admonition-accent\\)\\s*!important`)
+  )
+  assert.match(
+    css,
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon svg\\s*\\{[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?fill:\\s*var\\(--hc-admonition-accent\\)\\s*!important`)
+  )
+
+  assert.doesNotMatch(css, /\.admonitionblock:not\(/)
+  assert.match(css, /blockquote\s*\{[\s\S]*?border-left:\s*4px solid var\(--vscode-hc-border\)/)
+  assert.match(css, /\.notification-content\.warning,\s*\.warning\s*\{[\s\S]*?border-color:\s*var\(--vscode-hc-yellow\)\s*!important/)
+})
+
 test('workbench chrome is bordered in the contrast border, not white', () => {
   // Panes, panels, sidebars and controls all draw their edges with
   // --vscode-hc-border. Two declarations use a border property to paint

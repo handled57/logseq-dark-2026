@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 1.4.6 - 2026-09-04
+
+- Remove the visible outer border from rendered tip, note, important, caution,
+  pinned, and warning admonitions, and widen their icon divider to 4px using
+  the matching semantic icon color.
+
 ## 1.4.5 - 2026-09-04
 
 - Classify mounted blocks from their canonical stored Logseq source so Org
