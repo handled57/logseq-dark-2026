@@ -16,6 +16,136 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Adds a passage block that reads as one of Logseq's named admonitions, with commands to insert one.
 - No build runtime, tracking, remote imports, or network access.
 
+## Color palette
+
+`theme.css` is the source of truth for this palette. The chart shows every fixed color expression used by the theme; the tables below consolidate aliases that resolve to the same value and explain where each color appears.
+
+![Every opaque, HSL-component, and alpha color used by Dark High Contrast](screenshots/color-palette.svg)
+
+<!-- fixed-color-values:start -->
+### Core VS Code High Contrast colors
+
+| Color | Tokens | Used for |
+| --- | --- | --- |
+| `#000000` | `--vscode-hc-black` | Primary canvas; editor, menus, dialogs, controls, code, whiteboards, and selected surfaces. |
+| `#ffffff` | `--vscode-hc-white` | Primary text and icons, strong borders, bullets, scrollbars, and inverted selection backgrounds. |
+| `#f38518` | `--vscode-hc-focus`, `--vscode-hc-orange` | Keyboard focus, active bullets, hover borders, editor focus, and primary interaction emphasis. |
+| `#5b7e96` | `--vscode-hc-border` | Structural borders, guides, dividers, inactive controls, and the gray/accent ramps. |
+| `#569cd6` | `--vscode-hc-blue` | Tags and syntax keywords. |
+| `#1aebff` | `--vscode-hc-bright-blue` | Hovered links and tags and the brightest accent-scale text. |
+| `#3794ff` | `--vscode-hc-link` | Links, whiteboard blue strokes, and quick-link hover states. |
+| `#7ca668` | `--vscode-hc-green` | Comments and idle file-sync status. |
+| `#ce9178` | `--vscode-hc-string` | Inline code and string syntax. |
+| `#c586c0` | `--vscode-hc-purple` | Purple whiteboard strokes and syntax accents. |
+| `#9cdcfe` | `--vscode-hc-cyan` | Page and block references and variable/property syntax. |
+| `#4ec9b0` | `--vscode-hc-type` | Type and class-name syntax. |
+| `#ffff00` | `--vscode-hc-yellow` | Clozes, marks, search matches, warnings, pending sync, and operators. |
+| `#f48771` | `--vscode-hc-error` | Errors, destructive states, failed sync, and red whiteboard strokes. |
+| `#cca700` | `--vscode-hc-warning` | Reserved VS Code warning token. |
+| `#75beff` | `--vscode-hc-info` | Reserved VS Code information token. |
+| `#d7d7d7` | `--vscode-hc-muted` | Secondary text, tertiary borders, and gray whiteboard strokes. |
+| `#a0a0a0` | `--vscode-hc-disabled` | Disabled text and control borders. |
+| `#0c0c0c` | `--vscode-hc-panel` | Secondary surfaces, properties, quotes, inline code, and nested panels. |
+| `#151515` | `--vscode-hc-elevated` | Elevated and tertiary surfaces. |
+
+### Neutral surfaces and structural ramps
+
+| Color | Tokens or selectors | Used for |
+| --- | --- | --- |
+| `#101010` | `--ls-table-tr-even-background-color` | Alternating table rows. |
+| `#1f1f1f` | Quaternary, level 3/4, and block-highlight tokens | Highlighted blocks and intermediate raised surfaces. |
+| `#282828` | Quinary, level 4/5, and gray whiteboard background tokens | Higher neutral surfaces and gray whiteboard objects. |
+| `#333333` | Senary and level 5/6 tokens | High neutral surface steps. |
+| `#3d3d3d` | Level 6 and Radix gray step 7 | Strongest neutral surface before structural borders. |
+| `#7d9db4` | `--lx-gray-10` | Radix gray solid-fill hover step. |
+| `#001019` | `--lx-accent-02` | Subtle accent background. |
+| `#001d2e` | `--lx-accent-03` | Accent component background. |
+| `#002a42` | `--lx-accent-04` | Hovered accent component background. |
+| `#003656` | `--lx-accent-05` | Active or selected accent component background. |
+| `#003e6b` | `--lx-accent-06`, blue highlight/PDF/whiteboard tokens | Strong blue accent fill, blue highlights, PDF highlights, and whiteboard quick links. |
+| `#ffa04d` | `--lx-accent-10` | Bright orange solid-fill hover step. |
+
+### Semantic, syntax, highlight, PDF, whiteboard, and admonition colors
+
+| Color | Tokens or selectors | Used for |
+| --- | --- | --- |
+| `#3b0d08` | Error and red whiteboard background tokens | Dark error notifications and red whiteboard objects. |
+| `#332a00` | Warning and yellow whiteboard background tokens | Dark warning notifications and yellow whiteboard objects. |
+| `#14240f` | Success and green whiteboard background tokens | Dark success notifications and green whiteboard objects. |
+| `#b7d6a8` | Success text and green whiteboard stroke tokens | Success foreground and green whiteboard strokes. |
+| `#5a5200` | Yellow highlight and PDF-highlight tokens | Yellow text and PDF highlights. |
+| `#661d1d` | Red highlight and PDF-highlight tokens | Red text and PDF highlights. |
+| `#164a22` | Green highlight and PDF-highlight tokens | Green text and PDF highlights. |
+| `#522251` | Purple highlight and PDF-highlight tokens | Purple text and PDF highlights. |
+| `#66224c` | `--ls-highlight-color-pink` | Pink text highlights. |
+| `#454545` | `--ls-highlight-color-gray` | Gray text highlights. |
+| `#ff9ed2` | `--ls-wb-stroke-color-pink` | Pink whiteboard strokes. |
+| `#3b193a` | `--ls-wb-background-color-purple` | Purple whiteboard objects. |
+| `#4a1735` | `--ls-wb-background-color-pink` | Pink whiteboard objects. |
+| `#b5cea8` | Number syntax selectors | CodeMirror, Highlight.js, and Prism numeric literals. |
+| `#ebbc00` | Note admonition accent | Note icon and four-pixel divider. |
+| `#eb9091` | Important admonition accent | Important icon and four-pixel divider. |
+| `#fa934e` | Caution and warning admonition accent | Caution/warning icons and four-pixel dividers. |
+| `#264f78` | CodeMirror selection selectors | Selected text in Logseq's CodeMirror editor. |
+
+### HSL control tokens
+
+Logseq's newer controls consume these as HSL components, for example `hsl(var(--accent))`.
+
+| Components | Tokens | Used for |
+| --- | --- | --- |
+| `0 0% 0%` | `--background`, `--card`, `--popover`, `--primary`, `--accent-foreground`, `--destructive-foreground`, `--ls-button-background-hsl` | Black control surfaces and dark foregrounds on bright semantic fills. |
+| `0 0% 100%` | `--foreground`, `--card-foreground`, `--popover-foreground`, `--primary-foreground`, `--secondary-foreground` | White control text. |
+| `0 0% 5%` | `--secondary` | Secondary control surfaces. |
+| `0 0% 8%` | `--muted` | Muted control surfaces. |
+| `0 0% 84%` | `--muted-foreground` | Muted control text. |
+| `195 65% 65%` | `--accent` | Cyan control accent. |
+| `9 87% 70%` | `--destructive` | Destructive control fill. |
+| `204 24% 47%` | `--border`, `--input` | Control and input borders. |
+| `29 90% 52%` | `--ring` | Control focus rings. |
+
+### Alpha overlays
+
+The chart renders these over a checkerboard so the opacity remains visible.
+
+| Color expression | Token or selector | Used for |
+| --- | --- | --- |
+| `rgb(255 255 255 / 0%)` | `--lx-gray-01-alpha` | Fully transparent gray-scale base. |
+| `rgb(255 255 255 / 4%)` | `--lx-gray-02-alpha` | Subtle gray-scale overlay. |
+| `rgb(255 255 255 / 8%)` | `--lx-gray-03-alpha` | Gray component overlay. |
+| `rgb(255 255 255 / 12%)` | `--lx-gray-04-alpha`; ordinary bullet halo | Gray hover overlay and faint bullet halo. |
+| `rgb(255 255 255 / 16%)` | `--lx-gray-05-alpha` | Gray active-component overlay. |
+| `rgb(255 255 255 / 20%)` | `--lx-gray-06-alpha` | Gray subtle-border overlay. |
+| `rgb(255 255 255 / 26%)` | `--lx-gray-07-alpha` | Gray strong-border overlay. |
+| `rgb(91 126 150 / 80%)` | `--lx-gray-08-alpha` | Translucent structural border. |
+| `rgb(91 126 150 / 90%)` | `--lx-gray-09-alpha` | Translucent solid gray fill. |
+| `rgb(125 157 180 / 92%)` | `--lx-gray-10-alpha` | Translucent gray hover fill. |
+| `rgb(215 215 215 / 95%)` | `--lx-gray-11-alpha` | Nearly opaque secondary text. |
+| `rgb(255 255 255 / 100%)` | `--lx-gray-12-alpha` | Opaque high-contrast text. |
+| `rgb(0 62 107 / 8%)` | `--lx-accent-01-alpha` | Faintest blue accent overlay. |
+| `rgb(0 62 107 / 16%)` | `--lx-accent-02-alpha` | Subtle blue accent overlay. |
+| `rgb(0 62 107 / 28%)` | `--lx-accent-03-alpha` | Blue component overlay. |
+| `rgb(0 62 107 / 40%)` | `--lx-accent-04-alpha` | Blue hover overlay. |
+| `rgb(0 62 107 / 55%)` | `--lx-accent-05-alpha` | Blue active-component overlay. |
+| `rgb(0 62 107 / 70%)` | `--lx-accent-06-alpha` | Strong blue accent overlay. |
+| `rgb(91 126 150 / 60%)` | `--lx-accent-07-alpha` | Translucent accent border. |
+| `rgb(243 133 24 / 45%)` | `--lx-accent-08-alpha` | Translucent orange focus overlay. |
+| `rgb(243 133 24 / 80%)` | `--lx-accent-09-alpha` | Orange active-fill overlay. |
+| `rgb(255 160 77 / 85%)` | `--lx-accent-10-alpha` | Bright orange hover-fill overlay. |
+| `rgb(26 235 255 / 90%)` | `--lx-accent-11-alpha` | Bright cyan accent text overlay. |
+| `rgb(255 255 255 / 95%)` | `--lx-accent-12-alpha` | Nearly opaque accent text. |
+| `rgb(0 0 0 / 78%)` | Modal and dialog overlays | Screen scrim behind modal surfaces. |
+| `rgb(255 255 255 / 30%)` | Closed-bullet selector | Stronger halo for a closed bullet. |
+<!-- fixed-color-values:end -->
+
+### Dynamic and platform colors
+
+These values cannot have a single fixed swatch:
+
+- `transparent` removes fills or reserves invisible borders without introducing a color.
+- `inherit` and `currentColor` reuse the surrounding foreground; the pinned admonition uses `currentColor` for its icon and divider.
+- In Windows forced-colors mode, `Canvas`, `CanvasText`, `LinkText`, `Highlight`, and `HighlightText` defer to the user's operating-system contrast palette.
+
 ## Hiding properties by property value
 
 Blocks whose rendered properties match any one of the configured `key: value` pairs render as bare content: the whole property table is hidden. Clicking into such a block still shows its content *and* its properties as source, because Logseq replaces the entire rendered block with a textarea over the raw block content, and custom properties are part of that content — nothing needs to be un-hidden.

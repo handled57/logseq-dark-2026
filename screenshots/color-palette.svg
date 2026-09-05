@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title description">
+  <title id="title">Dark High Contrast complete color palette</title>
+  <desc id="description">Swatches for all 50 opaque colors, 26 alpha overlays, and 9 HSL component colors used by the Logseq theme.</desc>
+  <defs>
+    <pattern id="checker" width="12" height="12" patternUnits="userSpaceOnUse">
+      <rect width="12" height="12" fill="#000000"/>
+      <path d="M0 0h6v6H0zM6 6h6v6H6z" fill="#282828"/>
+    </pattern>
+    <style>
+      .heading { fill: #ffffff; font: 700 22px ui-monospace, SFMono-Regular, Consolas, monospace; }
+      .subheading { fill: #d7d7d7; font: 15px ui-monospace, SFMono-Regular, Consolas, monospace; }
+      .label { fill: #ffffff; font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; text-anchor: middle; }
+      .alpha-label { fill: #ffffff; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; text-anchor: middle; }
+      .swatch { stroke: #5b7e96; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="900" fill="#000000"/>
+  <text class="heading" x="24" y="38">Dark High Contrast — complete color palette</text>
+  <text class="subheading" x="24" y="64">50 opaque colors</text>
+
+  <!-- Opaque colors: 10 columns by 5 rows. -->
+  <g transform="translate(24 82)"><rect class="swatch" width="112" height="36" fill="#000000"/><text class="label" x="56" y="52">#000000</text></g>
+  <g transform="translate(160 82)"><rect class="swatch" width="112" height="36" fill="#ffffff"/><text class="label" x="56" y="52">#ffffff</text></g>
+  <g transform="translate(296 82)"><rect class="swatch" width="112" height="36" fill="#f38518"/><text class="label" x="56" y="52">#f38518</text></g>
+  <g transform="translate(432 82)"><rect class="swatch" width="112" height="36" fill="#5b7e96"/><text class="label" x="56" y="52">#5b7e96</text></g>
+  <g transform="translate(568 82)"><rect class="swatch" width="112" height="36" fill="#569cd6"/><text class="label" x="56" y="52">#569cd6</text></g>
+  <g transform="translate(704 82)"><rect class="swatch" width="112" height="36" fill="#1aebff"/><text class="label" x="56" y="52">#1aebff</text></g>
+  <g transform="translate(840 82)"><rect class="swatch" width="112" height="36" fill="#3794ff"/><text class="label" x="56" y="52">#3794ff</text></g>
+  <g transform="translate(976 82)"><rect class="swatch" width="112" height="36" fill="#7ca668"/><text class="label" x="56" y="52">#7ca668</text></g>
+  <g transform="translate(1112 82)"><rect class="swatch" width="112" height="36" fill="#ce9178"/><text class="label" x="56" y="52">#ce9178</text></g>
+  <g transform="translate(1248 82)"><rect class="swatch" width="112" height="36" fill="#c586c0"/><text class="label" x="56" y="52">#c586c0</text></g>
+
+  <g transform="translate(24 144)"><rect class="swatch" width="112" height="36" fill="#9cdcfe"/><text class="label" x="56" y="52">#9cdcfe</text></g>
+  <g transform="translate(160 144)"><rect class="swatch" width="112" height="36" fill="#4ec9b0"/><text class="label" x="56" y="52">#4ec9b0</text></g>
+  <g transform="translate(296 144)"><rect class="swatch" width="112" height="36" fill="#ffff00"/><text class="label" x="56" y="52">#ffff00</text></g>
+  <g transform="translate(432 144)"><rect class="swatch" width="112" height="36" fill="#f48771"/><text class="label" x="56" y="52">#f48771</text></g>
+  <g transform="translate(568 144)"><rect class="swatch" width="112" height="36" fill="#cca700"/><text class="label" x="56" y="52">#cca700</text></g>
+  <g transform="translate(704 144)"><rect class="swatch" width="112" height="36" fill="#75beff"/><text class="label" x="56" y="52">#75beff</text></g>
+  <g transform="translate(840 144)"><rect class="swatch" width="112" height="36" fill="#d7d7d7"/><text class="label" x="56" y="52">#d7d7d7</text></g>
+  <g transform="translate(976 144)"><rect class="swatch" width="112" height="36" fill="#a0a0a0"/><text class="label" x="56" y="52">#a0a0a0</text></g>
+  <g transform="translate(1112 144)"><rect class="swatch" width="112" height="36" fill="#0c0c0c"/><text class="label" x="56" y="52">#0c0c0c</text></g>
+  <g transform="translate(1248 144)"><rect class="swatch" width="112" height="36" fill="#151515"/><text class="label" x="56" y="52">#151515</text></g>
+
+  <g transform="translate(24 206)"><rect class="swatch" width="112" height="36" fill="#1f1f1f"/><text class="label" x="56" y="52">#1f1f1f</text></g>
+  <g transform="translate(160 206)"><rect class="swatch" width="112" height="36" fill="#282828"/><text class="label" x="56" y="52">#282828</text></g>
+  <g transform="translate(296 206)"><rect class="swatch" width="112" height="36" fill="#333333"/><text class="label" x="56" y="52">#333333</text></g>
+  <g transform="translate(432 206)"><rect class="swatch" width="112" height="36" fill="#101010"/><text class="label" x="56" y="52">#101010</text></g>
+  <g transform="translate(568 206)"><rect class="swatch" width="112" height="36" fill="#3b0d08"/><text class="label" x="56" y="52">#3b0d08</text></g>
+  <g transform="translate(704 206)"><rect class="swatch" width="112" height="36" fill="#332a00"/><text class="label" x="56" y="52">#332a00</text></g>
+  <g transform="translate(840 206)"><rect class="swatch" width="112" height="36" fill="#14240f"/><text class="label" x="56" y="52">#14240f</text></g>
+  <g transform="translate(976 206)"><rect class="swatch" width="112" height="36" fill="#b7d6a8"/><text class="label" x="56" y="52">#b7d6a8</text></g>
+  <g transform="translate(1112 206)"><rect class="swatch" width="112" height="36" fill="#5a5200"/><text class="label" x="56" y="52">#5a5200</text></g>
+  <g transform="translate(1248 206)"><rect class="swatch" width="112" height="36" fill="#661d1d"/><text class="label" x="56" y="52">#661d1d</text></g>
+
+  <g transform="translate(24 268)"><rect class="swatch" width="112" height="36" fill="#003e6b"/><text class="label" x="56" y="52">#003e6b</text></g>
+  <g transform="translate(160 268)"><rect class="swatch" width="112" height="36" fill="#164a22"/><text class="label" x="56" y="52">#164a22</text></g>
+  <g transform="translate(296 268)"><rect class="swatch" width="112" height="36" fill="#522251"/><text class="label" x="56" y="52">#522251</text></g>
+  <g transform="translate(432 268)"><rect class="swatch" width="112" height="36" fill="#66224c"/><text class="label" x="56" y="52">#66224c</text></g>
+  <g transform="translate(568 268)"><rect class="swatch" width="112" height="36" fill="#454545"/><text class="label" x="56" y="52">#454545</text></g>
+  <g transform="translate(704 268)"><rect class="swatch" width="112" height="36" fill="#3d3d3d"/><text class="label" x="56" y="52">#3d3d3d</text></g>
+  <g transform="translate(840 268)"><rect class="swatch" width="112" height="36" fill="#7d9db4"/><text class="label" x="56" y="52">#7d9db4</text></g>
+  <g transform="translate(976 268)"><rect class="swatch" width="112" height="36" fill="#001019"/><text class="label" x="56" y="52">#001019</text></g>
+  <g transform="translate(1112 268)"><rect class="swatch" width="112" height="36" fill="#001d2e"/><text class="label" x="56" y="52">#001d2e</text></g>
+  <g transform="translate(1248 268)"><rect class="swatch" width="112" height="36" fill="#002a42"/><text class="label" x="56" y="52">#002a42</text></g>
+
+  <g transform="translate(24 330)"><rect class="swatch" width="112" height="36" fill="#003656"/><text class="label" x="56" y="52">#003656</text></g>
+  <g transform="translate(160 330)"><rect class="swatch" width="112" height="36" fill="#ffa04d"/><text class="label" x="56" y="52">#ffa04d</text></g>
+  <g transform="translate(296 330)"><rect class="swatch" width="112" height="36" fill="#ff9ed2"/><text class="label" x="56" y="52">#ff9ed2</text></g>
+  <g transform="translate(432 330)"><rect class="swatch" width="112" height="36" fill="#3b193a"/><text class="label" x="56" y="52">#3b193a</text></g>
+  <g transform="translate(568 330)"><rect class="swatch" width="112" height="36" fill="#4a1735"/><text class="label" x="56" y="52">#4a1735</text></g>
+  <g transform="translate(704 330)"><rect class="swatch" width="112" height="36" fill="#b5cea8"/><text class="label" x="56" y="52">#b5cea8</text></g>
+  <g transform="translate(840 330)"><rect class="swatch" width="112" height="36" fill="#ebbc00"/><text class="label" x="56" y="52">#ebbc00</text></g>
+  <g transform="translate(976 330)"><rect class="swatch" width="112" height="36" fill="#eb9091"/><text class="label" x="56" y="52">#eb9091</text></g>
+  <g transform="translate(1112 330)"><rect class="swatch" width="112" height="36" fill="#fa934e"/><text class="label" x="56" y="52">#fa934e</text></g>
+  <g transform="translate(1248 330)"><rect class="swatch" width="112" height="36" fill="#264f78"/><text class="label" x="56" y="52">#264f78</text></g>
+
+  <text class="subheading" x="24" y="425">26 alpha overlays — checkerboard shows transparency</text>
+  <!-- Alpha overlays: 13 columns by 2 rows. -->
+  <g transform="translate(24 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0" data-color="rgb(255 255 255 / 0%)"/><text class="alpha-label" x="44" y="49">white / 0%</text></g>
+  <g transform="translate(128 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.04" data-color="rgb(255 255 255 / 4%)"/><text class="alpha-label" x="44" y="49">white / 4%</text></g>
+  <g transform="translate(232 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.08" data-color="rgb(255 255 255 / 8%)"/><text class="alpha-label" x="44" y="49">white / 8%</text></g>
+  <g transform="translate(336 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.12" data-color="rgb(255 255 255 / 12%)"/><text class="alpha-label" x="44" y="49">white / 12%</text></g>
+  <g transform="translate(440 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.16" data-color="rgb(255 255 255 / 16%)"/><text class="alpha-label" x="44" y="49">white / 16%</text></g>
+  <g transform="translate(544 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.20" data-color="rgb(255 255 255 / 20%)"/><text class="alpha-label" x="44" y="49">white / 20%</text></g>
+  <g transform="translate(648 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.26" data-color="rgb(255 255 255 / 26%)"/><text class="alpha-label" x="44" y="49">white / 26%</text></g>
+  <g transform="translate(752 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#5b7e96" fill-opacity="0.80" data-color="rgb(91 126 150 / 80%)"/><text class="alpha-label" x="44" y="49">steel / 80%</text></g>
+  <g transform="translate(856 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#5b7e96" fill-opacity="0.90" data-color="rgb(91 126 150 / 90%)"/><text class="alpha-label" x="44" y="49">steel / 90%</text></g>
+  <g transform="translate(960 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#7d9db4" fill-opacity="0.92" data-color="rgb(125 157 180 / 92%)"/><text class="alpha-label" x="44" y="49">gray / 92%</text></g>
+  <g transform="translate(1064 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#d7d7d7" fill-opacity="0.95" data-color="rgb(215 215 215 / 95%)"/><text class="alpha-label" x="44" y="49">muted / 95%</text></g>
+  <g transform="translate(1168 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="1" data-color="rgb(255 255 255 / 100%)"/><text class="alpha-label" x="44" y="49">white / 100%</text></g>
+  <g transform="translate(1272 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#003e6b" fill-opacity="0.08" data-color="rgb(0 62 107 / 8%)"/><text class="alpha-label" x="44" y="49">blue / 8%</text></g>
+
+  <g transform="translate(24 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#003e6b" fill-opacity="0.16" data-color="rgb(0 62 107 / 16%)"/><text class="alpha-label" x="44" y="49">blue / 16%</text></g>
+  <g transform="translate(128 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#003e6b" fill-opacity="0.28" data-color="rgb(0 62 107 / 28%)"/><text class="alpha-label" x="44" y="49">blue / 28%</text></g>
+  <g transform="translate(232 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#003e6b" fill-opacity="0.40" data-color="rgb(0 62 107 / 40%)"/><text class="alpha-label" x="44" y="49">blue / 40%</text></g>
+  <g transform="translate(336 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#003e6b" fill-opacity="0.55" data-color="rgb(0 62 107 / 55%)"/><text class="alpha-label" x="44" y="49">blue / 55%</text></g>
+  <g transform="translate(440 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#003e6b" fill-opacity="0.70" data-color="rgb(0 62 107 / 70%)"/><text class="alpha-label" x="44" y="49">blue / 70%</text></g>
+  <g transform="translate(544 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#5b7e96" fill-opacity="0.60" data-color="rgb(91 126 150 / 60%)"/><text class="alpha-label" x="44" y="49">steel / 60%</text></g>
+  <g transform="translate(648 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#f38518" fill-opacity="0.45" data-color="rgb(243 133 24 / 45%)"/><text class="alpha-label" x="44" y="49">orange / 45%</text></g>
+  <g transform="translate(752 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#f38518" fill-opacity="0.80" data-color="rgb(243 133 24 / 80%)"/><text class="alpha-label" x="44" y="49">orange / 80%</text></g>
+  <g transform="translate(856 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffa04d" fill-opacity="0.85" data-color="rgb(255 160 77 / 85%)"/><text class="alpha-label" x="44" y="49">bright / 85%</text></g>
+  <g transform="translate(960 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#1aebff" fill-opacity="0.90" data-color="rgb(26 235 255 / 90%)"/><text class="alpha-label" x="44" y="49">cyan / 90%</text></g>
+  <g transform="translate(1064 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.95" data-color="rgb(255 255 255 / 95%)"/><text class="alpha-label" x="44" y="49">white / 95%</text></g>
+  <g transform="translate(1168 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#000000" fill-opacity="0.78" data-color="rgb(0 0 0 / 78%)"/><text class="alpha-label" x="44" y="49">black / 78%</text></g>
+  <g transform="translate(1272 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.30" data-color="rgb(255 255 255 / 30%)"/><text class="alpha-label" x="44" y="49">white / 30%</text></g>
+
+  <text class="subheading" x="24" y="590">9 HSL component values used by Logseq controls</text>
+  <g transform="translate(24 610)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 0%)"/><text class="label" x="64" y="55">0 0% 0%</text></g>
+  <g transform="translate(176 610)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 100%)"/><text class="label" x="64" y="55">0 0% 100%</text></g>
+  <g transform="translate(328 610)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 5%)"/><text class="label" x="64" y="55">0 0% 5%</text></g>
+  <g transform="translate(480 610)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 8%)"/><text class="label" x="64" y="55">0 0% 8%</text></g>
+  <g transform="translate(632 610)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 84%)"/><text class="label" x="64" y="55">0 0% 84%</text></g>
+  <g transform="translate(784 610)"><rect class="swatch" width="128" height="38" fill="hsl(195 65% 65%)"/><text class="label" x="64" y="55">195 65% 65%</text></g>
+  <g transform="translate(936 610)"><rect class="swatch" width="128" height="38" fill="hsl(9 87% 70%)"/><text class="label" x="64" y="55">9 87% 70%</text></g>
+  <g transform="translate(1088 610)"><rect class="swatch" width="128" height="38" fill="hsl(204 24% 47%)"/><text class="label" x="64" y="55">204 24% 47%</text></g>
+  <g transform="translate(1240 610)"><rect class="swatch" width="128" height="38" fill="hsl(29 90% 52%)"/><text class="label" x="64" y="55">29 90% 52%</text></g>
+
+  <text class="subheading" x="24" y="720">Dynamic and platform-selected colors</text>
+  <text class="label" text-anchor="start" x="24" y="750">transparent · inherit · currentColor · Canvas · CanvasText · LinkText · Highlight · HighlightText</text>
+  <text class="subheading" x="24" y="795">Exact values, token aliases, and usage descriptions are listed in README.md.</text>
+</svg>
