@@ -13,7 +13,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
-- Adds a passage block that reads as one of Logseq's named admonitions, with commands to insert one.
+- Adds a passage block that reads as one of Logseq's named admonitions, with commands that resolve a Bible reference and insert one.
 - No build runtime, tracking, remote imports, or network access.
 
 ## Color palette
@@ -193,24 +193,55 @@ Insert one in either of two ways:
 - Type `/passage` and choose **Passage**.
 - Type `<` and choose **Passage**. Logseq has no plugin API for the `<` picker, so this entry is added to the picker's own menu while it is open; it withdraws itself as soon as what you have typed can no longer match.
 
-Both prompt for a reference, write it in bold on the first line, and leave the cursor on the blank line beneath it, which is where the passage goes. Escape or **Cancel** dismisses the prompt without changing the block, and a blank reference cannot be submitted.
+Both prompt for a reference. Escape or **Cancel** dismisses the prompt without changing the block, and a blank reference cannot be submitted.
 
-### Passage properties
+### References
 
-Every inserted passage also carries two properties:
+The reference you type is resolved against the theme's own index of books, chapters and verse counts, and written back in a canonical short-name form:
 
 ```text
-tags::
+tags:: Gen/50, Ex/1, Ex/2
 type:: Passage
 #+BEGIN_PASSAGE
-**John 3:16**
+**Gen 50–Ex 2**
 
+…
 #+END_PASSAGE
 ```
 
-`type:: Passage` is what the default **Properties that hide the property table** rule matches, so the drawer is hidden and the block renders as a bare passage; it is also what `data-hc-block-type="passage"` is taken from. `tags::` is left empty and ready to fill in — written as `tags::` and one trailing space, which is how Logseq itself writes a property with no value yet.
+Books are matched on their short or long name, ignoring case, spacing and punctuation, and on the usual abbreviations besides: `Gn`, `Exod`, `Mt`, `Mk`, `Lk`, `Jn`, `Psalms`, `1 Cor`, `1Cor`. A range is written with a hyphen, an en dash or an em dash, spaced or not. All of these are references:
 
-The two lines sit *above* `#+BEGIN_PASSAGE` because a block holds one property drawer, at the very top of its content: Logseq only recognizes a drawer as the first thing in a block, and `#+BEGIN_PASSAGE` is a custom block rather than a title line, so this is where Logseq's own property writer puts them too. Properties written below `#+END_PASSAGE` are not parsed as properties at all. A key the block already declares is left exactly as you wrote it — only the missing one is added.
+| Written | Means |
+| --- | --- |
+| `John 3:16` | one verse |
+| `Gen 50` | a whole chapter |
+| `Gen 1-3` | whole chapters |
+| `Gen 50 - Ex 2` | chapters across a book boundary |
+| `Genesis 50:1-10` | verses within a chapter |
+| `Gen 1:1-2:3` | verses across a chapter boundary |
+| `Genesis 50:1 - Ex 2:25` | verses across a book boundary |
+
+A bare number after the dash is a verse when the left side named one (`Gen 50:1 - 10`) and a chapter when it did not (`Gen 1 - 3`); name a book beside it and it is always that book's chapter.
+
+A reference that does not resolve leaves the prompt open with the reason under the field, so you can correct it: an unknown book, a chapter or verse the edition does not carry, or a range that runs backwards, such as `Ex 2-Gen 50`. Verses this edition omits as textually doubtful — Matthew 17:21 among them — are refused rather than quietly read as their neighbour.
+
+`tags::` names every chapter the passage spans, in order, as `shortName/chapter`, which makes each chapter a page of its own under a book namespace. `type:: Passage` is what the default **Properties that hide the property table** rule matches, so the drawer is hidden and the block renders as a bare passage; it is also what `data-hc-block-type="passage"` is taken from.
+
+### Passage text
+
+The passage itself is written under the reference as plain prose: no verse numbers, no section headings, and poetry keeps its own lineation. This needs a local text index, which the theme does not ship — the edition it is built from is licensed and cannot be redistributed here. Without one the command still writes the canonical reference and its chapter tags and leaves the text to you, which is what a Marketplace install does out of the box.
+
+To build the index, put a per-verse export of your edition at `resources/bible.index.json` and run:
+
+```sh
+node scripts/build-bible-index.mjs
+```
+
+That writes two files. `resources/bible.books.json` is the manifest — book names, chapter counts, verse counts and verse-id offsets, no verse text — and it is committed and shipped, which is what makes references resolve with no further setup. `resources/bible.text.json` is the verse text; it is git-ignored, never packaged, and read from the theme's own folder unless the **Passage text index** setting names another path.
+
+### Passage properties
+
+The two property lines sit *above* `#+BEGIN_PASSAGE` because a block holds one property drawer, at the very top of its content: Logseq only recognizes a drawer as the first thing in a block, and `#+BEGIN_PASSAGE` is a custom block rather than a title line, so this is where Logseq's own property writer puts them too. Properties written below `#+END_PASSAGE` are not parsed as properties at all. A key the block already declares is left exactly as you wrote it — only the missing one is added.
 
 ## Compatibility
 
