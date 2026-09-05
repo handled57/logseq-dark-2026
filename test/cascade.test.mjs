@@ -207,6 +207,45 @@ test('every repaired surface still carries a rule', () => {
   }
 })
 
+/* Logseq builds a rendered admonition as
+ * `div.flex.flex-row.admonitionblock` > `div.pr-4.admonition-icon.flex.flex-col
+ * .justify-center` (holding an `h-8 w-8` icon) + `div.ml-4.text-lg`. A passage
+ * is a bare `div.passage` with no such structure, so the theme rebuilds that
+ * geometry out of padding and two pseudo-elements. These are the upstream
+ * utility declarations that geometry is derived from; if any of them changes,
+ * the passage stops lining up with the admonitions beside it. */
+const admonitionMetrics = ['.h-8{height:2rem}', '.w-8{width:2rem}', '.pr-4{padding-right:1rem}', '.ml-4{margin-left:1rem}']
+
+test('the passage indent reproduces the admonition icon column', () => {
+  const rule = (selector) => {
+    const match = css.match(new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')} \\{([^}]*)\\}`))
+    assert.ok(match, `${selector} is missing`)
+    return match[1]
+  }
+  const rem = (declarations, property) => {
+    const match = declarations.match(new RegExp(`(?:^|;|\\n)\\s*${property}:\\s*([^;\\n]+)`))
+    assert.ok(match, `${property} is missing`)
+    const value = match[1].trim().split(/\s+/).at(property === 'padding' ? -1 : 0)
+    const number = Number.parseFloat(value)
+    return value.endsWith('px') ? number / 16 : number
+  }
+
+  const glyph = rem(rule('.block-body > .passage::after'), 'width')
+  const column = rem(rule('.block-body > .passage::before'), 'width')
+  const divider = rem(rule('.block-body > .passage::before'), 'border-right')
+  const indent = rem(rule('.block-body > .passage'), 'padding')
+
+  // `h-8`/`w-8`, and the row height that icon forces on a short admonition.
+  assert.equal(glyph, 2)
+  assert.equal(rem(rule('.block-body > .passage'), 'min-height'), 2)
+  // The icon plus the icon column's own `pr-4`.
+  assert.equal(column, glyph + 1)
+  // The divider the theme widens on `.admonition-icon`.
+  assert.equal(divider, 0.25)
+  // Everything above, plus the content column's `ml-4`.
+  assert.equal(indent, column + divider + 1)
+})
+
 /* Optional: confirm the pinned literals still describe the installed app. */
 const upstreamPath = process.env.LOGSEQ_CSS
 test(
@@ -220,6 +259,9 @@ test(
         upstream.includes(selector) || upstream.includes(compact),
         `${surface}: upstream no longer ships "${selector}"`
       )
+    }
+    for (const declaration of admonitionMetrics) {
+      assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }
     for (const token of radixTokens) {
       assert.ok(upstream.includes(`var(${token}`), `Logseq no longer reads ${token}`)
