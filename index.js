@@ -36,6 +36,7 @@ const SPECIAL_CONTENT_SELECTOR = [
   'pre', '.src', '.org-src-container', '.cp__fenced-code-block', '.extensions__code', '.extensions__code-calc',
   'center', '.center', '.CENTER', '.org-center', '[style*="text-align: center"]', '[style*="text-align:center"]',
   '.verse', '.VERSE', '.org-verse',
+  '.passage',
   '.katex-display', '.slides', '.reveal', '.cards-review',
   '.zotero-search', 'blockquote', '.admonitionblock'
 ].join(', ')
@@ -217,8 +218,304 @@ async function refreshBulletFromStoredSource(block) {
   }
 }
 
+/* Passage blocks.
+ *
+ * `#+BEGIN_PASSAGE` is not one of the admonition names compiled into mldoc, so
+ * Logseq renders it through the generic custom-block path as a bare
+ * `div.passage`. theme.css styles that div to read as a sibling of the named
+ * admonitions; this half inserts one.
+ *
+ * Two entry points, one insertion path: the `/` slash command, which has a
+ * plugin API, and the `<` command picker, which has none and is reached through
+ * a host-DOM bridge.
+ */
+
+const COMMAND_LABEL = 'Passage'
+const COMMAND_ATTR = 'data-hc-command'
+const DIALOG_ATTR = 'data-hc-passage-dialog'
+const DIALOG_STYLE_KEY = 'hc-passage-dialog'
+const COMMAND_MENU_SELECTORS = ['#ui__ac', '.cp__editor-commands', '#block-commands']
+const COMMAND_ITEM_SELECTOR = '.menu-link, a, li'
+const EDITOR_SELECTOR = 'textarea.block-editor, textarea'
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+
+/* `/pa` and `<pas` invoke the command as surely as the whole word does, so the
+ * trigger has to match the label's own prefixes — and nothing beyond them, so a
+ * slash or angle bracket that belongs to the surrounding prose is never eaten.
+ * The slash form requires at least one letter because Logseq's own
+ * `editor/clear-current-slash` has already removed the invocation by the time
+ * the hook runs; a bare `/` left at the cursor is therefore the user's text.
+ * The `<` picker clears nothing, so its bare trigger is ours to remove. */
+function invocationPattern(trigger, literal) {
+  const label = COMMAND_LABEL.toLowerCase()
+  let body = ''
+
+  for (let index = label.length - 1; index >= literal; index -= 1) body = `(?:${label[index]}${body})?`
+  for (let index = literal - 1; index >= 0; index -= 1) body = `${label[index]}${body}`
+
+  return new RegExp(`${trigger}${body}$`, 'i')
+}
+
+const INVOCATIONS = {
+  slash: invocationPattern('/', 1),
+  angle: invocationPattern('<', 0)
+}
+
+function editingArea() {
+  return doc.querySelector(EDITOR_SELECTOR)
+}
+
+function cursorIn(editor, content) {
+  return Number.isInteger(editor?.selectionStart) ? editor.selectionStart : content.length
+}
+
+/* The invocation has to be measured before the dialog takes focus, because
+ * leaving the editor ends the edit session and discards the selection. */
+async function captureInvocation(trigger) {
+  const editor = editingArea()
+  const live = typeof editor?.value === 'string'
+  const inline = live ? UUID_PATTERN.exec(editor.id ?? '')?.[0] ?? '' : ''
+  /* One host round-trip, and only when the editing DOM cannot answer alone. */
+  const stored = inline ? null : await logseq.Editor?.getCurrentBlock?.()
+  const uuid = inline || stored?.uuid || ''
+
+  if (!uuid) return null
+
+  const content = live ? editor.value : (stored?.content ?? '')
+  return { uuid, content, cursor: live ? cursorIn(editor, content) : content.length, trigger }
+}
+
+/* The reference is bold on the first line and the line below it is left empty:
+ * that blank line is where the passage is typed, and where the cursor lands. */
+function passageSource(reference) {
+  return `#+BEGIN_PASSAGE\n**${reference}**\n\n#+END_PASSAGE`
+}
+
+async function writePassage({ uuid, content, cursor, trigger }, reference) {
+  const head = content.slice(0, cursor).replace(INVOCATIONS[trigger], '')
+  const tail = content.slice(cursor)
+  /* `#+BEGIN_PASSAGE` only parses on a line of its own, so surrounding text is
+   * pushed onto its own line rather than dropped. */
+  const lead = head && !head.endsWith('\n') ? '\n' : ''
+  const trail = tail && !tail.startsWith('\n') ? '\n' : ''
+  const opening = `#+BEGIN_PASSAGE\n**${reference}**\n`
+
+  await logseq.Editor.updateBlock(uuid, `${head}${lead}${passageSource(reference)}${trail}${tail}`)
+  await logseq.Editor.editBlock?.(uuid, { pos: head.length + lead.length + opening.length })
+  repaint()
+}
+
+const DIALOG_STYLE = `
+[${DIALOG_ATTR}] {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+[${DIALOG_ATTR}] form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 320px;
+  padding: 20px;
+  color: var(--vscode-hc-white, #ffffff);
+  background: var(--vscode-hc-black, #000000);
+  border: 1px solid var(--vscode-hc-border, #5b7e96);
+  border-radius: 2px;
+  font-size: 14px;
+}
+
+[${DIALOG_ATTR}] label { font-weight: 600; }
+
+[${DIALOG_ATTR}] input {
+  padding: 6px 8px;
+  color: inherit;
+  background: var(--vscode-hc-black, #000000);
+  border: 1px solid var(--vscode-hc-border, #5b7e96);
+  border-radius: 2px;
+}
+
+[${DIALOG_ATTR}] input:focus {
+  outline: none;
+  border-color: var(--vscode-hc-focus, #f38518);
+}
+
+[${DIALOG_ATTR}] div { display: flex; justify-content: flex-end; gap: 8px; }
+
+[${DIALOG_ATTR}] button {
+  padding: 6px 14px;
+  color: inherit;
+  background: var(--vscode-hc-black, #000000);
+  border: 1px solid var(--vscode-hc-border, #5b7e96);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+[${DIALOG_ATTR}] button:hover:not([disabled]),
+[${DIALOG_ATTR}] button:focus-visible {
+  border-color: var(--vscode-hc-focus, #f38518);
+}
+
+[${DIALOG_ATTR}] button[disabled] {
+  color: var(--vscode-hc-disabled, #a0a0a0);
+  cursor: default;
+}
+`
+
+/* Resolves with the trimmed reference, or with null when the dialog is
+ * dismissed — the caller writes nothing in that case, so Escape and Cancel
+ * both leave the block exactly as it was. */
+let dismissDialog = null
+function askForReference() {
+  return new Promise((resolve) => {
+    const overlay = doc.createElement('div')
+    const form = doc.createElement('form')
+    const label = doc.createElement('label')
+    const input = doc.createElement('input')
+    const actions = doc.createElement('div')
+    const cancel = doc.createElement('button')
+    const insert = doc.createElement('button')
+
+    overlay.setAttribute(DIALOG_ATTR, '')
+    label.setAttribute('for', 'hc-passage-reference')
+    label.textContent = 'Passage reference'
+    input.id = 'hc-passage-reference'
+    input.type = 'text'
+    input.placeholder = 'John 3:16'
+    input.setAttribute('autocomplete', 'off')
+    cancel.type = 'button'
+    cancel.textContent = 'Cancel'
+    insert.type = 'submit'
+    insert.textContent = 'Insert'
+    insert.disabled = true
+
+    function close(reference) {
+      dismissDialog = null
+      overlay.remove()
+      resolve(reference)
+    }
+
+    /* Unloading mid-prompt has to settle the promise as well as remove the
+     * node, or the invocation it belongs to never finishes. */
+    dismissDialog = () => close(null)
+
+    function submit(event) {
+      event?.preventDefault?.()
+      const reference = input.value.trim()
+      /* A blank reference is not a passage, so the dialog stays open. */
+      if (reference) close(reference)
+    }
+
+    input.addEventListener('input', () => {
+      insert.disabled = input.value.trim() === ''
+    })
+    form.addEventListener('submit', submit)
+    cancel.addEventListener('click', () => close(null))
+    overlay.addEventListener('mousedown', (event) => {
+      if (event.target === overlay) close(null)
+    })
+    /* The host binds its own editor shortcuts on the document, so every key the
+     * dialog owns stops here rather than reaching the block behind it. */
+    overlay.addEventListener('keydown', (event) => {
+      event.stopPropagation()
+      if (event.key === 'Escape') close(null)
+      else if (event.key === 'Enter') submit(event)
+    })
+
+    actions.appendChild(cancel)
+    actions.appendChild(insert)
+    form.appendChild(label)
+    form.appendChild(input)
+    form.appendChild(actions)
+    overlay.appendChild(form)
+    doc.body.appendChild(overlay)
+    input.focus?.()
+  })
+}
+
+let prompting = false
+async function insertPassage(trigger) {
+  if (prompting) return
+  prompting = true
+
+  try {
+    const target = await captureInvocation(trigger)
+    if (!target) return
+
+    const reference = await askForReference()
+    if (!reference) return
+
+    await writePassage(target, reference)
+  } catch (error) {
+    console.warn('Dark High Contrast could not insert a passage block', error)
+  } finally {
+    prompting = false
+  }
+}
+
+function commandMenu() {
+  for (const selector of COMMAND_MENU_SELECTORS) {
+    const menu = doc.querySelector(selector)
+    if (menu) return menu
+  }
+
+  return null
+}
+
+/* True only while the text before the cursor ends in a `<` trigger the label
+ * still matches, which both distinguishes the `<` picker from the `/` menu and
+ * withdraws the entry once the typed filter rules Passage out. */
+function angleInvocation() {
+  const editor = editingArea()
+  if (typeof editor?.value !== 'string') return false
+
+  return INVOCATIONS.angle.test(editor.value.slice(0, cursorIn(editor, editor.value)))
+}
+
+/* The `<` picker has no plugin API, so its entry is added to the host's own
+ * popup. The bridge stays small deliberately: it runs from the existing
+ * rAF-coalesced paint instead of a second scheduler, writes at most one node,
+ * and recognizes that node on the next pass, so the childList observer settles
+ * after one more frame rather than looping. */
+function bridgeCommandMenu() {
+  const menu = angleInvocation() ? commandMenu() : null
+  const injected = doc.querySelectorAll(`[${COMMAND_ATTR}]`)
+
+  if (!menu) {
+    for (const item of injected) item.remove()
+    return
+  }
+
+  if (injected.length) return
+
+  const template = menu.querySelector(COMMAND_ITEM_SELECTOR)
+  if (typeof template?.cloneNode !== 'function') return
+
+  /* A shallow clone inherits the host's own item classes — the popup's markup
+   * is not this theme's to reproduce — while dropping the copied entry's label,
+   * icon and shortcut children. */
+  const item = template.cloneNode(false)
+  item.removeAttribute('id')
+  item.setAttribute(COMMAND_ATTR, 'passage')
+  item.textContent = COMMAND_LABEL
+  /* mousedown rather than click: the editor must still hold the selection the
+   * invocation is measured against when the handler reads it. */
+  item.addEventListener('mousedown', (event) => {
+    event.preventDefault()
+    void insertPassage('angle')
+  })
+
+  ;(template.parentElement ?? menu).appendChild(item)
+}
+
 function paint() {
   const active = rules()
+
+  bridgeCommandMenu()
 
   for (const block of doc.querySelectorAll('.ls-block')) {
     setBulletVisibility(block, shouldHideBullet(block))
@@ -254,21 +551,39 @@ function repaint() {
   })
 }
 
+/* Everything this script writes lives in the host document, which outlives the
+ * plugin, so unloading has to leave none of it behind. */
+let observer = null
+function teardown() {
+  observer?.disconnect()
+  observer = null
+  dismissDialog?.()
+
+  for (const node of doc.querySelectorAll(`[${COMMAND_ATTR}], [${DIALOG_ATTR}]`)) node.remove()
+  for (const table of doc.querySelectorAll(`[${HIDDEN_ATTR}]`)) table.removeAttribute(HIDDEN_ATTR)
+  for (const block of doc.querySelectorAll(`[${BULLET_ATTR}]`)) block.removeAttribute(BULLET_ATTR)
+  for (const block of doc.querySelectorAll(`[${TYPE_ATTR}]`)) block.removeAttribute(TYPE_ATTR)
+}
+
 function main() {
   migrateLegacySettings()
   logseq.useSettingsSchema(settingsSchema)
   logseq.provideStyle({ key: STYLE_KEY, style: `.block-properties[${HIDDEN_ATTR}] { display: none; }` })
+  logseq.provideStyle({ key: DIALOG_STYLE_KEY, style: DIALOG_STYLE })
+  logseq.Editor?.registerSlashCommand?.(COMMAND_LABEL, () => insertPassage('slash'))
   logseq.onSettingsChanged(repaint)
   logseq.App.onRouteChanged(repaint)
   logseq.DB?.onChanged?.(() => {
     sourceCache.clear()
     repaint()
   })
+  logseq.beforeunload?.(async () => teardown())
 
   /* childList/subtree only: this observer must not see its own attribute
    * writes, or every pass would schedule another one. */
   const container = doc.getElementById('app-container') ?? doc.body
-  new MutationObserver(repaint).observe(container, { childList: true, subtree: true })
+  observer = new MutationObserver(repaint)
+  observer.observe(container, { childList: true, subtree: true })
 
   repaint()
 }

@@ -48,33 +48,202 @@ function block(properties) {
   return { host, table }
 }
 
-function load(settings, blocks = [], storedBlocks = {}) {
+/* A stand-in for the parts of the host document the command path touches: the
+ * `<` command popup, the editing textarea, and the reference dialog. Only the
+ * selector forms `index.js` actually uses are supported — a compound of tag,
+ * id, class and attribute-presence tokens, optionally in a comma list. */
+function matchesSelector(target, selector) {
+  return selector.split(',').some((part) => {
+    const tokens = part.trim().match(/^[a-z]+|[.#][\w-]+|\[[^\]]+\]/gi) ?? []
+    if (!tokens.length) return false
+
+    return tokens.every((token) => {
+      if (token.startsWith('.')) return target.classList.has(token.slice(1))
+      if (token.startsWith('#')) return target.id === token.slice(1)
+      if (token.startsWith('[')) return target.attributes.has(token.slice(1, -1))
+      return target.tagName === token.toUpperCase()
+    })
+  })
+}
+
+function descendants(target) {
+  return target.children.flatMap((child) => [child, ...descendants(child)])
+}
+
+function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
+  const self = {
+    tagName: tag.toUpperCase(),
+    id,
+    classList: new Set(classes),
+    attributes: new Map(Object.entries(attributes)),
+    children: [],
+    listeners: new Map(),
+    parentElement: null,
+    textContent: '',
+    focused: false,
+    ...rest,
+    setAttribute(name, value) {
+      self.attributes.set(name, value)
+    },
+    getAttribute(name) {
+      return self.attributes.has(name) ? self.attributes.get(name) : null
+    },
+    removeAttribute(name) {
+      self.attributes.delete(name)
+      if (name === 'id') self.id = ''
+    },
+    addEventListener(type, handler) {
+      self.listeners.set(type, [...(self.listeners.get(type) ?? []), handler])
+    },
+    appendChild(child) {
+      child.parentElement = self
+      self.children.push(child)
+      return child
+    },
+    remove() {
+      const siblings = self.parentElement?.children
+      if (siblings) siblings.splice(siblings.indexOf(self), 1)
+      self.parentElement = null
+    },
+    cloneNode() {
+      return node(tag, {
+        id: self.id,
+        classes: [...self.classList],
+        attributes: Object.fromEntries(self.attributes)
+      })
+    },
+    focus() {
+      self.focused = true
+    },
+    matches: (selector) => matchesSelector(self, selector),
+    querySelector: (selector) =>
+      descendants(self).find((child) => matchesSelector(child, selector)) ?? null,
+    querySelectorAll: (selector) =>
+      descendants(self).filter((child) => matchesSelector(child, selector)),
+    /* Listeners are invoked directly rather than bubbled: every handler
+     * `index.js` registers sits on the node the host would deliver to. */
+    dispatch(type, event = {}) {
+      for (const handler of self.listeners.get(type) ?? []) {
+        handler({ target: self, preventDefault() {}, stopPropagation() {}, ...event })
+      }
+    }
+  }
+
+  return self
+}
+
+const PASSAGE_UUID = '65f00000-0000-0000-0000-00000000000a'
+const PASSAGE_SOURCE = '#+BEGIN_PASSAGE\n**John 3:16**\n\n#+END_PASSAGE'
+/* The blank line under the bold reference: the writing line. */
+const WRITING_LINE = PASSAGE_SOURCE.indexOf('\n\n') + 1
+
+function editingArea({ value = '', cursor = value.length, uuid = PASSAGE_UUID } = {}) {
+  return node('textarea', {
+    id: `edit-block-1-${uuid}`,
+    classes: ['block-editor'],
+    value,
+    selectionStart: cursor
+  })
+}
+
+function commandPopup(labels = ['Query']) {
+  const menu = node('div', { id: 'ui__ac' })
+  for (const label of labels) {
+    const item = node('a', { classes: ['menu-link'] })
+    item.textContent = label
+    menu.appendChild(item)
+  }
+  return menu
+}
+
+/* `insertPassage` awaits the invocation capture before the dialog is built, so
+ * the dialog exists only after the microtask queue has drained. */
+const flush = () => new Promise((resolve) => setImmediate(resolve))
+
+const dialogOf = (context) => context.parent.document.querySelector('[data-hc-passage-dialog]')
+
+function control(dialog, tag, label) {
+  return dialog.querySelectorAll(tag).find((candidate) => candidate.textContent === label)
+}
+
+function fill(dialog, reference) {
+  const input = dialog.querySelector('input')
+  input.value = reference
+  input.dispatch('input')
+  return input
+}
+
+function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   const provided = []
+  const observers = []
+  const commands = []
+  const updates = []
+  const edits = []
+  const unloads = []
   let blockReads = 0
   const context = {
     console,
+    setImmediate,
     MutationObserver: class {
-      observe() {}
+      constructor() {
+        this.connected = false
+        observers.push(this)
+      }
+
+      observe() {
+        this.connected = true
+      }
+
+      disconnect() {
+        this.connected = false
+      }
     },
     parent: {
       requestAnimationFrame(callback) {
         callback()
       },
       document: {
-        body: element(),
+        body: host,
         getElementById: () => element(),
+        createElement: (tag) => node(tag),
+        /* The two block collections keep their purpose-built stubs; everything
+         * else — the popup, the editor, the dialog — is served by the host
+         * stand-in. */
+        querySelector: (selector) => host.querySelector(selector),
         querySelectorAll: (selector) =>
-          selector === '.block-properties' ? blocks.map(({ table }) => table) : []
+          selector === '.block-properties' ? blocks.map(({ table }) => table)
+            : selector === '.ls-block' ? []
+              : host.querySelectorAll(selector)
       }
     },
     logseq: {
       settings,
       provided,
+      observers,
+      unloads,
       Editor: {
+        commands,
+        updates,
+        edits,
         async getBlock(uuid) {
           blockReads += 1
           return storedBlocks[uuid] ?? null
+        },
+        async getCurrentBlock() {
+          return storedBlocks[PASSAGE_UUID] ?? null
+        },
+        registerSlashCommand(name, action) {
+          commands.push({ name, action })
+        },
+        async updateBlock(uuid, content) {
+          updates.push({ uuid, content })
+        },
+        async editBlock(uuid, options) {
+          edits.push({ uuid, ...options })
         }
+      },
+      beforeunload(handler) {
+        unloads.push(handler)
       },
       useSettingsSchema(schema) {
         for (const entry of schema) {
@@ -246,12 +415,14 @@ test('the entry provides the one style rule that does the hiding', async () => {
 
   // Structural, not deep-equal: the object crosses out of the vm realm, so it
   // has that realm's Object prototype.
-  assert.equal(context.logseq.provided.length, 1)
-  assert.equal(context.logseq.provided[0].key, 'hc-hidden-properties')
-  assert.equal(
-    context.logseq.provided[0].style,
-    '.block-properties[data-hc-hidden] { display: none; }'
-  )
+  const hiding = context.logseq.provided.find(({ key }) => key === 'hc-hidden-properties')
+  assert.equal(hiding.style, '.block-properties[data-hc-hidden] { display: none; }')
+
+  // The reference dialog is chrome the plugin owns, so it is styled here rather
+  // than in theme.css, which only applies while this theme is the selected one.
+  const dialog = context.logseq.provided.find(({ key }) => key === 'hc-passage-dialog')
+  assert.match(dialog.style, /\[data-hc-passage-dialog\]/)
+  assert.equal(context.logseq.provided.length, 2)
 })
 
 function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '', wrapperSelector = '', uuid = '' } = {}) {
@@ -311,6 +482,7 @@ test('special source forms remain bulletless while editing', async () => {
     '#+BEGIN_SRC clojure\n(+ 1 2)\n#+END_SRC',
     '#+BEGIN_CENTER\ncentered text\n#+END_CENTER',
     '#+BEGIN_VERSE\na line of verse\n#+END_VERSE',
+    '#+BEGIN_PASSAGE\n**John 3:16**\n\n#+END_PASSAGE',
     'prompt #card'
   ]
 
@@ -372,4 +544,233 @@ test('stored source reads are cached per block UUID', async () => {
   await context.refreshBulletFromStoredSource(prose)
   await context.refreshBulletFromStoredSource(prose)
   assert.equal(context.blockReads(), 1)
+})
+
+test('a rendered passage block is bulletless without waiting on the stored source', async () => {
+  const context = await render({}, [])
+
+  // The synchronous path: `.passage` is in the rendered-DOM selector list, so
+  // the attribute lands on the first paint rather than on the async lookup.
+  assert.equal(
+    context.shouldHideBullet(bulletBlock({ text: 'John 3:16', renderedSelector: '.passage' })),
+    true
+  )
+})
+
+test('stored source keeps a passage block bulletless when the render carries no marker', async () => {
+  const uuid = '65f00000-0000-0000-0000-00000000000b'
+  const context = load({}, [], { [uuid]: { content: PASSAGE_SOURCE } })
+  const passage = bulletBlock({ text: 'John 3:16', uuid })
+
+  assert.equal(context.shouldHideBullet(passage), false)
+  await context.refreshBulletFromStoredSource(passage)
+  assert.equal(passage.attributes.has('data-hc-hide-bullet'), true)
+})
+
+/* Drives one insertion from invocation to the reference being submitted. */
+async function invoke(context, run, reference = 'John 3:16') {
+  const invocation = run()
+  await flush()
+
+  const dialog = dialogOf(context)
+  fill(dialog, reference)
+  dialog.querySelector('form').dispatch('submit')
+  await invocation
+  await flush()
+
+  return dialog
+}
+
+function commandContext({ value = '', cursor, menu = null } = {}) {
+  const host = node('body')
+  if (menu) host.appendChild(menu)
+  host.appendChild(editingArea({ value, cursor }))
+  return { host, context: load({}, [], {}, host) }
+}
+
+test('the slash command writes the passage source and leaves the cursor on the writing line', async () => {
+  const { context } = commandContext()
+  await Promise.resolve()
+
+  const [command] = context.logseq.Editor.commands
+  assert.equal(command.name, 'Passage')
+
+  await invoke(context, () => command.action())
+
+  assert.deepEqual(context.logseq.Editor.updates, [{ uuid: PASSAGE_UUID, content: PASSAGE_SOURCE }])
+  assert.deepEqual(context.logseq.Editor.edits, [{ uuid: PASSAGE_UUID, pos: WRITING_LINE }])
+  // The cursor sits at the start of the blank line, with the terminator below.
+  assert.equal(PASSAGE_SOURCE.slice(WRITING_LINE), '\n#+END_PASSAGE')
+})
+
+test('only the invocation text is removed, and the text around it is kept', async () => {
+  const { context } = commandContext({ value: 'see /pass then', cursor: 9 })
+  await Promise.resolve()
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action())
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    `see \n${PASSAGE_SOURCE}\n then`
+  )
+})
+
+test('a slash that belongs to the prose is never eaten', async () => {
+  // Logseq's own `editor/clear-current-slash` has already removed the
+  // invocation by the time the hook runs, so a bare trailing slash is text.
+  const { context } = commandContext({ value: 'and/or ' })
+  await Promise.resolve()
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action())
+
+  assert.equal(context.logseq.Editor.updates[0].content, `and/or \n${PASSAGE_SOURCE}`)
+})
+
+test('the reference dialog autofocuses, and stays open until it has a reference', async () => {
+  const { context } = commandContext()
+  await Promise.resolve()
+
+  const invocation = context.logseq.Editor.commands[0].action()
+  await flush()
+
+  const dialog = dialogOf(context)
+  const input = dialog.querySelector('input')
+  assert.equal(input.focused, true)
+
+  const insert = control(dialog, 'button', 'Insert')
+  assert.equal(insert.disabled, true, 'an empty reference is not submittable')
+
+  fill(dialog, '   ')
+  assert.equal(insert.disabled, true, 'whitespace is not a reference')
+  dialog.querySelector('form').dispatch('submit')
+  await flush()
+  assert.ok(dialogOf(context), 'the dialog closed on a blank reference')
+  assert.deepEqual(context.logseq.Editor.updates, [])
+
+  fill(dialog, 'John 3:16')
+  assert.equal(insert.disabled, false)
+  // Enter submits.
+  dialog.dispatch('keydown', { key: 'Enter' })
+  await invocation
+
+  assert.equal(context.logseq.Editor.updates[0].content, PASSAGE_SOURCE)
+  assert.equal(dialogOf(context), null, 'the dialog outlived the insertion')
+})
+
+test('Escape and Cancel dismiss the dialog without touching the block', async () => {
+  for (const dismiss of [
+    (dialog) => dialog.dispatch('keydown', { key: 'Escape' }),
+    (dialog) => control(dialog, 'button', 'Cancel').dispatch('click')
+  ]) {
+    const { context } = commandContext({ value: 'untouched' })
+    await Promise.resolve()
+
+    const invocation = context.logseq.Editor.commands[0].action()
+    await flush()
+
+    const dialog = dialogOf(context)
+    fill(dialog, 'John 3:16')
+    dismiss(dialog)
+    await invocation
+
+    assert.deepEqual(context.logseq.Editor.updates, [])
+    assert.deepEqual(context.logseq.Editor.edits, [])
+    assert.equal(dialogOf(context), null)
+  }
+})
+
+test('the angle-bracket picker gains exactly one Passage entry, however often it repaints', async () => {
+  const menu = commandPopup(['Query', 'Embed'])
+  const { context } = commandContext({ value: 'note <pas', menu })
+  await Promise.resolve()
+
+  const entries = () => menu.querySelectorAll('[data-hc-command]')
+  assert.equal(entries().length, 1)
+  assert.equal(entries()[0].textContent, 'Passage')
+  // Cloned from the host's own entry, so it inherits the popup's markup.
+  assert.equal(entries()[0].classList.has('menu-link'), true)
+
+  // Repainting is what the childList observer does after the injection, so the
+  // bridge has to recognize its own node and settle.
+  context.paint()
+  context.paint()
+  assert.equal(entries().length, 1)
+
+  // Unrelated entries are left exactly as the host wrote them.
+  assert.deepEqual(menu.children.slice(0, 2).map(({ textContent }) => textContent), ['Query', 'Embed'])
+})
+
+test('the Passage entry is withdrawn once the trigger no longer matches', async () => {
+  const menu = commandPopup()
+  const { context, host } = commandContext({ value: 'note <pas', menu })
+  await Promise.resolve()
+
+  assert.equal(menu.querySelectorAll('[data-hc-command]').length, 1)
+
+  // A filter Passage cannot match, then no editor at all: a route change.
+  const editor = host.querySelector('textarea')
+  editor.value = 'note <query'
+  editor.selectionStart = editor.value.length
+  context.paint()
+  assert.equal(menu.querySelectorAll('[data-hc-command]').length, 0)
+
+  editor.remove()
+  context.paint()
+  assert.equal(host.querySelectorAll('[data-hc-command]').length, 0)
+})
+
+test('the picker entry routes through the same insertion path as the slash command', async () => {
+  const menu = commandPopup()
+  const { context } = commandContext({ value: 'note <pas', menu })
+  await Promise.resolve()
+
+  const [entry] = menu.querySelectorAll('[data-hc-command]')
+  await invoke(context, () => entry.dispatch('mousedown'))
+
+  // The `<` picker clears nothing itself, so the bridge removes the trigger.
+  assert.equal(context.logseq.Editor.updates[0].content, `note \n${PASSAGE_SOURCE}`)
+  assert.deepEqual(context.logseq.Editor.edits, [{ uuid: PASSAGE_UUID, pos: 5 + 1 + WRITING_LINE }])
+})
+
+test('a popup that is not the angle-bracket picker is left alone', async () => {
+  const menu = commandPopup()
+  // The `/` menu renders in the same popup, and has its own plugin API.
+  const { context } = commandContext({ value: 'note /pas', menu })
+  await Promise.resolve()
+
+  assert.equal(menu.querySelectorAll('[data-hc-command]').length, 0)
+  assert.equal(context.logseq.Editor.commands.length, 1)
+})
+
+test('unloading leaves no injected node or written attribute behind', async () => {
+  const menu = commandPopup()
+  const { context, host } = commandContext({ value: 'note <pas', menu })
+  await Promise.resolve()
+
+  const painted = node('div', {
+    classes: ['ls-block'],
+    attributes: { 'data-hc-hide-bullet': '', 'data-hc-block-type': 'foo' }
+  })
+  const table = node('div', { classes: ['block-properties'], attributes: { 'data-hc-hidden': '' } })
+  host.appendChild(painted)
+  host.appendChild(table)
+
+  const invocation = context.logseq.Editor.commands[0].action()
+  await flush()
+  assert.ok(dialogOf(context))
+
+  const [unload] = context.logseq.unloads
+  await unload()
+
+  assert.equal(host.querySelectorAll('[data-hc-command]').length, 0)
+  assert.equal(dialogOf(context), null)
+  assert.equal(painted.attributes.has('data-hc-hide-bullet'), false)
+  assert.equal(painted.attributes.has('data-hc-block-type'), false)
+  assert.equal(table.attributes.has('data-hc-hidden'), false)
+  assert.equal(context.logseq.observers[0].connected, false)
+
+  // The prompt that was open when the plugin unloaded settles as a
+  // cancellation rather than hanging, and writes nothing.
+  await invocation
+  assert.deepEqual(context.logseq.Editor.updates, [])
 })
