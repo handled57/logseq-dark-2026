@@ -1,0 +1,250 @@
+/* Behavioral tests for the reference parser.
+ *
+ * `bible.js` is a classic script like `index.js`, so it is run in a `vm`
+ * context and its top-level declarations are read off that context's global.
+ * Everything here resolves against the manifest the theme actually ships,
+ * because the counts and names in that file are half of what is being tested.
+ */
+
+import assert from 'node:assert/strict'
+import vm from 'node:vm'
+import { readFile } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
+import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const context = { console }
+vm.createContext(context)
+new vm.Script(await readFile(resolve(root, 'bible.js'), 'utf8')).runInContext(context)
+
+const manifest = JSON.parse(await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8'))
+const { parsePassageReference, composePassageText } = context
+
+const parse = (reference) => parsePassageReference(reference, manifest)
+
+/* The parser runs in its own realm, so its arrays are not the test realm's
+ * `Array`; a round trip through JSON makes the result ordinary data. */
+function resolved(reference) {
+  const outcome = parse(reference)
+  assert.equal(outcome.ok, true, `${reference}: ${outcome.error}`)
+  return JSON.parse(JSON.stringify(outcome))
+}
+
+function rejected(reference) {
+  const outcome = parse(reference)
+  assert.equal(outcome.ok, false, `${reference} resolved when it should not have`)
+  assert.match(outcome.error, /\S/)
+  return outcome.error
+}
+
+test('the shipped manifest describes the whole edition', () => {
+  assert.deepEqual(manifest.stats, { books: 84, chapters: 1398, verses: 37758 })
+  assert.equal(manifest.books.length, manifest.stats.books)
+
+  const names = manifest.books.map(({ shortName }) => shortName)
+  assert.equal(new Set(names).size, names.length, 'short names are not unique')
+
+  // Verse ids run without a gap from the first book to the last, which is what
+  // makes the validity of a range one comparison.
+  let expected = 1
+  for (const book of manifest.books) {
+    assert.equal(book.fromVerseId, expected, book.shortName)
+    expected += book.chapters.reduce((total, { verses }) => total + verses, 0)
+  }
+  assert.equal(expected - 1, manifest.stats.verses)
+})
+
+test('the corrected book names are the ones the parser answers to', () => {
+  // The source index names these books one deuterocanonical book out of step,
+  // and calls Habakkuk `Bah` and the Psalms `Psalm`.
+  const corrected = {
+    35: ['Hab', 'Habakkuk'],
+    19: ['Ps', 'Psalms'],
+    72: ['Bar', 'Baruch'],
+    73: ['EpJer', 'Epistle of Jeremiah'],
+    74: ['Sgof3', 'Song of the Three'],
+    75: ['Sus', 'Susanna'],
+    76: ['Bel', 'Bel and the Dragon'],
+    77: ['1Macc', '1 Maccabees'],
+    78: ['2Macc', '2 Maccabees'],
+    79: ['1Esd', '1 Esdras'],
+    80: ['PrMan', 'Prayer of Manasseh'],
+    81: ['Ps151', 'Psalm 151'],
+    82: ['3Macc', '3 Maccabees'],
+    83: ['2Esd', '2 Esdras'],
+    84: ['4Macc', '4 Maccabees']
+  }
+
+  for (const [bookId, [shortName, longName]] of Object.entries(corrected)) {
+    const book = manifest.books.find((entry) => entry.bookId === Number(bookId))
+    assert.deepEqual([book.shortName, book.longName], [shortName, longName])
+    assert.equal(resolved(`${longName} 1:1`).start.shortName, shortName)
+  }
+
+  assert.equal(resolved('Habakkuk 3:19').canonical, 'Hab 3:19')
+  assert.equal(resolved('Psalms 150:6').canonical, 'Ps 150:6')
+})
+
+test('every written form of a reference resolves to the same canonical form', () => {
+  const forms = {
+    'John 3:16': ['John 3:16', 'john 3:16', 'JOHN 3:16', 'Jn 3:16', 'jn3:16', ' John  3 : 16 '],
+    'Gen 50': ['Gen 50', 'Genesis 50', 'gen. 50', 'Gn 50'],
+    'Gen 1–3': ['Gen 1-3', 'Genesis 1 - 3', 'Gen 1–3', 'Gen 1 — 3', 'Gen 1-Gen 3', 'Gen 1 - 3'],
+    'Gen 50–Ex 2': ['Gen 50 - Ex 2', 'Genesis 50-Exodus 2', 'Gen 50–Ex 2', 'Gen 50 — Exod 2'],
+    'Gen 50:1–10': ['Genesis 50:1-10', 'Genesis 50:1 - 10', 'Gen 50:1–10', 'Gen 50:1 — 10'],
+    'Gen 1:1–2:3': ['Gen 1:1-2:3', 'Genesis 1:1 - 2:3', 'Gen 1:1–2:3', 'Gen 1:1 — 2:3'],
+    'Gen 50:1–Ex 2:25': [
+      'Genesis 50:1 - Ex 2:25', 'Gen 50:1-Exodus 2:25', 'Gen 50:1–Ex 2:25', 'Gen 50:1 — Ex 2:25'
+    ],
+    '1Cor 13:1–13': ['1 Cor 13:1-13', '1Cor 13:1-13', '1 Corinthians 13:1 – 13', '1co 13:1-13']
+  }
+
+  for (const [canonical, written] of Object.entries(forms)) {
+    for (const reference of written) {
+      assert.equal(resolved(reference).canonical, canonical, reference)
+    }
+  }
+})
+
+test('a bare number after the dash is a verse only when it stands alone', () => {
+  // `Gen 50:1 - 10` is verse 10; `Gen 1 - 3` is chapter 3; and a book beside
+  // the number makes it that book's chapter however the left side was written.
+  assert.equal(resolved('Gen 50:1 - 10').canonical, 'Gen 50:1–10')
+  assert.equal(resolved('Gen 1 - 3').canonical, 'Gen 1–3')
+  assert.equal(resolved('Gen 50:1 - Ex 2').canonical, 'Gen 50:1–Ex 2:25')
+  assert.equal(resolved('Gen 50 - Ex 2:5').canonical, 'Gen 50:1–Ex 2:5')
+})
+
+test('the tags name every chapter the passage spans, in order', () => {
+  assert.deepEqual(resolved('Gen 50 - Ex 2').tags, ['Gen/50', 'Ex/1', 'Ex/2'])
+  assert.deepEqual(resolved('Genesis 50:1-10').tags, ['Gen/50'])
+  assert.deepEqual(resolved('John 3:16').tags, ['John/3'])
+  assert.deepEqual(resolved('Gen 1:1-3:2').tags, ['Gen/1', 'Gen/2', 'Gen/3'])
+  // Across a book boundary the whole of the books between is spanned.
+  assert.deepEqual(resolved('Obad 1 - Jonah 2').tags, ['Obad/1', 'Jonah/1', 'Jonah/2'])
+  assert.deepEqual(resolved('2John 1 - Jude 1').tags, ['2John/1', '3John/1', 'Jude/1'])
+})
+
+test('a backwards range is refused', () => {
+  assert.match(rejected('Ex 2-Gen 50'), /backwards/)
+  assert.match(rejected('Gen 3-Gen 1'), /backwards/)
+  assert.match(rejected('Gen 1:5-1:2'), /backwards/)
+  assert.match(rejected('Rev 22-Gen 1'), /backwards/)
+  // The endpoints touching is still a range, not a backwards one.
+  assert.equal(resolved('Gen 1:1-1:1').canonical, 'Gen 1:1')
+})
+
+test('a chapter or verse the edition does not carry is refused', () => {
+  assert.match(rejected('Gen 51'), /50 chapters/)
+  assert.match(rejected('Gen 0'), /no chapter 0/)
+  assert.match(rejected('Obad 2'), /one chapter/)
+  assert.match(rejected('John 3:37'), /no verse 37/)
+  assert.match(rejected('Ps 23:7'), /no verse 7/)
+  assert.match(rejected('Gen 1:1-Gen 1:32'), /no verse 32/)
+  // Verses this edition omits as textually doubtful are gaps, not shifts:
+  // Matthew 17 runs 1–20 and 22–27, and 17:21 is not 17:22 under another name.
+  assert.match(rejected('Matt 17:21'), /without 21/)
+  assert.equal(resolved('Matt 17:27').end.verse, 27)
+})
+
+test('an unknown or unparseable reference is refused', () => {
+  assert.match(rejected('Foo 1'), /No book named/)
+  assert.match(rejected('Gen'), /not a passage reference/)
+  assert.match(rejected('3:16'), /not a passage reference/)
+  assert.match(rejected(''), /John 3:16/)
+  assert.match(rejected('   '), /John 3:16/)
+  assert.match(rejected('Gen 1-'), /not a passage reference/)
+  assert.equal(parsePassageReference('Gen 1', null).ok, false)
+})
+
+test('chapters that do not begin at verse one keep their own numbering', () => {
+  // The Greek additions to Esther open at 5:3, and Sirach's prologue is
+  // numbered chapter 0.
+  assert.equal(resolved('AddEsth 5:3').canonical, 'AddEsth 5:3')
+  assert.match(rejected('AddEsth 5:1'), /no verse 1/)
+  assert.equal(resolved('Sir 0:1').canonical, 'Sir 0:1')
+  assert.deepEqual(resolved('Sir 0-1').tags, ['Sir/0', 'Sir/1'])
+})
+
+/* A stand-in for the text index, in the shape the generator writes. */
+const textIndex = {
+  books: {
+    Gen: {
+      1: {
+        verses: ['In the beginning.', 'And the earth.', 'Then God said.'],
+        paragraphs: [1, 3]
+      },
+      2: { verses: ['Thus the heavens.'], paragraphs: [1] }
+    },
+    Ps: {
+      23: {
+        verses: ['The LORD is my shepherd;\nI shall not want.', 'He makes me lie down.'],
+        paragraphs: [1],
+        headings: { 1: 'Trust in God' }
+      }
+    },
+    Matt: {
+      17: { verses: ['He said to them.', 'As they were gathering.'], numbers: [20, 22], paragraphs: [20] }
+    }
+  }
+}
+
+test('the passage text is prose, with paragraphs kept and verse numbers dropped', () => {
+  // A paragraph break is a blank line: without one the paragraphs render as a
+  // single run of prose.
+  assert.equal(
+    composePassageText(resolved('Gen 1'), textIndex),
+    'In the beginning. And the earth.\n\nThen God said.'
+  )
+  assert.equal(composePassageText(resolved('Gen 1:2'), textIndex), 'And the earth.')
+  // A chapter boundary is a paragraph boundary, and is separated the same way.
+  assert.equal(
+    composePassageText(resolved('Gen 1:3-2:1'), textIndex),
+    'Then God said.\n\nThus the heavens.'
+  )
+  // No verse numbers survive, and the text neither opens nor closes on a blank
+  // line.
+  const text = composePassageText(resolved('Gen 1'), textIndex)
+  assert.doesNotMatch(text, /^\d|\s\d+\s/)
+  assert.equal(text, text.trim())
+  assert.doesNotMatch(text, /\n{3}/)
+})
+
+test('poetry keeps its lineation and headings are left out', () => {
+  const psalm = composePassageText(resolved('Ps 23:1-2'), textIndex)
+  assert.equal(psalm, 'The LORD is my shepherd;\nI shall not want.\nHe makes me lie down.')
+  assert.doesNotMatch(psalm, /Trust in God/)
+})
+
+test('a chapter with omitted verses composes from the numbers it has', () => {
+  assert.equal(
+    composePassageText(resolved('Matt 17:20-22'), textIndex),
+    'He said to them. As they were gathering.'
+  )
+})
+
+test('an absent text index composes nothing rather than failing', () => {
+  assert.equal(composePassageText(resolved('Gen 1'), null), '')
+  assert.equal(composePassageText(resolved('Gen 1'), { books: {} }), '')
+  assert.equal(composePassageText({ ok: false }, textIndex), '')
+  // A book the index does not carry is the same case as no index at all.
+  assert.equal(composePassageText(resolved('Ex 1'), textIndex), '')
+})
+
+test('the whole edition resolves and composes without throwing', () => {
+  for (const book of manifest.books) {
+    for (const chapter of book.chapters) {
+      const outcome = resolved(`${book.shortName} ${chapter.chapter}`)
+      assert.equal(outcome.tags.length, 1)
+      assert.equal(outcome.end.verseId - outcome.start.verseId + 1, chapter.verses)
+    }
+  }
+
+  // The whole edition as one span names every chapter exactly once.
+  const whole = resolved('Gen 1 - 4Macc 18')
+  assert.equal(whole.tags.length, manifest.stats.chapters)
+  assert.equal(new Set(whole.tags).size, whole.tags.length)
+  assert.equal(whole.start.verseId, 1)
+  assert.equal(whole.end.verseId, manifest.stats.verses)
+})
