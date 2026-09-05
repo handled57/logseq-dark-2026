@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## 1.7.1 - 2026-09-05
+
+- Write verse numbers as superscript digits rather than as `<sup>`, which fixes
+  the number that opens a paragraph rendering on a line of its own above its
+  verse. Logseq parses block content with mldoc, and mldoc reads a `<` at the
+  start of a line as block-level HTML: the tag became a block of its own and
+  pushed the verse onto the next line. With **One verse per line** on, that was
+  every verse in the passage. Digits are plain text and parse the same wherever
+  they fall.
+
 ## 1.7.0 - 2026-09-05
 
 - Offer three passage display options in the reference prompt, under the field
