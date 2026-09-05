@@ -229,7 +229,7 @@ A reference that does not resolve leaves the prompt open with the reason under t
 
 ### Passage text
 
-The passage itself is written under the reference as plain prose: no verse numbers, no section headings, and poetry keeps its own lineation. This needs a local text index, which the theme does not ship — the edition it is built from is licensed and cannot be redistributed here. Without one the command still writes the canonical reference and its chapter tags and leaves the text to you, which is what a Marketplace install does out of the box.
+The passage itself is written under the reference as plain prose: no verse numbers, no section headings, a blank line between paragraphs, and poetry keeps its own lineation. A chapter boundary is a paragraph boundary, so it is separated the same way. This needs a local text index, which the theme does not ship — the edition it is built from is licensed and cannot be redistributed here. Without one the command still writes the canonical reference and its chapter tags and leaves the text to you, which is what a Marketplace install does out of the box.
 
 To build the index, put a per-verse export of your edition at `resources/bible.index.json` and run:
 

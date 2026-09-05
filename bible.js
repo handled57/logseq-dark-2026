@@ -313,8 +313,8 @@ function parsePassageReference(input, manifest) {
 
 /* Verses are joined into a paragraph with a space, except where either side
  * carries its own line breaks: that is poetry, and its lineation is the point.
- * Paragraphs and chapters are separated by a single newline, never a blank one,
- * because a blank line would end the `#+BEGIN_PASSAGE` block. */
+ * Paragraphs and chapters are separated by a blank line, which is what makes
+ * them read as paragraphs rather than as one run-on block of prose. */
 function bibleParagraph(lines) {
   return lines.reduce((text, line, position) => {
     if (!position) return line
@@ -348,5 +348,5 @@ function composePassageText(resolved, textIndex) {
     for (const paragraph of paragraphs) rendered.push(bibleParagraph(paragraph))
   }
 
-  return rendered.join('\n')
+  return rendered.join('\n\n')
 }

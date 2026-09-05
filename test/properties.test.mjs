@@ -915,6 +915,12 @@ const TEXT_INDEX = {
         numbers: [16, 17],
         paragraphs: [16]
       }
+    },
+    Gen: {
+      1: {
+        verses: ['In the beginning.', 'And the earth was a formless void.'],
+        paragraphs: [1, 2]
+      }
     }
   }
 }
@@ -946,6 +952,22 @@ test('a resolved reference is written canonically, with its chapter tags and tex
   const [edit] = context.logseq.Editor.edits
   assert.equal(content.slice(edit.pos), '\n#+END_PASSAGE')
   assert.deepEqual(context.messages, [])
+})
+
+test('a passage of more than one paragraph is written with a blank line between them', async () => {
+  const { context } = await bibleContext({
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
+  })
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Gen 1:1-2')
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    'tags:: Gen/1\ntype:: Passage\n' +
+      '#+BEGIN_PASSAGE\n**Gen 1:1\u20132**\n\n' +
+      'In the beginning.\n\nAnd the earth was a formless void.\n' +
+      '#+END_PASSAGE'
+  )
 })
 
 test('a passage spanning books is tagged with every chapter it covers', async () => {

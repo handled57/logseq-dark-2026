@@ -191,18 +191,24 @@ const textIndex = {
 }
 
 test('the passage text is prose, with paragraphs kept and verse numbers dropped', () => {
+  // A paragraph break is a blank line: without one the paragraphs render as a
+  // single run of prose.
   assert.equal(
     composePassageText(resolved('Gen 1'), textIndex),
-    'In the beginning. And the earth.\nThen God said.'
+    'In the beginning. And the earth.\n\nThen God said.'
   )
   assert.equal(composePassageText(resolved('Gen 1:2'), textIndex), 'And the earth.')
-  // Across chapters the text runs on without a blank line, which would end the
-  // `#+BEGIN_PASSAGE` block.
+  // A chapter boundary is a paragraph boundary, and is separated the same way.
   assert.equal(
     composePassageText(resolved('Gen 1:3-2:1'), textIndex),
-    'Then God said.\nThus the heavens.'
+    'Then God said.\n\nThus the heavens.'
   )
-  assert.doesNotMatch(composePassageText(resolved('Gen 1'), textIndex), /\n\n|^\d|\s\d+\s/)
+  // No verse numbers survive, and the text neither opens nor closes on a blank
+  // line.
+  const text = composePassageText(resolved('Gen 1'), textIndex)
+  assert.doesNotMatch(text, /^\d|\s\d+\s/)
+  assert.equal(text, text.trim())
+  assert.doesNotMatch(text, /\n{3}/)
 })
 
 test('poetry keeps its lineation and headings are left out', () => {
