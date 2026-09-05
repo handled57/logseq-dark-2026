@@ -106,6 +106,11 @@ const pairings = [
     upstream: 'html[data-theme=dark][data-color=logseq] .cp__themes-installed .it:hover',
     theme: 'html[data-theme][data-color] .cp__themes-installed .it:hover',
     tie: true
+  },
+  {
+    surface: 'rendered admonition icon dividers',
+    upstream: '.admonition-icon',
+    theme: '.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon'
   }
 ]
 

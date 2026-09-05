@@ -1083,6 +1083,44 @@ textarea.block-editor:focus {
   border-bottom-color: var(--vscode-hc-border) !important;
 }
 
+/* Rendered admonitions keep Logseq's semantic icon colors, but use the same
+ * color for their heavier internal divider. A transparent outer border keeps
+ * the existing box dimensions while removing the visible container edge. */
+.admonitionblock.tip {
+  --hc-admonition-accent: var(--vscode-hc-focus);
+}
+
+.admonitionblock.note {
+  --hc-admonition-accent: #ebbc00;
+}
+
+.admonitionblock.important {
+  --hc-admonition-accent: #eb9091;
+}
+
+.admonitionblock.caution,
+.admonitionblock.warning {
+  --hc-admonition-accent: #fa934e;
+}
+
+.admonitionblock.pinned {
+  --hc-admonition-accent: currentColor;
+}
+
+.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) {
+  border-color: transparent !important;
+}
+
+.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon {
+  color: var(--hc-admonition-accent) !important;
+  border-right: 4px solid var(--hc-admonition-accent) !important;
+}
+
+.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon svg {
+  color: var(--hc-admonition-accent) !important;
+  fill: var(--hc-admonition-accent) !important;
+}
+
 mark {
   color: var(--ls-page-mark-color);
   background: var(--ls-page-mark-bg-color);
