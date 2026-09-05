@@ -339,12 +339,20 @@ function bibleDisplay(options) {
   }
 }
 
-/* Logseq's markdown parser passes inline HTML through, and `<sup>` is the
- * superscript both it and the DOM agree on: `^{1}` is org syntax and `^^` is a
- * highlight. The number sits against the verse it opens, with no space, so the
- * two never wrap apart. */
+/* A verse number is written in superscript digits rather than in `<sup>`, which
+ * is the tag Logseq would otherwise render it with. mldoc, the parser behind
+ * every block, reads a `<` at the start of a line as block-level HTML: a tag
+ * opening a paragraph becomes a node of its own and pushes the verse it belongs
+ * to onto the next line, and with one verse per line that happens to every
+ * verse in the passage. Digits are plain text and parse the same wherever they
+ * fall, and Inter — the font Logseq ships, and the first this theme names —
+ * draws all ten. The number sits against its verse with no space between, so
+ * the two never wrap apart. */
+const BIBLE_SUPERSCRIPTS = '\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079'
+
 function bibleVerseNumber(number, text) {
-  return `<sup>${number}</sup>${text}`
+  const digits = String(number).replace(/\d/g, (digit) => BIBLE_SUPERSCRIPTS[Number(digit)])
+  return `${digits}${text}`
 }
 
 function composePassageText(resolved, textIndex, options) {
