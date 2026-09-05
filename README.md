@@ -23,6 +23,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 ![Every opaque, HSL-component, and alpha color used by Dark High Contrast](screenshots/color-palette.svg)
 
 <!-- fixed-color-values:start -->
+
 ### Core VS Code High Contrast colors
 
 | Color | Tokens | Used for |
@@ -53,40 +54,40 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 | Color | Tokens or selectors | Used for |
 | --- | --- | --- |
 | `#101010` | `--ls-table-tr-even-background-color` | Alternating table rows. |
-| `#1f1f1f` | Quaternary, level 3/4, and block-highlight tokens | Highlighted blocks and intermediate raised surfaces. |
-| `#282828` | Quinary, level 4/5, and gray whiteboard background tokens | Higher neutral surfaces and gray whiteboard objects. |
-| `#333333` | Senary and level 5/6 tokens | High neutral surface steps. |
-| `#3d3d3d` | Level 6 and Radix gray step 7 | Strongest neutral surface before structural borders. |
+| `#1f1f1f` | `--ls-quaternary-background-color`, `--ls-quaternary-background-color1`, `--ls-bg-quaternary`, `--ls-block-highlight-color`, `--ls-color-level-3`, `--lx-gray-04` | Highlighted blocks and intermediate raised surfaces. |
+| `#282828` | `--ls-quinary-background-color`, `--ls-color-level-4`, `--lx-gray-05`, `--ls-wb-background-color-gray` | Higher neutral surfaces and gray whiteboard objects. |
+| `#333333` | `--ls-senary-background-color`, `--ls-color-level-5`, `--lx-gray-06` | High neutral surface steps. |
+| `#3d3d3d` | `--ls-color-level-6`, `--lx-gray-07` | Strongest neutral surface before structural borders. |
 | `#7d9db4` | `--lx-gray-10` | Radix gray solid-fill hover step. |
 | `#001019` | `--lx-accent-02` | Subtle accent background. |
 | `#001d2e` | `--lx-accent-03` | Accent component background. |
 | `#002a42` | `--lx-accent-04` | Hovered accent component background. |
 | `#003656` | `--lx-accent-05` | Active or selected accent component background. |
-| `#003e6b` | `--lx-accent-06`, blue highlight/PDF/whiteboard tokens | Strong blue accent fill, blue highlights, PDF highlights, and whiteboard quick links. |
+| `#003e6b` | `--lx-accent-06`, `--ls-highlight-color-blue`, `--ph-highlight-color-blue`, `--ls-whiteboard-quick-links-background`, `--ls-wb-background-color-blue` | Strong blue accent fill, blue highlights, PDF highlights, and whiteboard quick links. |
 | `#ffa04d` | `--lx-accent-10` | Bright orange solid-fill hover step. |
 
 ### Semantic, syntax, highlight, PDF, whiteboard, and admonition colors
 
 | Color | Tokens or selectors | Used for |
 | --- | --- | --- |
-| `#3b0d08` | Error and red whiteboard background tokens | Dark error notifications and red whiteboard objects. |
-| `#332a00` | Warning and yellow whiteboard background tokens | Dark warning notifications and yellow whiteboard objects. |
-| `#14240f` | Success and green whiteboard background tokens | Dark success notifications and green whiteboard objects. |
-| `#b7d6a8` | Success text and green whiteboard stroke tokens | Success foreground and green whiteboard strokes. |
-| `#5a5200` | Yellow highlight and PDF-highlight tokens | Yellow text and PDF highlights. |
-| `#661d1d` | Red highlight and PDF-highlight tokens | Red text and PDF highlights. |
-| `#164a22` | Green highlight and PDF-highlight tokens | Green text and PDF highlights. |
-| `#522251` | Purple highlight and PDF-highlight tokens | Purple text and PDF highlights. |
+| `#3b0d08` | `--ls-error-background-color`, `--ls-wb-background-color-red` | Dark error notifications and red whiteboard objects. |
+| `#332a00` | `--ls-warning-background-color`, `--ls-wb-background-color-yellow` | Dark warning notifications and yellow whiteboard objects. |
+| `#14240f` | `--ls-success-background-color`, `--ls-wb-background-color-green` | Dark success notifications and green whiteboard objects. |
+| `#b7d6a8` | `--ls-success-text-color`, `--ls-wb-stroke-color-green` | Success foreground and green whiteboard strokes. |
+| `#5a5200` | `--ls-highlight-color-yellow`, `--ph-highlight-color-yellow` | Yellow text and PDF highlights. |
+| `#661d1d` | `--ls-highlight-color-red`, `--ph-highlight-color-red` | Red text and PDF highlights. |
+| `#164a22` | `--ls-highlight-color-green`, `--ph-highlight-color-green` | Green text and PDF highlights. |
+| `#522251` | `--ls-highlight-color-purple`, `--ph-highlight-color-purple` | Purple text and PDF highlights. |
 | `#66224c` | `--ls-highlight-color-pink` | Pink text highlights. |
 | `#454545` | `--ls-highlight-color-gray` | Gray text highlights. |
 | `#ff9ed2` | `--ls-wb-stroke-color-pink` | Pink whiteboard strokes. |
 | `#3b193a` | `--ls-wb-background-color-purple` | Purple whiteboard objects. |
 | `#4a1735` | `--ls-wb-background-color-pink` | Pink whiteboard objects. |
-| `#b5cea8` | Number syntax selectors | CodeMirror, Highlight.js, and Prism numeric literals. |
-| `#ebbc00` | Note admonition accent | Note icon and four-pixel divider. |
-| `#eb9091` | Important admonition accent | Important icon and four-pixel divider. |
-| `#fa934e` | Caution and warning admonition accent | Caution/warning icons and four-pixel dividers. |
-| `#264f78` | CodeMirror selection selectors | Selected text in Logseq's CodeMirror editor. |
+| `#b5cea8` | `.cm-number`, `.hljs-number`, `.token.number` | CodeMirror, Highlight.js, and Prism numeric literals. |
+| `#ebbc00` | `.admonitionblock.note` → `--hc-admonition-accent` | Note icon and four-pixel divider. |
+| `#eb9091` | `.admonitionblock.important` → `--hc-admonition-accent` | Important icon and four-pixel divider. |
+| `#fa934e` | `.admonitionblock.caution`, `.admonitionblock.warning` → `--hc-admonition-accent` | Caution/warning icons and four-pixel dividers. |
+| `#264f78` | `.cm-s-lsradix … .CodeMirror-selected` and selection pseudo-elements | Selected text in Logseq's CodeMirror editor. |
 
 ### HSL control tokens
 
@@ -134,8 +135,9 @@ The chart renders these over a checkerboard so the opacity remains visible.
 | `rgb(255 160 77 / 85%)` | `--lx-accent-10-alpha` | Bright orange hover-fill overlay. |
 | `rgb(26 235 255 / 90%)` | `--lx-accent-11-alpha` | Bright cyan accent text overlay. |
 | `rgb(255 255 255 / 95%)` | `--lx-accent-12-alpha` | Nearly opaque accent text. |
-| `rgb(0 0 0 / 78%)` | Modal and dialog overlays | Screen scrim behind modal surfaces. |
-| `rgb(255 255 255 / 30%)` | Closed-bullet selector | Stronger halo for a closed bullet. |
+| `rgb(0 0 0 / 78%)` | `.ui__modal-overlay`, `.ui__dialog-overlay` | Screen scrim behind modal surfaces. |
+| `rgb(255 255 255 / 30%)` | `.bullet-container:not(.typed-list).bullet-closed` | Stronger halo for a closed bullet. |
+
 <!-- fixed-color-values:end -->
 
 ### Dynamic and platform colors
