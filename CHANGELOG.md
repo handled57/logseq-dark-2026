@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## 1.8.0 - 2026-09-05
+
+- Write a passage reference back under the book's full name, in one of six
+  forms: `Genesis`, `Genesis 1`, `Genesis 1-2`, `Genesis 1:1 - 2:1`,
+  `Genesis 50:20 - Exodus 1:10`, `Genesis 1:1-10`. The dash is tight where what
+  follows it is a bare number continuing the book and chapter already named, and
+  spaced where it carries a chapter or a book of its own. The short name stays
+  on `tags::`, where it is half of a page name an existing graph already
+  carries, and a chapter heading was already written in full, so the two now
+  agree.
+- Resolve a book named on its own — `Genesis`, `gen.`, `1 Cor` — as the whole of
+  that book, which the parser previously refused because a reference had to end
+  in a number. A whole book runs from its first chapter to its last, taking each
+  end chapter's own first and last verse, so the books that do not begin at 1:1
+  are spanned correctly. A long name that ends in a digit is read as the book it
+  names rather than as a chapter of another: `Psalm 151` is the book.
+
 ## 1.7.1 - 2026-09-05
 
 - Write verse numbers as superscript digits rather than as `<sup>`, which fixes
