@@ -86,6 +86,56 @@ test('canonical stylesheet and public screenshot exist', async () => {
   await assert.rejects(access(resolve(root, 'custom.css'), constants.F_OK))
 })
 
+test('README and palette chart document every fixed stylesheet color', async () => {
+  const readme = await readFile(resolve(root, 'README.md'), 'utf8')
+  const palette = await readFile(resolve(root, 'screenshots', 'color-palette.svg'), 'utf8')
+  const start = '<!-- fixed-color-values:start -->'
+  const end = '<!-- fixed-color-values:end -->'
+  const documented = readme.slice(readme.indexOf(start) + start.length, readme.indexOf(end))
+
+  assert.ok(readme.includes('screenshots/color-palette.svg'), 'README does not embed the palette chart')
+  assert.ok(readme.indexOf(start) >= 0 && readme.indexOf(end) > readme.indexOf(start), 'README palette markers are missing or reversed')
+  assert.match(palette, /^<svg\b/)
+  assert.match(palette, /<\/svg>\s*$/)
+
+  const uniqueMatches = (source, pattern, transform = (value) => value.toLowerCase()) =>
+    [...new Set([...source.matchAll(pattern)].map((match) => transform(match[1] ?? match[0])))].sort()
+  const hexPattern = /#[\da-f]{6}\b/gi
+  const rgbPattern = /(rgb\([^)]*\))/gi
+  const cssHslPattern = /^\s*--[\w-]+:\s*(\d+(?:\.\d+)?\s+\d+(?:\.\d+)?%\s+\d+(?:\.\d+)?%);/gm
+  const documentedHslPattern = /`(\d+(?:\.\d+)?\s+\d+(?:\.\d+)?%\s+\d+(?:\.\d+)?%)`/g
+  const chartHslPattern = /hsl\((\d+(?:\.\d+)?\s+\d+(?:\.\d+)?%\s+\d+(?:\.\d+)?%)\)/g
+  const normalizeComponents = (value) => value.toLowerCase().replace(/\s+/g, ' ')
+
+  const expected = {
+    hex: uniqueMatches(css, hexPattern),
+    rgb: uniqueMatches(css, rgbPattern),
+    hsl: uniqueMatches(css, cssHslPattern, normalizeComponents)
+  }
+  const readmeColors = {
+    hex: uniqueMatches(documented, hexPattern),
+    rgb: uniqueMatches(documented, rgbPattern),
+    hsl: uniqueMatches(documented, documentedHslPattern, normalizeComponents)
+  }
+  const chartColors = {
+    hex: uniqueMatches(palette, hexPattern),
+    rgb: uniqueMatches(palette, rgbPattern),
+    hsl: uniqueMatches(palette, chartHslPattern, normalizeComponents)
+  }
+
+  assert.deepEqual(
+    { hex: expected.hex.length, rgb: expected.rgb.length, hsl: expected.hsl.length },
+    { hex: 50, rgb: 26, hsl: 9 },
+    'stylesheet color inventory changed unexpectedly'
+  )
+  assert.deepEqual(readmeColors, expected, 'README fixed-color tables have drifted from theme.css')
+  assert.deepEqual(chartColors, expected, 'palette chart has drifted from theme.css')
+
+  for (const keyword of ['transparent', 'inherit', 'currentColor', 'Canvas', 'CanvasText', 'LinkText', 'Highlight', 'HighlightText']) {
+    assert.ok(readme.includes(`\`${keyword}\``), `README does not explain ${keyword}`)
+  }
+})
+
 test('the plugin entry loads the vendored SDK before the property script', async () => {
   const sdk = await readFile(resolve(root, 'lib', 'lsplugin.user.js'), 'utf8')
   assert.ok(sdk.length > 10_000, 'the vendored SDK is unexpectedly small')
