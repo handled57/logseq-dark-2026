@@ -91,12 +91,15 @@ test('README and palette chart document every fixed stylesheet color', async () 
   const palette = await readFile(resolve(root, 'screenshots', 'color-palette.svg'), 'utf8')
   const start = '<!-- fixed-color-values:start -->'
   const end = '<!-- fixed-color-values:end -->'
-  const documented = readme.slice(readme.indexOf(start) + start.length, readme.indexOf(end))
+  const startIndex = readme.indexOf(start)
+  const endIndex = readme.indexOf(end)
 
   assert.ok(readme.includes('screenshots/color-palette.svg'), 'README does not embed the palette chart')
-  assert.ok(readme.indexOf(start) >= 0 && readme.indexOf(end) > readme.indexOf(start), 'README palette markers are missing or reversed')
+  assert.ok(startIndex >= 0 && endIndex > startIndex, 'README palette markers are missing or reversed')
   assert.match(palette, /^<svg\b/)
   assert.match(palette, /<\/svg>\s*$/)
+
+  const documented = readme.slice(startIndex + start.length, endIndex)
 
   const uniqueMatches = (source, pattern, transform = (value) => value.toLowerCase()) =>
     [...new Set([...source.matchAll(pattern)].map((match) => transform(match[1] ?? match[0])))].sort()
