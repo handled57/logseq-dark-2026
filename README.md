@@ -161,7 +161,7 @@ type: foo, status: done, kind: reference
 - `key: *`, or a bare `key` with no value, matches every value of that key.
 - Leave the field empty to render every block normally.
 
-The default is `type: foo`. A graph configured under 1.2.0 keeps its behavior: the old **Property key** and **Values that hide properties** settings are folded into this field the first time 1.3.0 loads.
+The default is `type: passage`, which hides the drawer on the one block type this theme writes itself. A graph configured under 1.2.0 keeps its behavior: the old **Property key** and **Values that hide properties** settings are folded into this field the first time 1.3.0 loads.
 
 Every block carrying one of the configured keys also gets `data-hc-block-type` set to that property's value, so `theme.css` can key rules to a block's type:
 
@@ -193,9 +193,26 @@ Insert one in either of two ways:
 
 Both prompt for a reference, write it in bold on the first line, and leave the cursor on the blank line beneath it, which is where the passage goes. Escape or **Cancel** dismisses the prompt without changing the block, and a blank reference cannot be submitted.
 
+### Passage properties
+
+Every inserted passage also carries two properties:
+
+```text
+tags::
+type:: Passage
+#+BEGIN_PASSAGE
+**John 3:16**
+
+#+END_PASSAGE
+```
+
+`type:: Passage` is what the default **Properties that hide the property table** rule matches, so the drawer is hidden and the block renders as a bare passage; it is also what `data-hc-block-type="passage"` is taken from. `tags::` is left empty and ready to fill in — written as `tags::` and one trailing space, which is how Logseq itself writes a property with no value yet.
+
+The two lines sit *above* `#+BEGIN_PASSAGE` because a block holds one property drawer, at the very top of its content: Logseq only recognizes a drawer as the first thing in a block, and `#+BEGIN_PASSAGE` is a custom block rather than a title line, so this is where Logseq's own property writer puts them too. Properties written below `#+END_PASSAGE` are not parsed as properties at all. A key the block already declares is left exactly as you wrote it — only the missing one is added.
+
 ## Compatibility
 
-Version 1.5.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
+Version 1.5.2 targets **Logseq 0.10.15 classic/file graphs on desktop**.
 
 - DB graphs are not supported in this release.
 - Mobile is not an advertised target; narrow desktop windows receive a layout smoke test.
