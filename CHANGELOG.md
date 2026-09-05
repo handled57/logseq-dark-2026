@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here.
 
+## 1.5.2 - 2026-09-05
+
+- Write `tags::` and `type:: Passage` into every passage the `/passage` command
+  and the `<` picker insert. The lines go at the top of the block, above
+  `#+BEGIN_PASSAGE`, which is where Logseq itself puts a property drawer for a
+  block with no title line and the only place it parses one; a key the block
+  already declares is left alone.
+- Default the property-hiding rule to `type: passage`, so a newly inserted
+  passage renders as a bare passage rather than under a property table. An
+  existing graph keeps whatever it is already configured with.
+- Keep a block bulletless when a property drawer sits above its `#+BEGIN_`
+  marker, which the source classifier previously read as ordinary prose.
+
 ## 1.5.1 - 2026-09-05
 
 - Match the passage block to a rendered admonition exactly: the icon is drawn
