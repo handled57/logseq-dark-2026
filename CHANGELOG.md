@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here.
 
+## 1.9.0 - 2026-09-05
+
+- Render a visible property table below the block's admonition or passage
+  rather than above it, with the table's left border on the divider between the
+  icon and the content. Logseq renders the table ahead of the block body, which
+  left it sitting above the box it describes; the change is to the render only,
+  so the properties stay first in the block's source and clicking into the block
+  still shows them where Logseq writes them. The 2rem the box carries below it
+  moves to the table, so the table sits against its own block and the block
+  keeps the height it had. It covers the six named admonitions and the passage
+  block; a table hidden by a rule, and an ordinary block's table, are left where
+  they are.
+
 ## 1.8.0 - 2026-09-05
 
 - Set verse numbers in the theme's cyan, the color of the passage's own icon.

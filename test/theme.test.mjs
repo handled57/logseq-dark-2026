@@ -411,6 +411,52 @@ test('verse numbers are cyan, and hang in a gutter where the block asks for one'
   )
 })
 
+test('a visible property table renders below the admonition or passage it names', () => {
+  // Logseq renders `.block-properties` ahead of `.block-body`, so the scope has
+  // to name both halves at once: a rendered box, and a table `index.js` has not
+  // marked hidden. A table the configuration hides stays where it is, and so
+  // does every ordinary block.
+  const boxes = ':is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)'
+  const scope = `.block-content:has(> .block-body > ${boxes}):has(> .block-properties:not([data-hc-hidden]))`
+
+  assert.match(
+    css,
+    new RegExp(`${escapeRegExp(scope)} \\{\\s*\\n\\s*display:\\s*flex;\\s*\\n\\s*flex-direction:\\s*column;`),
+    'the reordering column is missing or is not scoped to a visible table on a rendered box'
+  )
+
+  // Last in the column, and starting at the divider: the box's own 1px edge,
+  // the 2rem icon, and the icon column's 1rem `pr-4`.
+  assert.match(
+    css,
+    new RegExp(`${escapeRegExp(scope)} > \\.block-properties \\{[\\s\\S]*?order:\\s*1;[\\s\\S]*?margin-left:\\s*calc\\(3rem \\+ 1px\\);[\\s\\S]*?margin-bottom:\\s*2rem;`)
+  )
+
+  // The 2rem tail moves off the box and onto the table below it, so the table
+  // sits against the block it describes and the block keeps its height.
+  assert.match(
+    css,
+    new RegExp(`\\.block-content:has\\(> \\.block-properties:not\\(\\[data-hc-hidden\\]\\)\\) > \\.block-body > ${escapeRegExp(boxes)} \\{\\s*\\n\\s*margin-bottom:\\s*0;`)
+  )
+
+  // The attribute the scope reads is the one the script writes.
+  assert.match(script, /const HIDDEN_ATTR = 'data-hc-hidden'/)
+
+  // No rule may move a property table on its own: every selector that orders or
+  // indents one has to name the box it is being moved under, so an ordinary
+  // block's properties stay where Logseq puts them.
+  for (const rule of css.match(/[^{}]+\{[^{}]*\}/g) ?? []) {
+    const [selector, declarations] = rule.split('{')
+    if (!selector.includes('.block-properties')) continue
+    if (!/(?:^|[\s;])order:|margin-left:/.test(declarations)) continue
+    assert.match(
+      selector,
+      /\.admonitionblock|\.passage/,
+      `"${selector.trim()}" moves a property table without naming a rendered box`
+    )
+  }
+})
+
 test('workbench chrome is bordered in the contrast border, not white', () => {
   // Panes, panels, sidebars and controls all draw their edges with
   // --vscode-hc-border. Two declarations use a border property to paint

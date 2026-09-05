@@ -1256,6 +1256,47 @@ textarea.block-editor:focus {
   --hc-verse-gutter: 1.75em;
 }
 
+/* Properties below the box they belong to.
+ *
+ * Logseq renders `.block-properties` ahead of `.block-body` inside
+ * `.block-content`, so a block whose body is an admonition or a passage shows
+ * its property table above the box the properties describe, where the table
+ * reads as belonging to whatever came before it. Ordering the table last in a
+ * flex column moves the render only: the DOM, the stored block and the source
+ * order of the properties are untouched, and clicking into the block still
+ * shows them written where Logseq writes them.
+ *
+ * The scope carries both halves of the condition, so the column is built only
+ * for a `.block-content` that holds one of the six rendered admonitions or a
+ * passage *and* a property table that is still visible. `index.js` marks a
+ * table the configuration hides with `data-hc-hidden`, and a hidden table is
+ * left where it is: an ordinary block, and a styled block rendering bare, keep
+ * the flow layout they already have. */
+.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The table begins at the divider between the icon column and the content: the
+ * 1px edge the box itself carries — transparent, but laid out — then the
+ * icon's own 2rem and the icon column's 1rem `pr-4`. That is where a real
+ * `.admonition-icon` border sits, and where the passage draws its `::before`,
+ * so the table's left border lands on the divider and the line the icon column
+ * ends in carries on down the side of the table. */
+.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties {
+  order: 1;
+  margin-left: calc(3rem + 1px);
+  margin-bottom: 2rem;
+}
+
+/* The 2rem tail the box carries is what would otherwise be left between it and
+ * its own table. Flex items do not collapse margins, so the tail moves to the
+ * table instead: the table sits against the block it describes rather than
+ * halfway to the next one, and the block keeps the height it had. */
+.block-content:has(> .block-properties:not([data-hc-hidden])) > .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage) {
+  margin-bottom: 0;
+}
+
 mark {
   color: var(--ls-page-mark-color);
   background: var(--ls-page-mark-bg-color);
