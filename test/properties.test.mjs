@@ -515,6 +515,22 @@ test('the entry provides the one style rule that does the hiding', async () => {
   const dialog = context.logseq.provided.find(({ key }) => key === 'hc-passage-dialog')
   assert.match(dialog.style, /\[data-hc-passage-dialog\]/)
   assert.equal(context.logseq.provided.length, 2)
+
+  // A dialog button is black with white text in every state it has, so focus
+  // shows as the orange border and never as an orange fill. Logseq's own button
+  // rules are weighted, so these have to be.
+  const fill = dialog.style.slice(dialog.style.indexOf('] button,')).split('}')[0]
+  assert.match(fill, /--vscode-hc-white, #ffffff\) !important/)
+  assert.match(fill, /--vscode-hc-black, #000000\) !important/)
+  const states = fill.split('{')[0]
+  for (const state of ['button', 'button:hover', 'button:focus', 'button:focus-visible', 'button:active']) {
+    assert.match(states, new RegExp(`\\] ${state}\\b(?!-)`), `no black fill declared for ${state}`)
+  }
+  // The focus token marks an edge and never a surface: nowhere in the dialog is
+  // it a fill.
+  for (const declaration of dialog.style.match(/[a-z-]+:[^;{}]*--vscode-hc-focus[^;]*;/g) ?? []) {
+    assert.match(declaration, /^(border-color|outline):/, declaration)
+  }
 })
 
 function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '', wrapperSelector = '', uuid = '' } = {}) {
@@ -667,13 +683,30 @@ test('stored source keeps a passage block bulletless when the render carries no 
   assert.equal(passage.attributes.has('data-hc-hide-bullet'), true)
 })
 
-/* Drives one insertion from invocation to the reference being submitted. */
-async function invoke(context, run, reference = 'John 3:16') {
+/* The display options, by the id each checkbox carries. */
+const DISPLAY_BOXES = {
+  headings: '#hc-passage-headings',
+  numbers: '#hc-passage-numbers',
+  perLine: '#hc-passage-lines'
+}
+
+function choose(dialog, keys) {
+  for (const key of keys) {
+    const box = dialog.querySelector(DISPLAY_BOXES[key])
+    assert.ok(box, `the dialog has no ${key} checkbox`)
+    box.checked = true
+  }
+}
+
+/* Drives one insertion from invocation to the reference being submitted, with
+ * the named display options checked beside it. */
+async function invoke(context, run, reference = 'John 3:16', options = []) {
   const invocation = run()
   await flush()
 
   const dialog = dialogOf(context)
   fill(dialog, reference)
+  choose(dialog, options)
   dialog.querySelector('form').dispatch('submit')
   await invocation
   await flush()
@@ -1092,6 +1125,124 @@ test('a configured text index is read from its own path, not from the theme fold
 
   assert.match(context.logseq.Editor.updates[0].content, /Indeed, God did not send the Son\./)
   assert.deepEqual(context.messages, [])
+})
+
+test('the display options open unchecked, and open unchecked again next time', async () => {
+  const { context } = await bibleContext({
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
+  })
+
+  const invocation = context.logseq.Editor.commands[0].action()
+  await flush()
+  const dialog = dialogOf(context)
+
+  // Three boxes, in the order the issue names them, each with its own label.
+  const boxes = dialog.querySelectorAll('input').filter(({ type }) => type === 'checkbox')
+  assert.deepEqual(boxes.map(({ id }) => id), [
+    'hc-passage-headings',
+    'hc-passage-numbers',
+    'hc-passage-lines'
+  ])
+  assert.deepEqual(boxes.map(({ checked }) => checked), [false, false, false])
+  assert.deepEqual(dialog.querySelectorAll('span').map(({ textContent }) => textContent), [
+    'View chapter headings',
+    'View verse numbers',
+    'One verse per line'
+  ])
+
+  choose(dialog, ['headings', 'numbers', 'perLine'])
+  fill(dialog, 'John 3:16')
+  dialog.querySelector('form').dispatch('submit')
+  await invocation
+  await flush()
+
+  // A display option is a choice about the passage in front of you, not a
+  // setting: the next dialog opens with all three off again.
+  const second = context.logseq.Editor.commands[0].action()
+  await flush()
+  const reopened = dialogOf(context)
+  assert.notEqual(reopened, dialog, 'the dialog was reused rather than rebuilt')
+  assert.deepEqual(
+    reopened.querySelectorAll('input').filter(({ type }) => type === 'checkbox')
+      .map(({ checked }) => checked),
+    [false, false, false]
+  )
+
+  control(reopened, 'button', 'Cancel').dispatch('click')
+  await second
+})
+
+test('each display option formats the passage on its own', async () => {
+  const reference = 'jn 3:16-17'
+  const head = 'tags:: John/3\ntype:: Passage\n#+BEGIN_PASSAGE\n**John 3:16\u201317**\n\n'
+
+  for (const [options, body] of [
+    [[], 'For God so loved the world. Indeed, God did not send the Son.'],
+    [['headings'], '**John 3**\n\nFor God so loved the world. Indeed, God did not send the Son.'],
+    [
+      ['numbers'],
+      '<sup>16</sup>For God so loved the world. <sup>17</sup>Indeed, God did not send the Son.'
+    ],
+    [['perLine'], 'For God so loved the world.\nIndeed, God did not send the Son.']
+  ]) {
+    const { context } = await bibleContext({
+      bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
+    })
+
+    await invoke(context, () => context.logseq.Editor.commands[0].action(), reference, options)
+
+    assert.equal(
+      context.logseq.Editor.updates[0].content,
+      `${head}${body}\n#+END_PASSAGE`,
+      options.join(' + ') || 'no options'
+    )
+  }
+})
+
+test('the three display options are written together, and the cursor still lands after them', async () => {
+  const { context } = await bibleContext({
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
+  })
+
+  await invoke(
+    context,
+    () => context.logseq.Editor.commands[0].action(),
+    'jn 3:16-17',
+    ['headings', 'numbers', 'perLine']
+  )
+
+  const [{ content }] = context.logseq.Editor.updates
+  assert.equal(
+    content,
+    'tags:: John/3\ntype:: Passage\n' +
+      '#+BEGIN_PASSAGE\n**John 3:16\u201317**\n\n' +
+      '**John 3**\n\n' +
+      '<sup>16</sup>For God so loved the world.\n' +
+      '<sup>17</sup>Indeed, God did not send the Son.\n' +
+      '#+END_PASSAGE'
+  )
+  const [edit] = context.logseq.Editor.edits
+  assert.equal(content.slice(edit.pos), '\n#+END_PASSAGE')
+})
+
+test('without the text index the options add nothing to an empty body', async () => {
+  // The body is the reader's to write, so a heading or a verse number would be
+  // metadata standing in for a passage that is not there.
+  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
+
+  await invoke(
+    context,
+    () => context.logseq.Editor.commands[0].action(),
+    'Psalms 23',
+    ['headings', 'numbers', 'perLine']
+  )
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    'tags:: Ps/23\ntype:: Passage\n#+BEGIN_PASSAGE\n**Ps 23**\n\n#+END_PASSAGE'
+  )
+  assert.equal(context.messages.length, 1)
+  assert.match(context.messages[0].text, /build-bible-index/)
 })
 
 test('Enter inserts and Escape cancels ahead of the host, wherever the key lands', async () => {

@@ -292,6 +292,9 @@ function parsePassageReference(input, manifest) {
     tags: span.map(({ book, chapter }) => `${book.shortName}/${chapter.number}`),
     chapters: span.map(({ book, chapter }, position) => ({
       shortName: book.shortName,
+      /* The long name is what a chapter heading is written with, so it travels
+       * with the span rather than being looked up again from the manifest. */
+      longName: book.longName,
       chapter: chapter.number,
       from: position === 0 ? from.verse : chapter.first,
       to: position === span.length - 1 ? to.verse : chapter.last
@@ -313,20 +316,42 @@ function parsePassageReference(input, manifest) {
 
 /* Verses are joined into a paragraph with a space, except where either side
  * carries its own line breaks: that is poetry, and its lineation is the point.
- * Paragraphs and chapters are separated by a blank line, which is what makes
- * them read as paragraphs rather than as one run-on block of prose. */
-function bibleParagraph(lines) {
+ * `perLine` breaks between every verse instead, which leaves the line breaks
+ * inside a verse exactly where they were. Paragraphs and chapters are separated
+ * by a blank line, which is what makes them read as paragraphs rather than as
+ * one run-on block of prose. */
+function bibleParagraph(lines, perLine) {
   return lines.reduce((text, line, position) => {
     if (!position) return line
-    const broken = line.includes('\n') || lines[position - 1].includes('\n')
+    const broken = perLine || line.includes('\n') || lines[position - 1].includes('\n')
     return `${text}${broken ? '\n' : ' '}${line}`
   }, '')
 }
 
-function composePassageText(resolved, textIndex) {
+/* The three display options the dialog offers, read defensively: an absent
+ * options object is every option off, which is the plain prose the command has
+ * always written. */
+function bibleDisplay(options) {
+  return {
+    headings: Boolean(options?.headings),
+    numbers: Boolean(options?.numbers),
+    perLine: Boolean(options?.perLine)
+  }
+}
+
+/* Logseq's markdown parser passes inline HTML through, and `<sup>` is the
+ * superscript both it and the DOM agree on: `^{1}` is org syntax and `^^` is a
+ * highlight. The number sits against the verse it opens, with no space, so the
+ * two never wrap apart. */
+function bibleVerseNumber(number, text) {
+  return `<sup>${number}</sup>${text}`
+}
+
+function composePassageText(resolved, textIndex, options) {
   const books = textIndex?.books
   if (!resolved?.ok || !books) return ''
 
+  const display = bibleDisplay(options)
   const rendered = []
 
   for (const span of resolved.chapters) {
@@ -342,10 +367,17 @@ function composePassageText(resolved, textIndex) {
       const text = String(chapter.verses[position] ?? '').trim()
       if (!text) continue
       if (starts.has(number) || !paragraphs.length) paragraphs.push([])
-      paragraphs.at(-1).push(text)
+      paragraphs.at(-1).push(display.numbers ? bibleVerseNumber(number, text) : text)
     }
 
-    for (const paragraph of paragraphs) rendered.push(bibleParagraph(paragraph))
+    /* A chapter heading names the chapter the verses under it come from, so it
+     * is written only where there are verses for it to head — a passage with no
+     * text is left empty rather than filled with headings. */
+    if (display.headings && paragraphs.length) {
+      rendered.push(`**${span.longName ?? span.shortName} ${span.chapter}**`)
+    }
+
+    for (const paragraph of paragraphs) rendered.push(bibleParagraph(paragraph, display.perLine))
   }
 
   return rendered.join('\n\n')
