@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## 1.10.0 - 2026-09-05
+
+- Hang every block's bullet on one vertical rail at the left of the main editor,
+  with a cyan line running behind the bullets from the centre of the first to
+  the centre of the last. Only the bullet moves: Logseq's own control column is
+  pulled left by exactly the indentation its nesting level applied and handed
+  the same distance back on its other side, so the content column keeps the
+  hierarchy Logseq renders, and the bullet stays the real one — its click,
+  right-click menu, drag, hover and collapsed-state styling are Logseq's own.
+  Every rendered block takes a bullet, including the empty, code, `center`,
+  `verse` and passage blocks the theme leaves bulletless elsewhere; a collapsed
+  block still renders no descendants, so none appear on the rail. A numbered
+  list keeps its number beside its content and takes an ordinary bullet on the
+  rail. The rail covers pages, journals, narrow layouts and the full-width
+  route; sidebars, whiteboards, dialogs, linked references, and the embedded and
+  queried trees rendered inside a block keep Logseq's own layout, as do document
+  mode and the right-hand fold button, both of which re-measure the indentation
+  the rail is drawn from. A block's bullet now sits on its first line rather
+  than on a heading's baseline, which is the one change to where a bullet is
+  drawn.
+
 ## 1.9.0 - 2026-09-05
 
 - Render a visible property table below the block's admonition or passage

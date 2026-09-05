@@ -328,6 +328,166 @@ test('the moved property table lines up with the box text and takes the box tail
   assert.match(css, /> \.block-body > :is\([^{]*\.passage\) \{\s*\n\s*margin-bottom:\s*0;/)
 })
 
+/* The bullet rail hangs every block's bullet on one vertical line. Every
+ * distance it moves a bullet by is Logseq's own: the 29px a nesting level
+ * indents its subtree, the 22px fold arrow the bullet sits behind, the 16px
+ * bullet, and the 24px control box the bullet is centered in. Those are pinned
+ * here because the rail is arithmetic on them — if Logseq re-measures a block,
+ * the rail bends rather than breaks visibly, so nothing else would catch it. */
+const railMetrics = [
+  '.block-children-container{margin-left:29px;position:relative}',
+  '.block-control-wrap{height:24px;margin-top:0;padding-right:6px}',
+  '.bullet-container{align-items:center;border-radius:50%;display:flex;height:16px;justify-content:center;width:16px}',
+  '.bullet-container.as-order-list{justify-content:center;padding-left:3px;white-space:nowrap;width:22px}',
+  '.block-control-wrap.is-order-list{margin-right:0;padding-right:0}',
+  '.block-control-wrap.is-order-list .bullet-link-wrap{left:-3px;position:relative}',
+  // Both layouts re-measure that indentation, which is why the rail opts out of
+  // them rather than drawing a line through the wrong column.
+  'main.ls-fold-button-on-right .block-children-container{margin-left:7px}',
+  '.content.doc-mode .block-children-container{margin-left:18px}'
+]
+
+/* Read back off the declarations above. */
+const rail = { indent: 29, arrow: 22, bullet: 16, box: 24, gutter: 6, orderList: 22 }
+
+/* The rail reaches the page's own tree in the main editor and nothing else:
+ * not the sidebars, whiteboards or dialogs that render outside
+ * `#main-content-container`, not the embedded and queried trees that render
+ * inside a `.block-content-wrapper`, and not the two layouts above. */
+const scope =
+  'main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)'
+const block = `${scope} .ls-block:not(.block-content-wrapper *)`
+const wrap = `${block} > .block-main-container > .block-control-wrap`
+const control = `${wrap} > .block-control`
+
+/* Theme rules, as [selector, declarations], with selectors on one line. */
+const rules = new Map(
+  [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)].map(([, selector, body]) => [
+    selector.replace(/\s+/g, ' ').trim(),
+    body
+  ])
+)
+
+function rule(selector) {
+  const body = rules.get(selector)
+  assert.ok(body !== undefined, `no rule for "${selector}"`)
+  return body
+}
+
+function px(body, property) {
+  const match = body.match(new RegExp(`(?:^|;|\\n)\\s*${property}:\\s*(-?[\\d.]+)(?:px|(?=\\s*;))`))
+  assert.ok(match, `${property} is missing`)
+  return Number.parseFloat(match[1])
+}
+
+test('the rail takes back exactly the indentation each nesting level applied', () => {
+  const levels = new Map()
+  for (const [selector, body] of rules) {
+    if (!selector.startsWith(scope) || !selector.endsWith('.block-control-wrap')) continue
+    const depth = selector.split('.block-children ').length - 1
+    if (depth === 0) continue
+    assert.ok(!levels.has(depth), `nesting level ${depth} is shifted by two rules`)
+    assert.equal(
+      selector,
+      `${scope} ${'.block-children '.repeat(depth)}.ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap`,
+      `the rule for nesting level ${depth} is scoped differently from the rest of the rail`
+    )
+    levels.set(depth, body)
+  }
+
+  assert.ok(levels.size >= 12, `only ${levels.size} nesting levels ride the rail`)
+  for (const [depth, body] of levels) {
+    // Pulled left by everything the level indented, and handed back on the
+    // other side so the content column does not travel with the bullet.
+    assert.equal(px(body, 'margin-left'), -rail.indent * depth, `level ${depth} lands off the rail`)
+    assert.equal(px(body, 'margin-right'), rail.indent * depth, `level ${depth} drags its content column`)
+  }
+  for (let depth = 1; depth <= levels.size; depth += 1) {
+    assert.ok(levels.has(depth), `nesting level ${depth} has no rail rule`)
+  }
+})
+
+test('the rail line stands at the center of the bullet column and stops at a bullet', () => {
+  const line = rule(`${control}::before, ${control}::after`)
+  // The fold arrow, then half a bullet: the center of the bullet Logseq draws.
+  assert.equal(px(line, 'left'), rail.arrow + rail.bullet / 2)
+  assert.equal(px(line, 'width'), 1)
+  assert.match(line, /background-color:\s*var\(--vscode-hc-cyan\)/)
+  // Decorative: the line is never what a click lands on.
+  assert.match(line, /pointer-events:\s*none/)
+  // Behind the bullets, inside the stacking context the row is given for it.
+  assert.match(line, /z-index:\s*-1/)
+  assert.match(rule(`${block} > .block-main-container`), /isolation:\s*isolate/)
+
+  // What Logseq's 24px control box was centering the bullet by.
+  assert.equal(px(rule(`${wrap} > .bullet-link-wrap`), 'margin-top'), (rail.box - rail.bullet) / 2)
+
+  const up = rule(`${control}::before`)
+  const down = rule(`${control}::after`)
+  const center = rail.box / 2
+
+  // The upward segment reaches the center of its own bullet, having started
+  // above the row to cover the gap between one block and the next.
+  assert.ok(px(up, 'top') < 0, 'the upward segment does not cover the gap above its row')
+  assert.equal(px(up, 'height'), -px(up, 'top') + center)
+
+  // The downward segment leaves that center and runs past the foot of its row,
+  // by less than the distance a bullet sits below the row it follows — so it
+  // always meets the next segment and can never outrun a bullet center.
+  assert.equal(px(down, 'top'), center)
+  const overshoot = -px(down, 'bottom')
+  assert.ok(overshoot > 0, 'the downward segment stops short of the block below it')
+  assert.ok(overshoot < center, 'the downward segment can outrun the bullet below it')
+
+  // Both ends of the rail are a bullet center: the first rendered block draws
+  // no upward segment, and the last rendered block no downward one.
+  assert.match(rule(`${block}:not(.ls-block *):not(.ls-block ~ .ls-block) > .block-main-container > .block-control-wrap > .block-control::before`), /display:\s*none/)
+  assert.match(rule(`${block}:not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)):not(.ls-block:has(~ .ls-block) *) > .block-main-container > .block-control-wrap > .block-control::after`), /display:\s*none/)
+})
+
+test('an ordered list keeps its number beside the content and a bullet on the rail', () => {
+  const marker = rule(`${wrap} .bullet-container.as-order-list`)
+  // On the rail it reads as a bullet like any other, so it takes a bullet's box.
+  assert.equal(px(marker, 'width'), rail.bullet)
+  assert.equal(px(marker, 'padding-left'), 0)
+  assert.match(rule(`${wrap} .bullet-container.typed-list .bullet`), /background-color:\s*var\(--vscode-hc-white\)/)
+
+  // Logseq drops the gutter for an ordered list because its number is wider
+  // than a bullet. The number is no longer there, so the gutter comes back and
+  // every content column starts at the same offset.
+  assert.equal(px(rule(`${wrap}.is-order-list`), 'padding-right'), rail.gutter)
+
+  // The number itself is laid back where Logseq drew it, measured from the row
+  // rather than from the bullet, so it holds at every nesting level.
+  const label = rule(`${wrap} .bullet-container.typed-list .bullet > label`)
+  assert.match(label, /position:\s*absolute/)
+  assert.equal(px(label, 'left'), rail.arrow)
+  assert.equal(px(label, 'width'), rail.orderList)
+  assert.equal(px(label, 'height'), rail.box)
+
+  // Upstream hangs an ordered list's bullet off a relative box shifted by 3px.
+  // That box would otherwise be what the number above is measured from.
+  assert.match(rule(`${wrap} > .bullet-link-wrap`), /position:\s*static/)
+})
+
+test('the rail out-ranks the bullet suppression it answers', () => {
+  const visible = `${wrap} .bullet-container`
+  assert.match(rule(visible), /opacity:\s*1\s*!important/)
+
+  // The rules that keep a special block bulletless everywhere else. Both are
+  // !important, so specificity is what decides which one the rail sees.
+  for (const suppressed of [
+    '.ls-block[data-hc-hide-bullet] > .block-main-container > .block-control-wrap .bullet-container:not(.typed-list)',
+    '.ls-block:has(> .block-main-container > .block-content-wrapper :is(.org-src-container, .src, .center, .CENTER, .org-center, [style*="text-align: center"], [style*="text-align:center"], .verse, .VERSE, .org-verse, .passage)) > .block-main-container > .block-control-wrap .bullet-container:not(.typed-list)'
+  ]) {
+    assert.ok(rules.has(suppressed) || [...rules.keys()].some((key) => key.endsWith(suppressed)), `the rule "${suppressed.slice(0, 48)}…" is gone`)
+    assert.ok(
+      compare(specificity(visible), specificity(suppressed)) > 0,
+      "the rail does not out-rank the rule that hides a special block's bullet"
+    )
+  }
+})
+
 /* Optional: confirm the pinned literals still describe the installed app. */
 const upstreamPath = process.env.LOGSEQ_CSS
 test(
@@ -342,7 +502,7 @@ test(
         `${surface}: upstream no longer ships "${selector}"`
       )
     }
-    for (const declaration of [...admonitionMetrics, ...spacingMetrics]) {
+    for (const declaration of [...admonitionMetrics, ...spacingMetrics, ...railMetrics]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }
     assert.ok(upstream.includes(markDeclaration), 'Logseq no longer ships the page-mark rule')
