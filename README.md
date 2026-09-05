@@ -245,7 +245,7 @@ The two property lines sit *above* `#+BEGIN_PASSAGE` because a block holds one p
 
 ## Compatibility
 
-Version 1.5.2 targets **Logseq 0.10.15 classic/file graphs on desktop**.
+Version 1.6.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
 
 - DB graphs are not supported in this release.
 - Mobile is not an advertised target; narrow desktop windows receive a layout smoke test.
