@@ -1452,8 +1452,9 @@ textarea.block-editor:focus {
  * Logseq's icon column carries `justify-center`, which centers the icon over
  * the full height of a long admonition. Keep the column (and therefore its
  * divider) stretched to the full height, but pin its contents to the top. The
- * icon is 2rem square while the `text-lg` content's first line box is 1.75rem,
- * so half their difference centers the icon on that first rendered line. */
+ * icon is 1.5 times the `text-lg` content's 1.125rem font size while its first
+ * line box is 1.75rem, so half their difference centers the icon on that first
+ * rendered line. The fixed column geometry remains independent of the glyph. */
 .admonitionblock.tip {
   --hc-admonition-accent: var(--vscode-hc-focus);
 }
@@ -1476,9 +1477,15 @@ textarea.block-editor:focus {
 }
 
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) {
+  --hc-admonition-font-size: 1.125rem;
   --hc-admonition-first-line-height: 1.75rem;
+  --hc-admonition-icon-size: 1.5em;
 
   border-color: transparent !important;
+}
+
+.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) > :is(.admonition-icon, .text-lg) {
+  font-size: var(--hc-admonition-font-size);
 }
 
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon {
@@ -1488,7 +1495,9 @@ textarea.block-editor:focus {
 }
 
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon svg {
-  transform: translateY(calc((var(--hc-admonition-first-line-height) - 2rem) / 2));
+  width: var(--hc-admonition-icon-size) !important;
+  height: var(--hc-admonition-icon-size) !important;
+  transform: translateY(calc((var(--hc-admonition-first-line-height) - var(--hc-admonition-icon-size)) / 2));
   color: var(--hc-admonition-accent) !important;
   fill: var(--hc-admonition-accent) !important;
 }
@@ -1514,6 +1523,7 @@ textarea.block-editor:focus {
 .block-body > .passage {
   --hc-admonition-accent: var(--vscode-hc-cyan);
   --hc-admonition-first-line-height: 1.75rem;
+  --hc-admonition-icon-size: 1.5em;
   --hc-verse-gutter: 0px;
 
   position: relative;
@@ -1544,15 +1554,15 @@ textarea.block-editor:focus {
 
 /* The glyph. `mask-image` rather than a colored `background-image` keeps the
  * color a palette token. The SVG is inlined as a `data:` URI, so nothing is
- * fetched. Its 2rem box uses the same first-line offset as a named admonition;
+ * fetched. Its 1.5em box uses the same first-line offset as a named admonition;
  * the separate `::before` divider remains stretched over the full block. */
 .block-body > .passage::after {
   content: "";
   position: absolute;
-  top: calc((var(--hc-admonition-first-line-height) - 2rem) / 2);
+  top: calc((var(--hc-admonition-first-line-height) - var(--hc-admonition-icon-size)) / 2);
   left: 0;
-  width: 2rem;
-  height: 2rem;
+  width: var(--hc-admonition-icon-size);
+  height: var(--hc-admonition-icon-size);
   background-color: var(--hc-admonition-accent);
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11.2 6.6C8.9 5 5.9 4.3 2.8 4.5a.9.9 0 0 0-.8.9v12.7c0 .5.4.9 1 .9 2.7-.2 5.3.4 7.2 1.8.4.3.9 0 .9-.5V7.3a.9.9 0 0 0-.4-.7z'/%3E%3Cpath d='M12.8 6.6C15.1 5 18.1 4.3 21.2 4.5c.4 0 .8.4.8.9v12.7c0 .5-.4.9-1 .9-2.7-.2-5.3.4-7.2 1.8-.4.3-.9 0-.9-.5V7.3c0-.3.1-.5.4-.7z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11.2 6.6C8.9 5 5.9 4.3 2.8 4.5a.9.9 0 0 0-.8.9v12.7c0 .5.4.9 1 .9 2.7-.2 5.3.4 7.2 1.8.4.3.9 0 .9-.5V7.3a.9.9 0 0 0-.4-.7z'/%3E%3Cpath d='M12.8 6.6C15.1 5 18.1 4.3 21.2 4.5c.4 0 .8.4.8.9v12.7c0 .5-.4.9-1 .9-2.7-.2-5.3.4-7.2 1.8-.4.3-.9 0-.9-.5V7.3c0-.3.1-.5.4-.7z'/%3E%3C/svg%3E");
@@ -1560,8 +1570,8 @@ textarea.block-editor:focus {
   mask-repeat: no-repeat;
   -webkit-mask-position: 50% 50%;
   mask-position: 50% 50%;
-  -webkit-mask-size: 2rem 2rem;
-  mask-size: 2rem 2rem;
+  -webkit-mask-size: var(--hc-admonition-icon-size) var(--hc-admonition-icon-size);
+  mask-size: var(--hc-admonition-icon-size) var(--hc-admonition-icon-size);
 }
 
 /* Logseq gives block paragraphs `margin: .5rem 0`, with the first and last

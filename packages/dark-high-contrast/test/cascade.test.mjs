@@ -239,16 +239,16 @@ test('the passage indent reproduces the admonition icon column', () => {
     return value.endsWith('px') ? number / 16 : number
   }
 
-  const glyph = rem(rule('.block-body > .passage::after'), 'width')
+  const glyph = rule('.block-body > .passage::after')
   const column = rem(rule('.block-body > .passage::before'), 'width')
   const divider = rem(rule('.block-body > .passage::before'), 'border-right')
   const indent = rem(rule('.block-body > .passage'), 'padding')
 
-  // `h-8`/`w-8`, and the row height that icon forces on a short admonition.
-  assert.equal(glyph, 2)
+  // The glyph follows the passage font without changing the historical column.
+  assert.match(glyph, /width:\s*var\(--hc-admonition-icon-size\)/)
   assert.equal(rem(rule('.block-body > .passage'), 'min-height'), 2)
-  // The icon plus the icon column's own `pr-4`.
-  assert.equal(column, glyph + 1)
+  // The fixed icon column retains the old `h-8`/`w-8` plus `pr-4` geometry.
+  assert.equal(column, 3)
   // The divider the theme widens on `.admonition-icon`.
   assert.equal(divider, 0.25)
   // Everything above, plus the content column's `ml-4`.
