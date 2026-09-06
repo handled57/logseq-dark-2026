@@ -177,8 +177,10 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
         observers.push(this)
       }
 
-      observe() {
+      observe(target, options) {
         this.connected = true
+        this.target = target
+        this.options = options
       }
 
       disconnect() {
@@ -656,6 +658,9 @@ test('the native block menu puts one Open action immediately above Open in sideb
 
   assert.equal(context.blockMenuItems.length, 1)
   assert.equal(context.blockMenuItems[0].label, 'Open')
+  assert.equal(context.logseq.observers[0].target, fixture.host)
+  assert.equal(context.logseq.observers[0].options.childList, true)
+  assert.equal(context.logseq.observers[0].options.subtree, true)
   fixture.menu.appendChild(menuLink(context.blockMenuItems[0].label))
   context.paint()
   context.paint()

@@ -377,7 +377,11 @@ function main() {
 
   /* childList/subtree only: this observer must not see its own attribute
    * writes, or every pass would schedule another one. */
-  const container = doc.getElementById('app-container') ?? doc.body
+  /* Logseq portals the block context menu under `body`, outside
+   * `#app-container`. Observe the common host so ordinary block menus schedule
+   * the same placement pass as menus opened while a special block is still
+   * repainting. Attribute writes remain excluded, including our own marker. */
+  const container = doc.body
   observer = new MutationObserver(repaint)
   observer.observe(container, { childList: true, subtree: true })
 
