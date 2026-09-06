@@ -11,7 +11,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - VS Code-inspired semantic colors for links, references, properties, tasks, and code.
 - Compact workbench treatment for the header, sidebars, command palette, menus, dialogs, and settings.
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
-- Every block in the main editor hangs its bullet on one vertical cyan rail at the left of the page, with the content column keeping its usual nesting.
+- Every block in the main editor hangs its bullet on one vertical cyan rail in the margin left of the page, each bullet on the middle of its block's first line, with the content column keeping its usual nesting.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
 - Adds a passage block that reads as one of Logseq's named admonitions, with commands that resolve a Bible reference and insert one, optionally with chapter headings, verse numbers, or a line per verse.
@@ -138,6 +138,7 @@ The chart renders these over a checkerboard so the opacity remains visible.
 | `rgb(255 255 255 / 95%)` | `--lx-accent-12-alpha` | Nearly opaque accent text. |
 | `rgb(0 0 0 / 78%)` | `.ui__modal-overlay`, `.ui__dialog-overlay` | Screen scrim behind modal surfaces. |
 | `rgb(255 255 255 / 30%)` | `.bullet-container:not(.typed-list).bullet-closed` | Stronger halo for a closed bullet. |
+| `rgb(156 220 254 / 30%)` | Hovered block's bullet on the rail | Cyan halo and ring marking the block under the pointer. |
 
 <!-- fixed-color-values:end -->
 
@@ -311,12 +312,16 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 ## Intentional layout choices
 
 - On desktop, ordinary pages use 80% of the available main column. Logseq's full-width route remains full width.
-- Every rendered block in the main editor keeps a bullet, and every bullet stands in the same column: Logseq's own bullet is pulled left by exactly the indentation its nesting level applied, so the content column keeps the hierarchy Logseq renders. A cyan line runs behind the bullets from the centre of the first to the centre of the last. The bullet stays on the first line of its block, which is a change only for headings, where Logseq aligns it to the heading's baseline instead.
+- Every rendered block in the main editor keeps a bullet, and every bullet stands in the same column: Logseq's own bullet is pulled left by the indentation its nesting level applied plus the margin the rail stands in, so the content column keeps the hierarchy Logseq renders. A cyan line runs behind the bullets, from the centre of the first bullet to the end of the last block.
+- A bullet sits on the middle of its block's first line of text, wherever that line begins. A heading's bullet drops by 1.75 times the size Logseq gives that heading level, both in view and while the heading is being typed; a quote, a passage, an admonition, a code block and a table drop their bullet into the box the block opens with. A block whose first line is a picture keeps its bullet at the top of the block.
+- Hovering a block lights its own bullet in the rail's cyan. An ancestor holding the hovered block keeps its bullet plain, the way the block highlight already behaves.
+- How far left the rail stands is one number, `--hc-rail-offset`. It defaults to 80px, drops to 48px on a window narrower than 1100px, and to 24px on the full-width route, where the only space left of the tree is the scroll container's own padding. A graph that wants the rail nearer its text can set it in `custom.css`.
 - The rail is the page's own tree in the main editor. Sidebars, whiteboards, dialogs and linked references keep Logseq's layout, as do embedded and queried trees rendered inside a block. Document mode and Logseq's right-hand fold button both re-measure indentation, so the rail steps aside for them and bullets render as Logseq draws them.
 - Outside the rail, bullets follow the older rule: untyped bullets are visible for ordinary prose blocks, while empty, property-only, heading, reference, embed, command/macro, query, media, code (including `src`), `center`, `verse`, `passage`, namespace, math, ClojureScript-eval, slide, flashcard, Zotero, quote, and other advanced `<`-menu blocks remain bulletless.
 - A numbered list keeps its number beside its content and takes an ordinary bullet on the rail.
 - The active block receives a steel-blue outline; hovering a child never reveals or recolors ancestor bullets, and Logseq's connector/thread lines remain hidden — the rail replaces them.
 - A block nested deeper than twelve levels hangs from the twelfth level's position rather than its own.
+- An admonition centres a short text against its icon, so its bullet marks the head of its box rather than that first line.
 
 ## Development
 

@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="976" viewBox="0 0 1400 976" role="img" aria-labelledby="title description">
   <title id="title">Dark High Contrast complete color palette</title>
-  <desc id="description">Swatches for all 50 opaque colors, 26 alpha overlays, and 9 HSL component colors used by the Logseq theme.</desc>
+  <desc id="description">Swatches for all 50 opaque colors, 27 alpha overlays, and 9 HSL component colors used by the Logseq theme.</desc>
   <defs>
     <pattern id="checker" width="12" height="12" patternUnits="userSpaceOnUse">
       <rect width="12" height="12" fill="#000000"/>
@@ -15,7 +15,7 @@
     </style>
   </defs>
 
-  <rect width="1400" height="900" fill="#000000"/>
+  <rect width="1400" height="976" fill="#000000"/>
   <text class="heading" x="24" y="38">Dark High Contrast — complete color palette</text>
   <text class="subheading" x="24" y="64">50 opaque colors</text>
 
@@ -75,7 +75,7 @@
   <g transform="translate(1112 330)"><rect class="swatch" width="112" height="36" fill="#fa934e"/><text class="label" x="56" y="52">#fa934e</text></g>
   <g transform="translate(1248 330)"><rect class="swatch" width="112" height="36" fill="#264f78"/><text class="label" x="56" y="52">#264f78</text></g>
 
-  <text class="subheading" x="24" y="425">26 alpha overlays — checkerboard shows transparency</text>
+  <text class="subheading" x="24" y="425">27 alpha overlays — checkerboard shows transparency</text>
   <!-- Alpha overlays: 13 columns by 2 rows. -->
   <g transform="translate(24 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0" data-color="rgb(255 255 255 / 0%)"/><text class="alpha-label" x="44" y="49">white / 0%</text></g>
   <g transform="translate(128 444)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.04" data-color="rgb(255 255 255 / 4%)"/><text class="alpha-label" x="44" y="49">white / 4%</text></g>
@@ -104,19 +104,20 @@
   <g transform="translate(1064 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.95" data-color="rgb(255 255 255 / 95%)"/><text class="alpha-label" x="44" y="49">white / 95%</text></g>
   <g transform="translate(1168 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#000000" fill-opacity="0.78" data-color="rgb(0 0 0 / 78%)"/><text class="alpha-label" x="44" y="49">black / 78%</text></g>
   <g transform="translate(1272 506)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#ffffff" fill-opacity="0.30" data-color="rgb(255 255 255 / 30%)"/><text class="alpha-label" x="44" y="49">white / 30%</text></g>
+  <g transform="translate(24 582)"><rect class="swatch" width="88" height="34" fill="url(#checker)"/><rect width="88" height="34" fill="#9cdcfe" fill-opacity="0.30" data-color="rgb(156 220 254 / 30%)"/><text class="alpha-label" x="44" y="49">cyan / 30%</text></g>
 
-  <text class="subheading" x="24" y="590">9 HSL component values used by Logseq controls</text>
-  <g transform="translate(24 610)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 0%)"/><text class="label" x="64" y="55">0 0% 0%</text></g>
-  <g transform="translate(176 610)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 100%)"/><text class="label" x="64" y="55">0 0% 100%</text></g>
-  <g transform="translate(328 610)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 5%)"/><text class="label" x="64" y="55">0 0% 5%</text></g>
-  <g transform="translate(480 610)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 8%)"/><text class="label" x="64" y="55">0 0% 8%</text></g>
-  <g transform="translate(632 610)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 84%)"/><text class="label" x="64" y="55">0 0% 84%</text></g>
-  <g transform="translate(784 610)"><rect class="swatch" width="128" height="38" fill="hsl(195 65% 65%)"/><text class="label" x="64" y="55">195 65% 65%</text></g>
-  <g transform="translate(936 610)"><rect class="swatch" width="128" height="38" fill="hsl(9 87% 70%)"/><text class="label" x="64" y="55">9 87% 70%</text></g>
-  <g transform="translate(1088 610)"><rect class="swatch" width="128" height="38" fill="hsl(204 24% 47%)"/><text class="label" x="64" y="55">204 24% 47%</text></g>
-  <g transform="translate(1240 610)"><rect class="swatch" width="128" height="38" fill="hsl(29 90% 52%)"/><text class="label" x="64" y="55">29 90% 52%</text></g>
+  <text class="subheading" x="24" y="666">9 HSL component values used by Logseq controls</text>
+  <g transform="translate(24 686)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 0%)"/><text class="label" x="64" y="55">0 0% 0%</text></g>
+  <g transform="translate(176 686)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 100%)"/><text class="label" x="64" y="55">0 0% 100%</text></g>
+  <g transform="translate(328 686)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 5%)"/><text class="label" x="64" y="55">0 0% 5%</text></g>
+  <g transform="translate(480 686)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 8%)"/><text class="label" x="64" y="55">0 0% 8%</text></g>
+  <g transform="translate(632 686)"><rect class="swatch" width="128" height="38" fill="hsl(0 0% 84%)"/><text class="label" x="64" y="55">0 0% 84%</text></g>
+  <g transform="translate(784 686)"><rect class="swatch" width="128" height="38" fill="hsl(195 65% 65%)"/><text class="label" x="64" y="55">195 65% 65%</text></g>
+  <g transform="translate(936 686)"><rect class="swatch" width="128" height="38" fill="hsl(9 87% 70%)"/><text class="label" x="64" y="55">9 87% 70%</text></g>
+  <g transform="translate(1088 686)"><rect class="swatch" width="128" height="38" fill="hsl(204 24% 47%)"/><text class="label" x="64" y="55">204 24% 47%</text></g>
+  <g transform="translate(1240 686)"><rect class="swatch" width="128" height="38" fill="hsl(29 90% 52%)"/><text class="label" x="64" y="55">29 90% 52%</text></g>
 
-  <text class="subheading" x="24" y="720">Dynamic and platform-selected colors</text>
-  <text class="label" text-anchor="start" x="24" y="750">transparent · inherit · currentColor · Canvas · CanvasText · LinkText · Highlight · HighlightText</text>
-  <text class="subheading" x="24" y="795">Exact values, token aliases, and usage descriptions are listed in README.md.</text>
+  <text class="subheading" x="24" y="796">Dynamic and platform-selected colors</text>
+  <text class="label" text-anchor="start" x="24" y="826">transparent · inherit · currentColor · Canvas · CanvasText · LinkText · Highlight · HighlightText</text>
+  <text class="subheading" x="24" y="871">Exact values, token aliases, and usage descriptions are listed in README.md.</text>
 </svg>

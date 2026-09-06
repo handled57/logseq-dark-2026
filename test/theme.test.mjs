@@ -128,7 +128,7 @@ test('README and palette chart document every fixed stylesheet color', async () 
 
   assert.deepEqual(
     { hex: expected.hex.length, rgb: expected.rgb.length, hsl: expected.hsl.length },
-    { hex: 50, rgb: 26, hsl: 9 },
+    { hex: 50, rgb: 27, hsl: 9 },
     'stylesheet color inventory changed unexpectedly'
   )
   assert.deepEqual(readmeColors, expected, 'README fixed-color tables have drifted from theme.css')
@@ -285,11 +285,41 @@ const railRules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^
   .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
   .filter(([selector]) => selector.includes('#main-content-container .page-blocks-inner'))
 
+/* A selector list, split at the commas that separate selectors rather than the
+ * ones inside `:is()` and `:has()`. */
+function selectors(list) {
+  const found = []
+  let depth = 0
+  let start = 0
+  for (let index = 0; index < list.length; index += 1) {
+    if (list[index] === '(') depth += 1
+    else if (list[index] === ')') depth -= 1
+    else if (list[index] === ',' && depth === 0) {
+      found.push(list.slice(start, index).trim())
+      start = index + 1
+    }
+  }
+  found.push(list.slice(start).trim())
+  return found
+}
+
+/* What a selector actually paints: its last compound, with the guards a rule
+ * qualifies itself by — `:has()`, `:not()` — taken back off. */
+function subject(selector) {
+  let plain = selector
+  let previous
+  do {
+    previous = plain
+    plain = plain.replace(/:(?:has|not|is|where)\([^()]*\)/g, '')
+  } while (plain !== previous)
+  return plain.split(/[\s>]+/).filter(Boolean).pop() ?? ''
+}
+
 test('the rail reaches the page tree in the main editor and nothing else', () => {
   assert.ok(railRules.length >= 20, 'the rail is missing from the stylesheet')
 
   for (const [selector] of railRules) {
-    for (const part of selector.split(', ')) {
+    for (const part of selectors(selector)) {
       // Sidebars, whiteboards and dialogs render outside the main editor; the
       // right-hand fold button and document mode re-measure the indentation the
       // rail is drawn from. All four are out of reach by construction.
@@ -337,12 +367,20 @@ test('every rendered block in the main editor keeps a bullet on the rail', () =>
 
   // The rail reads `.block-children` as the record of how deep a block sits and
   // declares nothing on those boxes: not a connector line, and not a display
-  // that would reveal the descendants a collapsed block never renders.
-  assert.ok(
-    railRules.every(([selector]) =>
-      selector.split(', ').every((part) => /\.block-control|\.bullet|\.block-main-container$/.test(part))),
-    'a rail rule paints something other than a block\'s own control column'
-  )
+  // that would reveal the descendants a collapsed block never renders. Every
+  // rule paints a row or something in its control column, and nothing else —
+  // the block types a rule names to place a bullet are guards on the row, not
+  // boxes it touches.
+  const painted = /^(?:\.block-main-container|\.block-control-wrap|\.block-control|\.bullet-link-wrap|\.bullet-container|\.bullet|label)(?:\.[\w-]+)*(?:::(?:before|after))?$/
+  for (const [selector] of railRules) {
+    for (const part of selectors(selector)) {
+      assert.match(
+        subject(part),
+        painted,
+        `a rail rule paints something other than a block's own control column: "${part.slice(0, 60)}…"`
+      )
+    }
+  }
 })
 
 test('interactive chrome stays black with one-pixel orange borders', () => {
