@@ -62,7 +62,7 @@ test('marketplace metadata is classic-only and agrees with the package', () => {
 })
 
 test('the plugin entry loads the vendored SDK, then the parser, then the command', async () => {
-  const sdk = await readFile(resolve(root, 'lib', 'lsplugin.user.js'), 'utf8')
+  const sdk = await readFile(resolve(root, '..', '..', 'vendor', 'logseq', 'lsplugin.user.js'), 'utf8')
   assert.ok(sdk.length > 10_000, 'the vendored SDK is unexpectedly small')
 
   assert.match(entry, /<script src="\.\/lib\/lsplugin\.user\.js"><\/script>/)
@@ -139,23 +139,24 @@ test('the tracked source carries no verse text', async () => {
 })
 
 test('the build stages a local verse index only after the archive is closed', async () => {
-  const build = await readFile(resolve(root, 'scripts', 'build-release.mjs'), 'utf8')
-  const verify = await readFile(resolve(root, 'scripts', 'verify-release.mjs'), 'utf8')
+  const repo = resolve(root, '..', '..')
+  const build = await readFile(resolve(repo, 'scripts', 'build-release.mjs'), 'utf8')
+  const verify = await readFile(resolve(repo, 'scripts', 'verify-release.mjs'), 'utf8')
 
   /* The verse text is never one of the packaged files. It is copied into the
    * unpacked folder afterwards so a developer's own install keeps working
    * across rebuilds, and the ordering is what keeps it out of the ZIP. */
-  const list = build.slice(build.indexOf('const releaseFiles'), build.indexOf(']', build.indexOf('const releaseFiles')))
-  assert.doesNotMatch(list, /bible\.text\.json/, 'the verse text is in the release file list')
+  assert.doesNotMatch(JSON.stringify(pkg.release.files), /bible\.text\.json/, 'the verse text is in the release file list')
+  assert.deepEqual(pkg.release.unpackedLocalFiles, ['resources/bible.text.json'])
 
-  const archived = build.indexOf('archiving exited with status')
-  const staged = build.indexOf("'bible.text.json'")
+  const archived = build.indexOf('zipped?.status')
+  const staged = build.indexOf('unpackedLocalFiles')
   assert.ok(archived >= 0, 'the build no longer archives')
   assert.ok(staged >= 0, 'the build no longer stages a local verse index')
   assert.ok(staged > archived, 'the verse index is staged before the archive is closed')
 
-  // And the archive is checked for it either way.
-  assert.match(verify, /bible\\.\(text\|index\)/)
+  // The generic verifier derives an exact allowlist from workspace metadata.
+  assert.match(verify, /release\.files/)
 })
 
 test('the command script reads the host document and namespaces what it writes', () => {

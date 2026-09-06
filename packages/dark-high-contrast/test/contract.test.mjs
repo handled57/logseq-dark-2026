@@ -13,6 +13,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { classicScript } from '../../../test/support/classic-script.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const contract = resolve(root, '..', '..', 'docs', 'contracts', 'passage-v1.md')
@@ -52,7 +53,8 @@ const context = {
   }
 }
 vm.createContext(context)
-new vm.Script(await readFile(resolve(root, 'index.js'), 'utf8')).runInContext(context)
+const themeScript = await classicScript(resolve(root, 'index.js'))
+themeScript.runInContext(context)
 
 for (const { name, source, verseLines } of cases) {
   test(`the theme reads the contract's ${name} fixture`, () => {

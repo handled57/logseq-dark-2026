@@ -13,14 +13,16 @@ Paths below are relative to `packages/dark-high-contrast/` unless noted.
 - `theme.css` is the canonical stylesheet.
 - `index.js` is the canonical entry script for property-table hiding and `data-hc-block-type` annotations.
 - `index.html` loads the entry script.
-- `lib/lsplugin.user.js` is a vendored Logseq SDK file. Do not edit it as application source.
+- `../../vendor/logseq/lsplugin.user.js` is the one canonical vendored Logseq SDK file. Root release tooling copies it into each archive as `lib/lsplugin.user.js`; source workspaces do not contain `lib/`.
 - `package.json` and `manifest.json` define package and Marketplace metadata.
 - `test/theme.test.mjs` checks package structure, workspace layout, required selectors, palette values, accessibility, and release metadata.
 - `test/cascade.test.mjs` checks selector specificity against pinned Logseq CSS behavior.
 - `test/properties.test.mjs` behaviorally tests `index.js` against a stub host document.
-- `scripts/build-release.mjs` creates the Marketplace ZIP in `dist/`.
-- `scripts/verify-release.mjs` verifies the ZIP contents and metadata.
-- The repository root holds `package.json`, `package-lock.json`, `README.md`, `LICENSE`, and this guide, and nothing a package ships.
+- Each package's `package.json#release.files` is its exact package-owned archive allowlist.
+- Root `scripts/build-release.mjs` creates extracted packages and Marketplace ZIPs in root `dist/`; aggregate builds clean once and targeted workspace builds remove only their own outputs.
+- Root `scripts/verify-release.mjs` verifies exact archive contents, metadata agreement, and byte parity with canonical sources.
+- Root `test/support/` owns reusable host-document, classic-script, ZIP, and pinned-CSS test helpers; package-specific assertions remain in their workspaces.
+- The repository root holds shared release inputs (`LICENSE` and `vendor/logseq/lsplugin.user.js`) as well as coordinator tooling and documentation.
 
 Read the package's `README.md` and `CHANGELOG.md` before changing public behavior. Keep both synchronized with user-visible changes.
 

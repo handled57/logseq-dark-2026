@@ -12,11 +12,12 @@ import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { classicScript } from '../../../test/support/classic-script.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const contract = resolve(root, '..', '..', 'docs', 'contracts', 'passage-v1.md')
 
-const parser = new vm.Script(await readFile(resolve(root, 'bible.js'), 'utf8'))
+const parser = await classicScript(resolve(root, 'bible.js'))
 const manifest = JSON.parse(await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8'))
 
 function fixtures(document) {

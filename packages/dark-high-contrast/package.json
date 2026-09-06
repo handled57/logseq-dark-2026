@@ -20,8 +20,8 @@
   ],
   "scripts": {
     "test": "node --test test/theme.test.mjs test/cascade.test.mjs test/properties.test.mjs test/contract.test.mjs",
-    "build": "node scripts/build-release.mjs",
-    "verify:release": "node scripts/verify-release.mjs",
+    "build": "node ../../scripts/build-release.mjs",
+    "verify:release": "node ../../scripts/verify-release.mjs",
     "check": "npm test && npm run build && npm run verify:release"
   },
   "files": [
@@ -37,6 +37,21 @@
     "THIRD_PARTY_NOTICES.md",
     "manifest.json"
   ],
+  "release": {
+    "files": [
+      "package.json",
+      "manifest.json",
+      "theme.css",
+      "index.html",
+      "index.js",
+      "icon.svg",
+      "screenshots/color-palette.svg",
+      "screenshots/logseq-dark-high-contrast.png",
+      "README.md",
+      "CHANGELOG.md",
+      "THIRD_PARTY_NOTICES.md"
+    ]
+  },
   "repo": "handled57/logseq-dark-2026",
   "title": "Dark High Contrast",
   "main": "index.html",
