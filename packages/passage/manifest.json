@@ -1,0 +1,13 @@
+{
+  "title": "Passage",
+  "description": "Insert a Bible passage into a Logseq block: a canonical reference, one namespaced tag per chapter, and the verse text from a local index you build yourself.",
+  "author": "Peter Cole",
+  "repo": "handled57/logseq-dark-2026",
+  "icon": "icon.svg",
+  "theme": false,
+  "effect": true,
+  "web": false,
+  "supportsDB": false,
+  "supportsDBOnly": false,
+  "id": "logseq-passage"
+}

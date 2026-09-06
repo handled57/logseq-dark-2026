@@ -1,7 +1,7 @@
 {
-  "name": "logseq-dark-high-contrast-theme",
-  "version": "2.0.0",
-  "description": "A Logseq port of Visual Studio Code's Dark High Contrast workbench.",
+  "name": "logseq-passage",
+  "version": "0.1.0",
+  "description": "Insert a Bible passage into a Logseq block, with a canonical reference, per-chapter tags and text from a local index.",
   "author": "Peter Cole",
   "license": "MIT",
   "repository": {
@@ -12,25 +12,24 @@
   "bugs": "https://github.com/handled57/logseq-dark-2026/issues",
   "keywords": [
     "logseq",
-    "theme",
-    "dark",
-    "high-contrast",
-    "accessibility",
-    "vscode"
+    "plugin",
+    "bible",
+    "passage",
+    "reference"
   ],
   "scripts": {
-    "test": "node --test test/theme.test.mjs test/cascade.test.mjs test/properties.test.mjs test/contract.test.mjs",
+    "test": "node --test test/package.test.mjs test/bible.test.mjs test/passage.test.mjs test/contract.test.mjs",
     "build": "node scripts/build-release.mjs",
     "verify:release": "node scripts/verify-release.mjs",
     "check": "npm test && npm run build && npm run verify:release"
   },
   "files": [
-    "theme.css",
     "index.html",
     "index.js",
+    "bible.js",
+    "resources/bible.books.json",
     "lib",
     "icon.svg",
-    "screenshots",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
@@ -38,22 +37,13 @@
     "manifest.json"
   ],
   "repo": "handled57/logseq-dark-2026",
-  "title": "Dark High Contrast",
+  "title": "Passage",
   "main": "index.html",
   "effect": true,
-  "theme": true,
   "logseq": {
-    "id": "logseq-dark-high-contrast-theme",
-    "title": "Dark High Contrast",
+    "id": "logseq-passage",
+    "title": "Passage",
     "icon": "./icon.svg",
-    "main": "index.html",
-    "themes": [
-      {
-        "name": "Dark High Contrast",
-        "url": "./theme.css",
-        "mode": "dark",
-        "description": "VS Code's Dark High Contrast workbench, adapted for Logseq classic graphs."
-      }
-    ]
+    "main": "index.html"
   }
 }

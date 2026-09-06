@@ -1,0 +1,222 @@
+# Passage for Logseq
+
+Insert a Bible passage into a block: a canonical reference, one namespaced tag
+per chapter it spans, and — where you have built a local text index — the verse
+text itself.
+
+Passage is a plugin, not a theme. It writes ordinary Logseq markup and styles
+nothing. The [Dark High Contrast](../dark-high-contrast) theme paints passage
+blocks as a sibling of Logseq's named admonitions, but neither package needs the
+other: the shape they agree on is written down in
+[`docs/contracts/passage-v1.md`](../../docs/contracts/passage-v1.md).
+
+## What it writes
+
+A passage block holds a quoted passage under a bold reference:
+
+```text
+tags:: Gen/50, Ex/1, Ex/2
+type:: Passage
+#+BEGIN_PASSAGE
+**Genesis 50 - Exodus 2**
+
+…
+#+END_PASSAGE
+```
+
+`tags::` names every chapter the passage spans, in order, as
+`shortName/chapter`, which makes each chapter a page of its own under a book
+namespace. `type:: Passage` is the key a theme's property rules read — it is the
+default rule Dark High Contrast ships, which hides the drawer and renders the
+block as a bare passage.
+
+The two property lines sit *above* `#+BEGIN_PASSAGE` because a block holds one
+property drawer, at the very top of its content: Logseq only recognizes a drawer
+as the first thing in a block, and `#+BEGIN_PASSAGE` is a custom block rather
+than a title line, so this is where Logseq's own property writer puts them too.
+Properties written below `#+END_PASSAGE` are not parsed as properties at all. A
+key the block already declares is left exactly as you wrote it — only the
+missing one is added.
+
+## Inserting a passage
+
+- Type `/passage` and choose **Passage**.
+- Type `<` and choose **Passage**. Logseq has no plugin API for the `<` picker,
+  so this entry is added to the picker's own menu while it is open; it withdraws
+  itself as soon as what you have typed can no longer match.
+
+Both prompt for a reference and for how the passage should be displayed. Enter
+is **Insert**, the prompt's default action; Escape or **Cancel** dismisses it
+without changing the block. A blank reference cannot be submitted.
+
+## References
+
+The reference you type is resolved against the plugin's own index of books,
+chapters and verse counts, and written back under the book's full name. Books
+are matched on their short or long name, ignoring case, spacing and punctuation,
+and on the usual abbreviations besides: `Gn`, `Exod`, `Mt`, `Mk`, `Lk`, `Jn`,
+`Psalms`, `1 Cor`, `1Cor`. A range is written with a hyphen, an en dash or an em
+dash, spaced or not. A book named on its own is the whole of that book. All of
+these are references:
+
+| Written | Means | Written back |
+| --- | --- | --- |
+| `Gen` | a whole book | `Genesis` |
+| `John 3:16` | one verse | `John 3:16` |
+| `Gen 50` | a whole chapter | `Genesis 50` |
+| `Gen 1-3` | whole chapters | `Genesis 1-3` |
+| `Gen 50 - Ex 2` | chapters across a book boundary | `Genesis 50 - Exodus 2` |
+| `Genesis 50:1-10` | verses within a chapter | `Genesis 50:1-10` |
+| `Gen 1:1-2:3` | verses across a chapter boundary | `Genesis 1:1 - 2:3` |
+| `Genesis 50:1 - Ex 2:25` | verses across a book boundary | `Genesis 50:1 - Exodus 2:25` |
+
+However it was typed, a reference is written back in full: the book's long name,
+and a dash that is tight where what follows it is a bare number continuing the
+book and chapter already named, and spaced where it carries a chapter or a book
+of its own. The short name stays on the tags, where it is half of a page name
+your graph already carries.
+
+A bare number after the dash is a verse when the left side named one
+(`Gen 50:1 - 10`) and a chapter when it did not (`Gen 1 - 3`); name a book beside
+it and it is always that book's chapter.
+
+A reference that does not resolve leaves the prompt open with the reason under
+the field, so you can correct it: an unknown book, a chapter or verse the
+edition does not carry, or a range that runs backwards, such as `Ex 2-Gen 50`.
+Verses this edition omits as textually doubtful — Matthew 17:21 among them — are
+refused rather than quietly read as their neighbour.
+
+## Passage text
+
+The passage itself is written under the reference as plain prose: no verse
+numbers, no section headings, a blank line between paragraphs, and poetry keeps
+its own lineation. A chapter boundary is a paragraph boundary, so it is
+separated the same way.
+
+This needs a local text index, which the plugin does not ship — the edition it is
+built from is licensed and cannot be redistributed here. Without one the command
+still writes the canonical reference and its chapter tags and leaves the text to
+you, which is what a Marketplace install does out of the box.
+
+To build the index, put a per-verse export of your edition at
+`resources/bible.index.json` and run:
+
+```sh
+node scripts/build-bible-index.mjs
+```
+
+That writes two files. `resources/bible.books.json` is the manifest — book names,
+chapter counts, verse counts and verse-id offsets, no verse text — and it is
+committed and shipped, which is what makes references resolve with no further
+setup. `resources/bible.text.json` is the verse text; it is git-ignored, never
+packaged, and read from the plugin's own folder unless the **Passage text index**
+setting names another path.
+
+Your edition's licence is yours to observe. Nothing in this repository
+redistributes verse text: it is not committed, it is not in the release archive,
+and the checks in `scripts/verify-release.mjs` fail the build if it ever appears
+in one.
+
+## Display options
+
+Three checkboxes under the reference field decide how that text is written. Each
+works on its own and any combination works together, over a single verse or a
+range spanning chapters and books:
+
+| Option | Writes |
+| --- | --- |
+| **View chapter headings** | `**Genesis 1**` above the verses of every chapter the passage includes, under the book's long name — a single chapter and a partial chapter are headed too |
+| **View verse numbers** | each verse number as a superscript against the front of its own verse: `¹⁶For God so loved…` |
+| **One verse per line** | every verse on a new line, with the line breaks inside a verse left exactly where the edition put them |
+
+All three open unchecked every time the prompt does: they describe the passage in
+front of you rather than the next one. With none of them checked the passage is
+written exactly as it is described above.
+
+Verse numbers are written as superscript digits rather than as `<sup>` markup.
+Logseq parses block content with mldoc, which reads a `<` at the start of a line
+as block-level HTML, so a tag opening a paragraph — or, with one verse per line,
+opening any verse — was pushed onto a line of its own above the text it belongs
+to. Digits are plain text and parse the same wherever they fall. The digits are
+wrapped in highlight markup — `^^¹⁶^^For God so loved…` — because that is what
+gives the number an element of its own for a theme to color; read anywhere else,
+the number is still a number.
+
+The options add to the text and never replace it. Paragraph breaks, poetry
+lineation and chapter separation stay as they are wherever an option does not
+override them, verse numbers stay attached to their own verses where an edition
+omits one — Matthew 17:21 among them — and the edition's own section headings are
+still left out. Without a local text index the body stays empty and the
+missing-index notice still appears: a heading or a verse number over a passage
+that has no text would be metadata standing in for the passage.
+
+## Settings
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| **Passage text index** (`biblePassageText`) | empty | Full path to a `bible.text.json` you built. Empty reads the one in the plugin's own `resources` folder. |
+
+If you used the Passage command in Dark High Contrast 1.x, that path was a theme
+setting. Settings do not move between packages: re-enter it once under
+**Plugins → Passage → Settings**. Passages already written to your graph are
+content and need no migration.
+
+## Compatibility
+
+Passage targets **Logseq 0.10.15 classic/file graphs on desktop**.
+
+- DB graphs are not supported in this release.
+- Mobile is not an advertised target.
+- The plugin declares `effect: true`, which keeps its entry on the host's own
+  origin. Without it `parent.document` is out of reach, and the `<` picker has no
+  plugin API to reach it by instead.
+- Passage works with any theme, or none. Its one piece of chrome, the reference
+  dialog, carries a fallback for every colour it names.
+
+## Install from the Logseq Marketplace
+
+After the plugin is accepted into the marketplace:
+
+1. Open **Plugins → Marketplace → Plugins**.
+2. Search for **Passage** and install it.
+
+## Load the repository as an unpacked plugin
+
+1. Clone or download this repository.
+2. In Logseq, enable **Settings → Advanced → Developer mode**.
+3. Open **Plugins**, choose **Load unpacked plugin**, and select
+   `packages/passage`.
+
+No dependency installation or compilation is needed to use the plugin.
+
+## Development
+
+```sh
+npm test --workspace packages/passage            # the package's own suites
+npm run check --workspace packages/passage       # test, build and verify the ZIP
+```
+
+### Testing against the built plugin
+
+`npm run build` stages the release into `dist/logseq-passage/` and zips it. That
+folder is also what you load as an unpacked plugin, so after the archive is
+closed the build copies your local `resources/bible.text.json` into it, if you
+have one. The unpacked folder is then a complete working plugin — verses
+included — across rebuilds, while the ZIP stays exactly the file list
+`scripts/verify-release.mjs` asserts. A clean checkout and CI have no local index
+and nothing is copied.
+
+The copy happens strictly after archiving, and `verify-release.mjs` checks the
+archive for verse text by name as well as by its exact file list, so a licensed
+edition cannot reach a release this way.
+
+## Attribution
+
+`resources/bible.books.json` carries book names, chapter counts, verse counts and
+verse-id offsets, and no verse text. See
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the edition it is derived
+from and for the vendored Logseq SDK.
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).
