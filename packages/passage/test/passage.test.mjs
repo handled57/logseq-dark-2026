@@ -203,19 +203,10 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
   const exits = []
   const unloads = []
   const messages = []
-  let pendingEditorSave = null
   const writes = []
   const context = {
     console,
     setImmediate,
-    /* Logseq finishes the textarea save in a later host task even though
-     * exitEditingMode's promise has already resolved. Run that queued save
-     * before the plugin's own zero-delay continuation. */
-    setTimeout(callback) {
-      pendingEditorSave?.()
-      pendingEditorSave = null
-      callback()
-    },
     messages,
     ...(routes.fetch ? { fetch: routes.fetch } : {}),
     MutationObserver: class {
@@ -288,10 +279,21 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
         },
         async updateBlock(uuid, content) {
           updates.push({ uuid, content })
-          writes.push({ source: 'passage', content })
+          /* Logseq's real API routes an update of the currently edited block
+           * into the live editor state instead of saving it straight to the
+           * database. The textarea consequently carries that value into the
+           * host's eventual session-ending save. */
+          const editor = host.querySelector('textarea')
+          if (editing && editor?.id.includes(uuid)) editor.value = content
+          else writes.push({ source: 'passage', content })
         },
         async editBlock(uuid, options) {
           edits.push({ uuid, ...options })
+          const current = host.querySelector('textarea')
+          if (editing && current?.id.includes(uuid)) {
+            current.selectionStart = options?.pos ?? current.value.length
+            return
+          }
           const content = updates.findLast((update) => update.uuid === uuid)?.content ?? ''
           host.appendChild(editingArea({ value: content, cursor: options?.pos ?? content.length, uuid }))
           editing = true
@@ -303,10 +305,8 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
           exits.push({ after: updates.length })
           editing = false
           const stale = host.querySelector('textarea')?.value ?? ''
-          pendingEditorSave = () => {
-            writes.push({ source: 'host', content: stale })
-            host.querySelector('textarea')?.remove()
-          }
+          writes.push({ source: 'host', content: stale })
+          host.querySelector('textarea')?.remove()
         }
       },
       beforeunload(handler) {
@@ -382,7 +382,10 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
   context.endEditSession = () => {
     if (!editing) return null
     editing = false
-    return host.querySelector('textarea')?.value ?? ''
+    const content = host.querySelector('textarea')?.value ?? ''
+    writes.push({ source: 'host', content })
+    host.querySelector('textarea')?.remove()
+    return content
   }
   context.writes = writes
 
@@ -446,33 +449,22 @@ test('the slash command writes the passage source and leaves the cursor on the w
   assert.equal(PASSAGE_BLOCK.slice(WRITING_LINE), '\n#+END_PASSAGE')
 })
 
-test('the block leaves edit mode before the passage is written', async () => {
-  /* The slash command puts the caret back in the block's own textarea before
-   * the plugin's handler runs, so the block is still being edited while the
-   * dialog is open. The host writes that textarea back to the block when the
-   * session ends: left open, the save lands after the passage and replaces it
-   * with the line that was there — an empty block, out of edit mode, and no
-   * session left to undo it in. */
+test('the passage becomes the value saved by the existing edit session', async () => {
+  /* updateBlock has a special live-editor path for the block being edited.
+   * Keep that session: when Logseq later ends it, its own save must carry the
+   * passage rather than overwrite a prior database write with stale text. */
   const { context } = commandContext()
   await Promise.resolve()
 
   await invoke(context, () => context.logseq.Editor.commands[0].action())
 
-  const [exit, ...rest] = context.logseq.Editor.exits
-  assert.ok(exit, 'the block was left in edit mode')
-  assert.equal(exit.after, 0, 'the edit session ended after the passage was written')
-  assert.deepEqual(rest, [], 'the edit session was ended more than once')
+  assert.deepEqual(context.logseq.Editor.exits, [], 'Passage ended the live editor session')
   assert.equal(
     context.endEditSession(),
     PASSAGE_BLOCK,
-    'the new edit session did not contain the passage'
+    'Logseq would save stale editor text over the passage'
   )
-  // The API resolves before Logseq's queued textarea save. That save must land
-  // before Passage, leaving Passage as the final write.
-  assert.deepEqual(context.writes, [
-    { source: 'host', content: '' },
-    { source: 'passage', content: PASSAGE_BLOCK }
-  ])
+  assert.deepEqual(context.writes, [{ source: 'host', content: PASSAGE_BLOCK }])
 })
 
 test('the passage properties join the drawer the block already has', async () => {

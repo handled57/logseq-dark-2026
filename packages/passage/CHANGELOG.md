@@ -21,11 +21,10 @@ All notable changes to this package are documented here.
   host puts the caret back in its own textarea once the command menu closes,
   which sent the reference into the block and left Insert disabled and Enter
   with a blank field to read.
-- The block leaves edit mode before the passage is written. The host saves the
-  textarea it was editing back to the block whenever that session ends. Passage
-  now also waits for that queued host save to commit before it writes; the API's
-  promise resolves when exit is requested, while the save itself can otherwise
-  land after the insertion and make the passage appear and then vanish.
+- Passage keeps the invoking block's edit session open while it writes. Logseq
+  routes `updateBlock` for the currently edited block into the live editor
+  state, so the host's eventual textarea save contains the passage instead of
+  overwriting it and making the inserted text appear and then vanish.
 - Enter and Escape are claimed on the host window before Logseq's document-level
   editor shortcuts. Pressing Enter now follows the same insertion path as
   clicking **Insert**, without the host creating a block behind the prompt.
