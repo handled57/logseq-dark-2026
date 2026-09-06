@@ -438,10 +438,17 @@ hr {
   outline-width: 1px !important;
 }
 
-.ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper,
+/* Selection and Logseq's own highlight are deliberate, persistent states, so
+ * they carry the raised fill. Hover is transient and only outlines the block
+ * the pointer is over; filling it too made scanning a page flash gray. */
 .ls-block.selected > .flex > .block-content-wrapper,
 .block-highlight {
   background: var(--ls-block-highlight-color);
+}
+
+.ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper,
+.ls-block.selected > .flex > .block-content-wrapper,
+.block-highlight {
   outline: 1px solid var(--vscode-hc-border);
   outline-offset: 1px;
 }
@@ -868,10 +875,6 @@ a.tag:hover,
   color: var(--vscode-hc-muted);
   background: var(--vscode-hc-panel);
   border: 1px solid var(--vscode-hc-border);
-}
-
-.ls-block:hover > .flex > .block-content-wrapper .block-properties {
-  border-color: transparent;
 }
 
 .page-properties .page-property-key,

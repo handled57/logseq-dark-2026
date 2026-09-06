@@ -55,7 +55,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 | Color | Tokens or selectors | Used for |
 | --- | --- | --- |
 | `#101010` | `--ls-table-tr-even-background-color` | Alternating table rows. |
-| `#1f1f1f` | `--ls-quaternary-background-color`, `--ls-quaternary-background-color1`, `--ls-bg-quaternary`, `--ls-block-highlight-color`, `--ls-color-level-3`, `--lx-gray-04` | Highlighted blocks and intermediate raised surfaces. |
+| `#1f1f1f` | `--ls-quaternary-background-color`, `--ls-quaternary-background-color1`, `--ls-bg-quaternary`, `--ls-block-highlight-color`, `--ls-color-level-3`, `--lx-gray-04` | Selected and highlighted blocks, and intermediate raised surfaces. |
 | `#282828` | `--ls-quinary-background-color`, `--ls-color-level-4`, `--lx-gray-05`, `--ls-wb-background-color-gray` | Higher neutral surfaces and gray whiteboard objects. |
 | `#333333` | `--ls-senary-background-color`, `--ls-color-level-5`, `--lx-gray-06` | High neutral surface steps. |
 | `#3d3d3d` | `--ls-color-level-6`, `--lx-gray-07` | Strongest neutral surface before structural borders. |
@@ -319,6 +319,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 - The rail is the page's own tree in the main editor. Sidebars, whiteboards, dialogs and linked references keep Logseq's layout, as do embedded and queried trees rendered inside a block. Document mode and Logseq's right-hand fold button both re-measure indentation, so the rail steps aside for them and bullets render as Logseq draws them.
 - Outside the rail, bullets follow the older rule: untyped bullets are visible for ordinary prose blocks, while empty, property-only, heading, reference, embed, command/macro, query, media, code (including `src`), `center`, `verse`, `passage`, namespace, math, ClojureScript-eval, slide, flashcard, Zotero, quote, and other advanced `<`-menu blocks remain bulletless.
 - A numbered list keeps its number beside its content and takes an ordinary bullet on the rail.
+- Hovering a block outlines it without filling it. The raised `#1f1f1f` fill is kept for the deliberate, persistent states: a selected block and Logseq's own block highlight.
 - The active block receives a steel-blue outline; hovering a child never reveals or recolors ancestor bullets, and Logseq's connector/thread lines remain hidden — the rail replaces them.
 - A block nested deeper than twelve levels hangs from the twelfth level's position rather than its own.
 - An admonition centres a short text against its icon, so its bullet marks the head of its box rather than that first line.
