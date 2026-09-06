@@ -2,8 +2,6 @@ name: Test
 
 on:
   push:
-    branches:
-      - main
   pull_request:
 
 permissions:
@@ -21,5 +19,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate source and release archive
-        run: npm run check
+      - name: Validate source and release archives
+        run: |
+          npm run check
+          git diff --check

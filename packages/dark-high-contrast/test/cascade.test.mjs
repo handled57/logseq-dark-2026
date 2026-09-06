@@ -19,6 +19,7 @@ import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { compareSpecificity as compare, specificity } from '../../../test/support/pinned-css.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const css = await readFile(resolve(root, 'theme.css'), 'utf8')
@@ -26,37 +27,6 @@ const css = await readFile(resolve(root, 'theme.css'), 'utf8')
 /* Specificity as [ids, classes/attributes/pseudo-classes, types/pseudo-elements].
  * `:not()`, `:is()` and `:has()` take the specificity of their most specific
  * argument and contribute nothing themselves; `:where()` contributes nothing. */
-function specificity(selector) {
-  const total = [0, 0, 0]
-  let rest = selector.trim()
-
-  rest = rest.replace(/:(?:not|is|has|matches)\(([^()]*)\)/g, (_, inner) => {
-    const best = inner.split(',').map(specificity).sort(compare).pop() ?? [0, 0, 0]
-    for (let i = 0; i < 3; i += 1) total[i] += best[i]
-    return ' '
-  })
-  rest = rest.replace(/:where\([^()]*\)/g, ' ')
-  rest = rest.replace(/:[\w-]+\([^()]*\)/g, ':x')
-
-  total[0] += (rest.match(/#[\w-]+/g) ?? []).length
-  total[1] += (rest.match(/\.[\w-]+/g) ?? []).length
-  total[1] += (rest.match(/\[[^\]]*\]/g) ?? []).length
-  total[1] += (rest.match(/(?<!:):(?!:)[\w-]+/g) ?? []).length
-  total[2] += (rest.match(/::[\w-]+/g) ?? []).length
-
-  const types = rest
-    .replace(/\[[^\]]*\]/g, ' ')
-    .replace(/::?[\w-]+/g, ' ')
-    .replace(/[.#][\w-]+/g, ' ')
-  total[2] += (types.match(/(?:^|[\s>+~,])[a-zA-Z][\w-]*/g) ?? []).length
-
-  return total
-}
-
-function compare(first, second) {
-  return first[0] - second[0] || first[1] - second[1] || first[2] - second[2]
-}
-
 const format = (value) => `(${value.join(',')})`
 
 /* Each pairing names the upstream selector the theme must out-rank and the

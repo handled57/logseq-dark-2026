@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Passage for Logseq</title>
+  <desc id="desc">An open book with cyan lines of verse and an orange bookmark on black</desc>
+  <rect width="128" height="128" rx="12" fill="#000000"/>
+  <path d="M18 32h36a10 10 0 0 1 10 10v58a10 10 0 0 0-10-10H18zM110 32H74a10 10 0 0 0-10 10v58a10 10 0 0 1 10-10h36z" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M30 52h20M30 68h20M78 52h20M78 68h20" fill="none" stroke="#6fc3df" stroke-width="6" stroke-linecap="square"/>
+  <path d="M64 18h20v34l-10-8-10 8z" fill="none" stroke="#f38518" stroke-width="7" stroke-linejoin="round"/>
+</svg>

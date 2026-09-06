@@ -73,7 +73,7 @@ test('marketplace metadata is classic-only and agrees with the package', () => {
   assert.equal(marketplace.author, pkg.author)
   assert.equal(
     marketplace.description,
-    'A VS Code-inspired Dark High Contrast theme for Logseq classic graphs, with configurable property hiding and Bible passage insertion.'
+    'A VS Code-inspired Dark High Contrast theme for Logseq classic graphs, with configurable property hiding.'
   )
   assert.equal(marketplace.theme, true)
   assert.equal(marketplace.effect, pkg.effect)
@@ -144,66 +144,46 @@ test('README and palette chart document every fixed stylesheet color', async () 
 })
 
 test('the plugin entry loads the vendored SDK before the property script', async () => {
-  const sdk = await readFile(resolve(root, 'lib', 'lsplugin.user.js'), 'utf8')
+  const sdk = await readFile(resolve(root, '..', '..', 'vendor', 'logseq', 'lsplugin.user.js'), 'utf8')
   assert.ok(sdk.length > 10_000, 'the vendored SDK is unexpectedly small')
 
   assert.match(entry, /<script src="\.\/lib\/lsplugin\.user\.js"><\/script>/)
-  assert.match(entry, /<script src="\.\/bible\.js"><\/script>/)
   assert.match(entry, /<script src="\.\/index\.js"><\/script>/)
   assert.ok(
     entry.indexOf('lsplugin.user.js') < entry.indexOf('index.js'),
     'index.js runs before the SDK defines the logseq global'
   )
-  // Both are classic scripts sharing one global scope, so the parser has to be
-  // defined by the time the entry script calls it.
-  assert.ok(
-    entry.indexOf('bible.js') < entry.indexOf('index.js'),
-    'index.js runs before bible.js defines the reference parser'
-  )
+  // The SDK and the theme's own script, and nothing else: the reference parser
+  // is the Passage package's, and loading it here would ship a second copy.
+  assert.deepEqual([...entry.matchAll(/<script src="([^"]+)"/g)].map(([, src]) => src), [
+    './lib/lsplugin.user.js',
+    './index.js'
+  ])
 })
 
-test('the package ships the reference manifest and no verse text', async () => {
-  const parser = await readFile(resolve(root, 'bible.js'), 'utf8')
-  const books = JSON.parse(await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8'))
-  const ignored = await readFile(resolve(root, '.gitignore'), 'utf8')
+test('the theme ships nothing that belongs to Passage', async () => {
+  /* Passage is a package of its own. The theme styles the blocks it writes, but
+   * it neither carries its files nor depends on it being installed. */
+  await assert.rejects(access(resolve(root, 'bible.js'), constants.F_OK))
+  await assert.rejects(access(resolve(root, 'resources'), constants.F_OK))
+  await assert.rejects(access(resolve(root, 'scripts', 'build-bible-index.mjs'), constants.F_OK))
 
-  assert.ok(pkg.files.includes('bible.js'))
-  assert.ok(pkg.files.includes('resources/bible.books.json'))
-  // The verse text is a licensed edition. It is built locally, never committed,
-  // and the manifest that ships in its place carries counts, not words.
-  assert.deepEqual(
-    pkg.files.filter((file) => file.startsWith('resources')),
-    ['resources/bible.books.json']
-  )
-  assert.match(ignored, /^resources\/\*$/m)
-  assert.match(ignored, /^!resources\/bible\.books\.json$/m)
+  assert.deepEqual(pkg.files.filter((file) => /bible|resources/i.test(file)), [])
 
-  assert.deepEqual(books.stats, { books: 84, chapters: 1398, verses: 37758 })
-  // Names, counts and offsets, and nothing else: a stray text field would be
-  // verse text republished under another name.
-  for (const book of books.books) {
-    assert.deepEqual(
-      Object.keys(book).sort(),
-      ['bookId', 'chapters', 'fromVerseId', 'longName', 'shortName'],
-      book.shortName
-    )
-    for (const chapter of book.chapters) {
-      assert.deepEqual(
-        Object.keys(chapter).filter((key) => !['chapter', 'verses', 'first', 'missing'].includes(key)),
-        [],
-        `${book.shortName} ${chapter.chapter}`
-      )
-    }
-  }
-
-  // The parser reaches nothing: no host document, no network, no plugin API.
-  // Its own prose says as much, so the check reads the code without it.
-  const code = parser.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  assert.doesNotMatch(code, /parent\.|document|fetch\(|logseq\./)
+  const code = script.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  assert.doesNotMatch(code, /bible|registerSlashCommand|data-passage-/i)
+  // The one exception is the render Logseq emits for a passage block, which is
+  // content in the graph rather than anything the plugin provides.
+  assert.match(code, /'\.passage'/)
 })
 
 test('the property script reads the host document and hides only its own table', () => {
   assert.match(script, /parent\.document/)
+  /* Every attribute and style key the theme writes is its own, so a sibling
+   * plugin annotating the same document is never read, replaced or cleared. */
+  for (const attribute of script.match(/'data-[\w-]+'/g) ?? []) {
+    assert.match(attribute, /^'data-hc-/, `${attribute} is not namespaced to the theme`)
+  }
   assert.match(script, /\.block-properties\[\$\{HIDDEN_ATTR\}\] \{ display: none; \}/)
   assert.match(script, /logseq\.ready\(main\)/)
 
@@ -691,4 +671,28 @@ test('principal foreground/background pairs meet WCAG thresholds', () => {
   ]) {
     assert.ok(contrast(foreground, background) >= minimum, `${name} contrast is too low`)
   }
+})
+
+test('the theme is an independently staged workspace of the monorepo root', async () => {
+  const repo = resolve(root, '..', '..')
+  const workspace = JSON.parse(await readFile(resolve(repo, 'package.json'), 'utf8'))
+
+  assert.equal(workspace.private, true, 'the coordinator would otherwise be publishable')
+  assert.ok(workspace.workspaces.includes('packages/*'), 'the package is outside the workspaces glob')
+  assert.equal(resolve(repo, 'packages', 'dark-high-contrast'), root)
+
+  assert.match(workspace.scripts.test, /--workspaces/, 'root test does not aggregate')
+  assert.match(workspace.scripts.build, /build-release\.mjs --all/, 'root build is not a single aggregate build')
+  assert.match(workspace.scripts['verify:release'], /verify-release\.mjs --all/, 'root verification is not aggregate')
+  for (const script of ['test', 'build', 'verify:release', 'check']) assert.ok(pkg.scripts[script])
+  for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+    assert.equal(workspace[field], undefined, `the root declares ${field}`)
+    assert.equal(pkg[field], undefined, `the theme declares ${field}`)
+  }
+
+  for (const file of pkg.release.files) await access(resolve(root, file), constants.R_OK)
+  await access(resolve(repo, 'LICENSE'), constants.R_OK)
+  await access(resolve(repo, 'vendor', 'logseq', 'lsplugin.user.js'), constants.R_OK)
+  await assert.rejects(access(resolve(root, 'lib'), constants.F_OK))
+  await assert.rejects(access(resolve(root, 'LICENSE'), constants.F_OK))
 })

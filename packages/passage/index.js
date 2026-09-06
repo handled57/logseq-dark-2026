@@ -1,12 +1,15 @@
-/* Behavior half of the Dark High Contrast theme.
+/* Passage: writes a Bible passage into the block being edited.
  *
- * Hides a block's rendered property table when the block matches any one of
- * the configured `key: value` pairs, so a tagged block renders as bare
- * content. Editing needs no special handling: Logseq replaces the whole
- * rendered block (`.block-content-wrapper`, which is what holds
- * `.block-properties`) with a textarea over the raw `:block/content`, and
- * custom properties are part of that content. Clicking into the block
- * therefore already shows the content and its properties as source.
+ * `#+BEGIN_PASSAGE` is not one of the admonition names compiled into mldoc, so
+ * Logseq renders it through the generic custom-block path as a bare
+ * `div.passage`. This plugin inserts one; styling it is a theme's business, and
+ * the shape both sides agree on is written down in
+ * `docs/contracts/passage-v1.md`. Nothing here needs a theme installed: the
+ * block it writes is ordinary Logseq markup that renders readably on its own.
+ *
+ * Two entry points, one insertion path: the `/` slash command, which has a
+ * plugin API, and the `<` command picker, which has none and is reached through
+ * a host-DOM bridge.
  *
  * `parent.document` is reachable because package.json declares `effect: true`.
  * That flag keeps the plugin entry on the host's own `file://` origin;
@@ -16,55 +19,29 @@
 
 const doc = parent.document
 
-const STYLE_KEY = 'hc-hidden-properties'
-const HIDDEN_ATTR = 'data-hc-hidden'
-const TYPE_ATTR = 'data-hc-block-type'
-const BULLET_ATTR = 'data-hc-hide-bullet'
-const VERSE_ATTR = 'data-hc-verse-lines'
-const sourceCache = new Map()
+const COMMAND_LABEL = 'Passage'
+/* Every attribute, style key and element id this plugin writes is namespaced to
+ * Passage, so a theme that annotates the same host document — Dark High
+ * Contrast writes `data-hc-*` — never reads or clears one of these by mistake,
+ * and neither plugin's teardown touches the other's nodes. */
+const COMMAND_ATTR = 'data-passage-command'
+const DIALOG_ATTR = 'data-passage-dialog'
+const OPTIONS_ATTR = 'data-passage-options'
+const ACTIONS_ATTR = 'data-passage-actions'
+const DIALOG_STYLE_KEY = 'passage-dialog'
+const COMMAND_MENU_SELECTORS = ['#ui__ac', '.cp__editor-commands', '#block-commands']
+const COMMAND_ITEM_SELECTOR = '.menu-link, a, li'
+const EDITOR_SELECTOR = 'textarea.block-editor, textarea'
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 
-const SPECIAL_CONTENT_SELECTOR = [
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  '.multiline-block.h1', '.multiline-block.h2', '.multiline-block.h3',
-  '.multiline-block.h4', '.multiline-block.h5', '.multiline-block.h6',
-  '.uniline-block.h1', '.uniline-block.h2', '.uniline-block.h3',
-  '.uniline-block.h4', '.uniline-block.h5', '.uniline-block.h6',
-  '.block-ref', '.block-reference',
-  '.embed', '.embed-block', '.embed-page', '.block-embed', '.page-embed',
-  '.macro', '.macro-renderer', '[data-macro-name]', '[data-slot-id]',
-  '.custom-query', '.query-result', '.references-blocks',
-  '.asset-container', '.asset-ref', 'audio', 'video', 'img', 'iframe',
-  'pre', '.src', '.org-src-container', '.cp__fenced-code-block', '.extensions__code', '.extensions__code-calc',
-  'center', '.center', '.CENTER', '.org-center', '[style*="text-align: center"]', '[style*="text-align:center"]',
-  '.verse', '.VERSE', '.org-verse',
-  '.passage',
-  '.katex-display', '.slides', '.reveal', '.cards-review',
-  '.zotero-search', 'blockquote', '.admonitionblock'
-].join(', ')
-
-const RULES_SETTING = 'hiddenProperties'
-const DEFAULT_RULES = 'type: passage'
-const ANY_VALUE = '*'
-
-/* The manifest ships with the theme; the verse text does not, and cannot — it
+/* The manifest ships with the plugin; the verse text does not, and cannot — it
  * is a licensed edition. This setting is where a reader who has built the text
- * index points the Passage command at it. */
+ * index points the command at it. */
 const TEXT_SETTING = 'biblePassageText'
 const BIBLE_MANIFEST_PATH = 'resources/bible.books.json'
 const BIBLE_TEXT_PATH = 'resources/bible.text.json'
 
 const settingsSchema = [
-  {
-    key: RULES_SETTING,
-    type: 'string',
-    default: DEFAULT_RULES,
-    title: 'Properties that hide the property table',
-    description:
-      'Any number of key:value pairs, separated by commas, semicolons or newlines — for example ' +
-      '"type: foo, type: bar, status: done". A block whose properties match any one pair renders ' +
-      'bare. Write "key: *", or the bare key, to match every value of that key. Leave empty to ' +
-      'render every block normally.'
-  },
   {
     key: TEXT_SETTING,
     type: 'string',
@@ -72,240 +49,12 @@ const settingsSchema = [
     title: 'Passage text index',
     description:
       'Full path to a bible.text.json built by scripts/build-bible-index.mjs. Leave empty to read ' +
-      'the one in the theme\u2019s own resources folder. Without it the Passage command still ' +
+      'the one in this plugin’s own resources folder. Without it the Passage command still ' +
       'writes the reference and its chapter tags, and leaves the text to you.'
   }
 ]
 
-/* An absent setting means "not configured yet", so it takes the schema default.
- * An empty string is a deliberate choice and must survive as empty. */
-function readSetting(key, fallback) {
-  const value = logseq.settings?.[key]
-  return typeof value === 'string' ? value.trim().toLowerCase() : fallback
-}
-
-/* Rules are matched against the rendered table, which is lower-cased, so both
- * halves of every pair are folded here once instead of at each comparison. A
- * pair with no `:` is a key on its own and matches any value it carries. */
-function parseRules(source) {
-  const rules = []
-
-  for (const entry of source.split(/[\n,;]+/)) {
-    const text = entry.trim()
-    if (!text) continue
-
-    const separator = text.indexOf(':')
-    const key = (separator === -1 ? text : text.slice(0, separator)).trim()
-    const value = separator === -1 ? '' : text.slice(separator + 1).trim()
-    if (!key) continue
-
-    rules.push({ key, value: value || ANY_VALUE })
-  }
-
-  return rules
-}
-
-/* 1.2.0 shipped one key plus a list of its values. Those two settings are gone
- * from the schema, but a graph upgraded in place still holds them, and
- * `useSettingsSchema` would write the new default over that choice. Fold them
- * into one rule list first; the stale keys are left in the settings file, where
- * nothing reads them. */
-function legacyRules() {
-  const key = readSetting('hiddenPropertyKey', '')
-  if (!key) return []
-
-  return readSetting('hiddenPropertyValues', ANY_VALUE)
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map((value) => ({ key, value }))
-}
-
-function migrateLegacySettings() {
-  if (typeof logseq.settings?.[RULES_SETTING] === 'string') return
-
-  const legacy = legacyRules()
-  if (!legacy.length) return
-
-  logseq.updateSettings({
-    [RULES_SETTING]: legacy.map(({ key, value }) => `${key}: ${value}`).join(', ')
-  })
-}
-
-function rules() {
-  return parseRules(readSetting(RULES_SETTING, DEFAULT_RULES))
-}
-
-/* Read the rendered table rather than the database: a property row is a direct
- * child of `.block-properties` holding one `.page-property-key` and one
- * `.page-property-value`, which is cheaper and synchronous. */
-function propertiesOf(table) {
-  const properties = {}
-
-  for (const row of table.children) {
-    const key = row.querySelector('.page-property-key')
-    const value = row.querySelector('.page-property-value')
-    if (key && value) properties[key.textContent.trim().toLowerCase()] = value.textContent.trim().toLowerCase()
-  }
-
-  return properties
-}
-
-function shouldHide(active, properties) {
-  return active.some(
-    ({ key, value }) => key in properties && (value === ANY_VALUE || properties[key] === value)
-  )
-}
-
-/* The styling hook carries one value, so the first configured key the block
- * actually has wins. Configuration order is therefore precedence order. */
-function blockType(active, properties) {
-  for (const { key } of active) {
-    if (properties[key]) return properties[key]
-  }
-
-  return ''
-}
-
-function rawBlockContent(wrapper) {
-  const editor = wrapper.querySelector('textarea.block-editor, textarea')
-  return typeof editor?.value === 'string' ? editor.value.trim() : ''
-}
-
-function propertyFreeText(wrapper) {
-  if (typeof wrapper.cloneNode !== 'function') return wrapper.textContent?.trim() ?? ''
-
-  const copy = wrapper.cloneNode(true)
-  for (const properties of copy.querySelectorAll('.block-properties')) properties.remove()
-  return copy.textContent.trim()
-}
-
 const PROPERTY_LINE = /^[\w.-]+::(?:\s|$)/
-
-/* A block's property drawer sits at the top of its content, so a marker such as
- * `#+BEGIN_PASSAGE` only opens the block once those lines are stepped over — a
- * passage carries `type:: Passage` above its own marker. A block that is
- * nothing but properties is special in its own right. */
-function specialSource(text) {
-  if (!text) return true
-
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-  let start = 0
-  while (start < lines.length && PROPERTY_LINE.test(lines[start])) start += 1
-  if (start === lines.length) return true
-
-  const body = lines.slice(start).join('\n')
-
-  return /^(?:#{1,6}\s|>|```|~~~|\$\$|#\+BEGIN_)/i.test(body) ||
-    /^(?:\(\([^\n]+\)\)|\[\[[^\n]+\]\])$/.test(body) ||
-    /^\{\{[\s\S]+\}\}$/.test(body) ||
-    /^!\[[^\]]*\]\([^)]+\)$/.test(body) ||
-    /(?:^|\s)#card(?:\s|$)|(?:^|\n)card::|zotero/i.test(text)
-}
-
-function shouldHideBullet(block) {
-  const wrapper = block.querySelector(':scope > .block-main-container > .block-content-wrapper')
-  if (!wrapper) return true
-
-  const raw = rawBlockContent(wrapper)
-  if (raw) return specialSource(raw)
-  if (typeof wrapper.matches === 'function' && wrapper.matches(SPECIAL_CONTENT_SELECTOR)) return true
-  if (wrapper.querySelector(SPECIAL_CONTENT_SELECTOR)) return true
-  return propertyFreeText(wrapper) === ''
-}
-
-function blockUuid(block) {
-  const wrapper = block.querySelector(':scope > .block-main-container > .block-content-wrapper')
-  const candidate = block.getAttribute?.('blockid') || block.dataset?.uuid ||
-    wrapper?.id?.replace(/^block-content-/, '') || ''
-  return /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(candidate) ? candidate : ''
-}
-
-function setBulletVisibility(block, hidden) {
-  if (hidden) block.setAttribute(BULLET_ATTR, '')
-  else block.removeAttribute(BULLET_ATTR)
-}
-
-/* Highlight markup, and the one shape of it the Passage command writes: the
- * superscript digits of `bibleVerseNumber` wrapped in the markup that gives a
- * verse number a `mark` element to be colored through. A highlight of the
- * reader's own is a `mark` too, which is why every one of them is read here
- * rather than only the numbers. */
-const HIGHLIGHT = /\^\^[\s\S]+?\^\^/g
-const VERSE_NUMBER = /^\^\^[\u2070\u00b9\u00b2\u00b3\u2074-\u2079]+\^\^$/
-
-/* theme.css hangs a verse number in a gutter beside its verse, which is only
- * right where every number starts a line — the passage written one verse per
- * line. The render cannot be asked: inside `#+BEGIN_PASSAGE` mldoc parses the
- * whole body as one paragraph of inline nodes separated by line breaks, and a
- * number that merely follows a poetry break inside the verse before it is
- * indistinguishable, in CSS, from one that opens a line. The block's own source
- * says it plainly, so it is read here and answered once for the block: a block
- * that holds any number mid-line — prose, or a prose passage beside a
- * one-verse-per-line one — keeps every number where the text puts it. */
-function versesOpenLines(text) {
-  let seen = false
-
-  for (const line of text.split(/\r?\n/)) {
-    const marked = line.match(HIGHLIGHT)
-    if (!marked) continue
-    if (marked.length > 1 || !VERSE_NUMBER.test(marked[0]) || !line.startsWith(marked[0])) {
-      return false
-    }
-    seen = true
-  }
-
-  return seen
-}
-
-function setVerseLines(block, hanging) {
-  if (hanging) block.setAttribute(VERSE_ATTR, '')
-  else block.removeAttribute(VERSE_ATTR)
-}
-
-async function refreshFromStoredSource(block) {
-  const uuid = blockUuid(block)
-  if (!uuid || typeof logseq.Editor?.getBlock !== 'function') return
-
-  try {
-    let request = sourceCache.get(uuid)
-    if (!request) {
-      request = logseq.Editor.getBlock(uuid)
-      sourceCache.set(uuid, request)
-    }
-    const stored = await request
-    if (typeof stored?.content !== 'string') return
-    const source = stored.content.trim()
-    setBulletVisibility(block, specialSource(source) || shouldHideBullet(block))
-    setVerseLines(block, versesOpenLines(source))
-  } catch (error) {
-    sourceCache.delete(uuid)
-    console.warn('Dark High Contrast could not classify block source', uuid, error)
-  }
-}
-
-/* Passage blocks.
- *
- * `#+BEGIN_PASSAGE` is not one of the admonition names compiled into mldoc, so
- * Logseq renders it through the generic custom-block path as a bare
- * `div.passage`. theme.css styles that div to read as a sibling of the named
- * admonitions; this half inserts one.
- *
- * Two entry points, one insertion path: the `/` slash command, which has a
- * plugin API, and the `<` command picker, which has none and is reached through
- * a host-DOM bridge.
- */
-
-const COMMAND_LABEL = 'Passage'
-const COMMAND_ATTR = 'data-hc-command'
-const DIALOG_ATTR = 'data-hc-passage-dialog'
-const OPTIONS_ATTR = 'data-hc-passage-options'
-const ACTIONS_ATTR = 'data-hc-passage-actions'
-const DIALOG_STYLE_KEY = 'hc-passage-dialog'
-const COMMAND_MENU_SELECTORS = ['#ui__ac', '.cp__editor-commands', '#block-commands']
-const COMMAND_ITEM_SELECTOR = '.menu-link, a, li'
-const EDITOR_SELECTOR = 'textarea.block-editor, textarea'
-const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 
 /* `/pa` and `<pas` invoke the command as surely as the whole word does, so the
  * trigger has to match the label's own prefixes — and nothing beyond them, so a
@@ -337,6 +86,25 @@ function cursorIn(editor, content) {
   return Number.isInteger(editor?.selectionStart) ? editor.selectionStart : content.length
 }
 
+function editorFor(uuid) {
+  const editor = editingArea()
+  return UUID_PATTERN.exec(editor?.id ?? '')?.[0] === uuid ? editor : null
+}
+
+/* updateBlock renders a new value into the textarea asynchronously. Restore
+ * the caret there after that render rather than calling editBlock on a block
+ * which is already being edited: editBlock reads the database copy and can
+ * replace the new live value before the current session has saved it. */
+async function restoreLiveCursor(uuid, position) {
+  await new Promise((resolve) => parent.requestAnimationFrame(resolve))
+  const editor = editorFor(uuid)
+  if (!editor) return false
+
+  editor.setSelectionRange?.(position, position)
+  editor.focus?.()
+  return true
+}
+
 /* The invocation has to be measured before the dialog takes focus, because
  * leaving the editor ends the edit session and discards the selection. */
 async function captureInvocation(trigger) {
@@ -357,16 +125,16 @@ async function captureInvocation(trigger) {
  *
  * Two files, and neither one is required. `resources/bible.books.json` is the
  * manifest — book names, chapter counts and verse-id offsets, no verse text —
- * and it ships with the theme, so references resolve out of the box. The verse
+ * and it ships with the plugin, so references resolve out of the box. The verse
  * text is a licensed edition that cannot be redistributed here: it is built
- * locally by `scripts/build-bible-index.mjs` and read from the theme's own
+ * locally by `scripts/build-bible-index.mjs` and read from the plugin's own
  * resources folder or from wherever the setting points.
  *
  * Every read route below is optional and guarded. A route that is missing or
  * refuses is simply the next one's turn, and when all of them fail the command
  * degrades a step at a time: no text index means the reference and its tags
  * with the body left to the reader, and no manifest at all means the reference
- * exactly as it was typed. The theme stays fully usable installed from the
+ * exactly as it was typed. The plugin stays fully usable installed from the
  * Marketplace with no Bible data present.
  */
 
@@ -378,7 +146,7 @@ function settingPath(key) {
 const ABSOLUTE_PATH = /^(?:[/\\]|[a-z]:[/\\])/i
 
 /* `logseq.baseInfo.lsr` is the plugin's own root as a URL, so a path packaged
- * with the theme becomes a filesystem path through it. A path the reader
+ * with the plugin becomes a filesystem path through it. A path the reader
  * configured is already one. */
 function pluginPath(path) {
   if (ABSOLUTE_PATH.test(path)) return path
@@ -448,9 +216,9 @@ function loadBibleText() {
 }
 
 const MISSING_TEXT_NOTICE =
-  'Dark High Contrast wrote the reference and its chapter tags. The passage text needs a local ' +
-  'index: run scripts/build-bible-index.mjs and put bible.text.json beside the theme, or name it ' +
-  'in the theme\u2019s settings.'
+  'Passage wrote the reference and its chapter tags. The passage text needs a local index: run ' +
+  'scripts/build-bible-index.mjs and put bible.text.json beside the plugin, or name it in the ' +
+  'plugin’s settings.'
 
 async function passageBody(resolved, display) {
   if (!resolved.tags?.length) return ''
@@ -480,8 +248,8 @@ function passageSource(reference, body) {
 }
 
 /* Every passage the commands write is also typed and taggable: `type:: Passage`
- * is what the property rules and `data-hc-block-type` key on, and `tags::`
- * carries one namespaced tag per chapter the passage spans. */
+ * is the key a theme's property rules and block-type annotations read, and
+ * `tags::` carries one namespaced tag per chapter the passage spans. */
 function passageProperties(tags) {
   return [['tags', tags.join(', ')], ['type', 'Passage']]
 }
@@ -531,11 +299,21 @@ async function writePassage({ uuid, content, cursor, trigger }, resolved, displa
     resolved.tags ?? []
   )
 
+  /* Keep the existing edit session alive. For the block currently being
+   * edited, Logseq's updateBlock writes into its live editor state; the
+   * textarea and the save performed when that session eventually ends then
+   * contain the passage too. Do not re-enter that same block through editBlock:
+   * it reads the still-old database copy and can reset the live editor before
+   * its save. */
   await logseq.Editor.updateBlock(uuid, written.content)
-  await logseq.Editor.editBlock?.(uuid, { pos: written.cursor })
-  repaint()
+  if (!(await restoreLiveCursor(uuid, written.cursor))) {
+    await logseq.Editor.editBlock?.(uuid, { pos: written.cursor })
+  }
 }
 
+/* The dialog is this plugin's own chrome, whichever theme is selected, so it
+ * paints itself: the colors fall back to plain black and white where the Dark
+ * High Contrast variables are not defined. */
 const DIALOG_STYLE = `
 [${DIALOG_ATTR}] {
   position: fixed;
@@ -602,8 +380,7 @@ const DIALOG_STYLE = `
   accent-color: var(--vscode-hc-white, #ffffff);
 }
 
-/* A box is too small to carry the focus on its border, and the dialog is chrome
- * the plugin owns whichever theme is selected, so it rings its own. */
+/* A box is too small to carry the focus on its border, so it rings its own. */
 [${DIALOG_ATTR}] input[type="checkbox"]:focus-visible {
   outline: 2px solid var(--vscode-hc-focus, #f38518);
   outline-offset: 2px;
@@ -621,7 +398,7 @@ const DIALOG_STYLE = `
 /* A button is black with white text in every state it has: hover, focus, and
  * the press between them. Only the border answers to focus, which keeps the
  * orange a ring around the button rather than a fill inside it. The
- * declarations carry weight because the theme's own button rules do, and those
+ * declarations carry weight because a theme's own button rules do, and those
  * would otherwise repaint a hovered button from underneath. */
 [${DIALOG_ATTR}] button,
 [${DIALOG_ATTR}] button:hover,
@@ -650,9 +427,9 @@ const DIALOG_STYLE = `
  * however the last passage was written; everything unchecked is the plain prose
  * the command has always inserted. */
 const DISPLAY_OPTIONS = [
-  { key: 'headings', id: 'hc-passage-headings', label: 'View chapter headings' },
-  { key: 'numbers', id: 'hc-passage-numbers', label: 'View verse numbers' },
-  { key: 'perLine', id: 'hc-passage-lines', label: 'One verse per line' }
+  { key: 'headings', id: 'passage-headings', label: 'View chapter headings' },
+  { key: 'numbers', id: 'passage-numbers', label: 'View verse numbers' },
+  { key: 'perLine', id: 'passage-lines', label: 'One verse per line' }
 ]
 
 /* Resolves with the resolved reference and the display options chosen beside
@@ -675,9 +452,9 @@ function askForReference() {
     const insert = doc.createElement('button')
 
     overlay.setAttribute(DIALOG_ATTR, '')
-    label.setAttribute('for', 'hc-passage-reference')
+    label.setAttribute('for', 'passage-reference')
     label.textContent = 'Passage reference'
-    input.id = 'hc-passage-reference'
+    input.id = 'passage-reference'
     input.type = 'text'
     input.placeholder = 'John 3:16'
     input.setAttribute('autocomplete', 'off')
@@ -715,9 +492,28 @@ function askForReference() {
 
     function close(choice) {
       dismissDialog = null
-      doc.removeEventListener('keydown', keys, true)
+      parent.removeEventListener('keydown', keys, true)
+      doc.removeEventListener('focusin', holdFocus, true)
       overlay.remove()
       resolve(choice)
+    }
+
+    /* The dialog is modal, so it holds the focus for as long as it is open.
+     * The host's editor does not know the prompt exists: the block behind it is
+     * still in edit mode, and Logseq puts the caret back in its textarea on its
+     * own schedule once the command menu closes. Focus taken back that way is
+     * silent and total — the reference is typed into the block instead of the
+     * field, so the field stays empty, Insert stays disabled, and Enter reads a
+     * blank reference and does nothing. Anything focused outside the dialog is
+     * handed straight back to whatever inside it had the focus last. */
+    let held = input
+    function inside(target) {
+      for (let node = target; node; node = node.parentElement) if (node === overlay) return true
+      return false
+    }
+    function holdFocus(event) {
+      if (inside(event.target)) held = event.target
+      else held.focus?.()
     }
 
     /* Unloading mid-prompt has to settle the promise as well as remove the
@@ -739,8 +535,9 @@ function askForReference() {
      * as it is open. The host binds its own editor shortcuts on the document
      * and sees a key there before it ever reaches the dialog — Enter would open
      * a new block behind the prompt — so the dialog claims those two keys on
-     * the same document in the same capturing phase, ahead of the host, and
-     * lets everything else through to whatever has focus. */
+     * the parent window in the capturing phase. Window capture precedes the
+     * document where Logseq has already registered its shortcut, so Passage
+     * can stop Enter before the host creates a block behind the prompt. */
     function keys(event) {
       if (event.key !== 'Enter' && event.key !== 'Escape') return
 
@@ -767,7 +564,8 @@ function askForReference() {
       if (event.key === 'Escape') close(null)
       else if (event.key === 'Enter') submit(event)
     })
-    doc.addEventListener('keydown', keys, true)
+    parent.addEventListener('keydown', keys, true)
+    doc.addEventListener('focusin', holdFocus, true)
 
     actions.appendChild(cancel)
     actions.appendChild(insert)
@@ -796,7 +594,7 @@ async function insertPassage(trigger) {
 
     await writePassage(target, choice.resolved, choice.display)
   } catch (error) {
-    console.warn('Dark High Contrast could not insert a passage block', error)
+    console.warn('Passage could not insert a passage block', error)
   } finally {
     prompting = false
   }
@@ -822,10 +620,10 @@ function angleInvocation() {
 }
 
 /* The `<` picker has no plugin API, so its entry is added to the host's own
- * popup. The bridge stays small deliberately: it runs from the existing
- * rAF-coalesced paint instead of a second scheduler, writes at most one node,
- * and recognizes that node on the next pass, so the childList observer settles
- * after one more frame rather than looping. */
+ * popup. The bridge stays small deliberately: it runs from an rAF-coalesced
+ * paint rather than on every mutation, writes at most one node, and recognizes
+ * that node on the next pass, so the childList observer settles after one more
+ * frame rather than looping. */
 function bridgeCommandMenu() {
   const menu = angleInvocation() ? commandMenu() : null
   const injected = doc.querySelectorAll(`[${COMMAND_ATTR}]`)
@@ -841,8 +639,8 @@ function bridgeCommandMenu() {
   if (typeof template?.cloneNode !== 'function') return
 
   /* A shallow clone inherits the host's own item classes — the popup's markup
-   * is not this theme's to reproduce — while dropping the copied entry's label,
-   * icon and shortcut children. */
+   * is not this plugin's to reproduce — while dropping the copied entry's
+   * label, icon and shortcut children. */
   const item = template.cloneNode(false)
   item.removeAttribute('id')
   item.setAttribute(COMMAND_ATTR, 'passage')
@@ -857,32 +655,6 @@ function bridgeCommandMenu() {
   ;(template.parentElement ?? menu).appendChild(item)
 }
 
-function paint() {
-  const active = rules()
-
-  bridgeCommandMenu()
-
-  for (const block of doc.querySelectorAll('.ls-block')) {
-    setBulletVisibility(block, shouldHideBullet(block))
-    void refreshFromStoredSource(block)
-  }
-
-  for (const table of doc.querySelectorAll('.block-properties')) {
-    const properties = propertiesOf(table)
-
-    if (shouldHide(active, properties)) table.setAttribute(HIDDEN_ATTR, '')
-    else table.removeAttribute(HIDDEN_ATTR)
-
-    /* Styling hook for theme.css, e.g. .ls-block[data-hc-block-type="foo"]. */
-    const block = table.closest('.ls-block')
-    if (!block) continue
-
-    const type = blockType(active, properties)
-    if (type) block.setAttribute(TYPE_ATTR, type)
-    else block.removeAttribute(TYPE_ATTR)
-  }
-}
-
 /* The sandbox is an unrendered iframe, so its own rAF never fires; the host
  * window's does. Coalescing per frame keeps a burst of edit-mode mutations
  * down to one pass. */
@@ -892,7 +664,7 @@ function repaint() {
   queued = true
   parent.requestAnimationFrame(() => {
     queued = false
-    paint()
+    bridgeCommandMenu()
   })
 }
 
@@ -905,20 +677,14 @@ function teardown() {
   dismissDialog?.()
 
   for (const node of doc.querySelectorAll(`[${COMMAND_ATTR}], [${DIALOG_ATTR}]`)) node.remove()
-  for (const table of doc.querySelectorAll(`[${HIDDEN_ATTR}]`)) table.removeAttribute(HIDDEN_ATTR)
-  for (const block of doc.querySelectorAll(`[${BULLET_ATTR}]`)) block.removeAttribute(BULLET_ATTR)
-  for (const block of doc.querySelectorAll(`[${VERSE_ATTR}]`)) block.removeAttribute(VERSE_ATTR)
-  for (const block of doc.querySelectorAll(`[${TYPE_ATTR}]`)) block.removeAttribute(TYPE_ATTR)
 }
 
 function main() {
-  migrateLegacySettings()
   logseq.useSettingsSchema(settingsSchema)
   /* The manifest is small and every reference needs it, so the read starts
    * here; nothing waits on it, and a passage typed before it lands is written
    * as it was typed. */
   void loadBibleManifest().catch(() => null)
-  logseq.provideStyle({ key: STYLE_KEY, style: `.block-properties[${HIDDEN_ATTR}] { display: none; }` })
   logseq.provideStyle({ key: DIALOG_STYLE_KEY, style: DIALOG_STYLE })
   logseq.Editor?.registerSlashCommand?.(COMMAND_LABEL, () => insertPassage('slash'))
   /* A new text-index path is a new read, and a reason to say again that there
@@ -926,17 +692,12 @@ function main() {
   logseq.onSettingsChanged(() => {
     bibleTextRead = null
     noticed = false
-    repaint()
-  })
-  logseq.App.onRouteChanged(repaint)
-  logseq.DB?.onChanged?.(() => {
-    sourceCache.clear()
-    repaint()
   })
   logseq.beforeunload?.(async () => teardown())
 
-  /* childList/subtree only: this observer must not see its own attribute
-   * writes, or every pass would schedule another one. */
+  /* childList/subtree only: the `<` picker appears and disappears as a subtree
+   * of the host's own popup layer, and this observer must not see the attribute
+   * it writes onto its own entry, or every pass would schedule another one. */
   const container = doc.getElementById('app-container') ?? doc.body
   observer = new MutationObserver(repaint)
   observer.observe(container, { childList: true, subtree: true })

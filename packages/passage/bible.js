@@ -402,11 +402,12 @@ function bibleDisplay(options) {
  * the two never wrap apart.
  *
  * The digits are wrapped in highlight markup because a bare run of text is
- * nothing theme.css can reach: `^^…^^` parses as emphasis wherever it falls,
+ * nothing a stylesheet can reach: `^^…^^` parses as emphasis wherever it falls,
  * line start included, and Logseq renders it as a `mark` element, which is the
- * element the theme colors and hangs in its own gutter. The markup holds the
+ * element a theme colors and hangs in its own gutter. The markup holds the
  * digits rather than replacing them, so a passage read anywhere else — another
- * theme, a plain editor, the clipboard — still shows the number as a number. */
+ * theme, no theme, a plain editor, the clipboard — still shows the number as a
+ * number. See `docs/contracts/passage-v1.md`. */
 const BIBLE_SUPERSCRIPTS = '\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079'
 
 function bibleVerseNumber(number, text) {

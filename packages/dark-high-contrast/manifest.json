@@ -1,6 +1,6 @@
 {
   "title": "Dark High Contrast",
-  "description": "A VS Code-inspired Dark High Contrast theme for Logseq classic graphs, with configurable property hiding and Bible passage insertion.",
+  "description": "A VS Code-inspired Dark High Contrast theme for Logseq classic graphs, with configurable property hiding.",
   "author": "Peter Cole",
   "repo": "handled57/logseq-dark-2026",
   "icon": "icon.svg",

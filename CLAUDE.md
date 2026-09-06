@@ -2,24 +2,38 @@
 
 ## Project
 
-This repository packages **Dark High Contrast**, a Logseq theme for classic/file graphs on desktop. It targets Logseq 0.10.15 and adapts Visual Studio Code's Dark High Contrast palette.
+This repository is an npm-workspace monorepo of Logseq packages. `packages/dark-high-contrast/` holds **Dark High Contrast**, a Logseq theme for classic/file graphs on desktop. It targets Logseq 0.10.15 and adapts Visual Studio Code's Dark High Contrast palette.
 
-The package is intentionally installable without dependency installation or compilation. Keep release artifacts self-contained and do not add runtime network access, tracking, or remote CSS imports.
+The root `package.json` is a private coordinator: it declares `workspaces: ["packages/*"]`, aggregates each package's scripts, and owns no sources and no dependencies. Every package is intentionally installable without dependency installation or compilation. Keep release artifacts self-contained and package-specific, and do not add runtime network access, tracking, or remote CSS imports.
 
 ## Source of truth
+
+Paths below are relative to `packages/dark-high-contrast/` unless noted.
 
 - `theme.css` is the canonical stylesheet.
 - `index.js` is the canonical entry script for property-table hiding and `data-hc-block-type` annotations.
 - `index.html` loads the entry script.
-- `lib/lsplugin.user.js` is a vendored Logseq SDK file. Do not edit it as application source.
+- `../../vendor/logseq/lsplugin.user.js` is the one canonical vendored Logseq SDK file. Root release tooling copies it into each archive as `lib/lsplugin.user.js`; source workspaces do not contain `lib/`.
 - `package.json` and `manifest.json` define package and Marketplace metadata.
-- `test/theme.test.mjs` checks package structure, required selectors, palette values, accessibility, and release metadata.
+- `test/theme.test.mjs` checks package structure, workspace layout, required selectors, palette values, accessibility, and release metadata.
 - `test/cascade.test.mjs` checks selector specificity against pinned Logseq CSS behavior.
 - `test/properties.test.mjs` behaviorally tests `index.js` against a stub host document.
-- `scripts/build-release.mjs` creates the Marketplace ZIP in `dist/`.
-- `scripts/verify-release.mjs` verifies the ZIP contents and metadata.
+- Each package's `package.json#release.files` is its exact package-owned archive allowlist.
+- Root `scripts/build-release.mjs` creates extracted packages and Marketplace ZIPs in root `dist/`; aggregate builds clean once and targeted workspace builds remove only their own outputs.
+- Root `scripts/verify-release.mjs` verifies exact archive contents, metadata agreement, and byte parity with canonical sources.
+- Root `test/support/` owns reusable host-document, classic-script, ZIP, and pinned-CSS test helpers; package-specific assertions remain in their workspaces.
+- The repository root holds shared release inputs (`LICENSE` and `vendor/logseq/lsplugin.user.js`) as well as coordinator tooling and documentation.
+- Root `README.md` is the repository and independent-installation overview;
+  `CONTRIBUTING.md` owns prerequisites, commands, manual acceptance, and release
+  workflow.
+- `docs/architecture.md` records runtime and release invariants;
+  `docs/adding-a-package.md` is the package-integration checklist; and
+  `docs/migrating-theme-2.md` owns the 1.x-to-2.0.0 user migration.
+- `docs/contracts/passage-v1.md` is the normative cross-package content
+  contract. Package READMEs explain their own setup and behavior; do not make a
+  root document the only source for package-specific use.
 
-Read `README.md` and `CHANGELOG.md` before changing public behavior. Keep both synchronized with user-visible changes.
+Read the package's `README.md` and `CHANGELOG.md` before changing public behavior. Keep both synchronized with user-visible changes.
 
 ## Design and compatibility constraints
 
@@ -58,6 +72,12 @@ A short confirmation such as `continue`, `close`, `done`, `ship it`, `looks good
 
 Do not create a release tag for documentation-only or unreleased maintenance unless the user explicitly requests a release. Never rewrite shared history or use destructive Git commands to resolve conflicts.
 
+Theme and Passage versions and release tags are independent. Their intended tag
+namespaces are `theme-vX.Y.Z` and `passage-vX.Y.Z`; do not use them until CI
+selects and publishes only the named package. GitHub release automation does not
+submit a package to the Logseq Marketplace, which remains a separate maintainer
+action.
+
 ## Validation
 
 Run the complete local gate before merging or releasing:
@@ -67,7 +87,13 @@ npm run check
 git diff --check
 ```
 
-`npm run check` runs all tests, builds the release archive, and verifies it. When an installed Logseq 0.10.15 stylesheet is available, also validate the pinned upstream selectors:
+At the root, `npm run check` runs every workspace's tests, builds each release archive, and verifies it. Target one package with npm's workspace flag:
+
+```sh
+npm run check --workspace packages/dark-high-contrast
+```
+
+When an installed Logseq 0.10.15 stylesheet is available, also validate the pinned upstream selectors:
 
 ```sh
 LOGSEQ_CSS=/path/to/Logseq/resources/app/css/style.css npm test

@@ -1,61 +1,61 @@
-import { cp, mkdir, readFile, rm } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { access, cp, mkdir, rm } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
+import { basename, resolve } from 'node:path'
+import {
+  distRoot, licenseSource, sdkSource, selectedWorkspaces
+} from './release-support.mjs'
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
-const dist = resolve(root, 'dist')
-const bundleName = pkg.name
-const bundle = resolve(dist, bundleName)
-const archive = `${bundleName}-${pkg.version}.zip`
+const all = process.argv.includes('--all')
+const targets = await selectedWorkspaces(all)
 
-const releaseFiles = [
-  'package.json',
-  'manifest.json',
-  'theme.css',
-  'index.html',
-  'index.js',
-  'bible.js',
-  'resources/bible.books.json',
-  'lib',
-  'icon.svg',
-  'screenshots',
-  'README.md',
-  'CHANGELOG.md',
-  'LICENSE',
-  'THIRD_PARTY_NOTICES.md'
-]
+if (all) await rm(distRoot, { recursive: true, force: true })
+await mkdir(distRoot, { recursive: true })
 
-await rm(dist, { recursive: true, force: true })
-await mkdir(bundle, { recursive: true })
+for (const target of targets) {
+  if (!all) {
+    await rm(target.bundle, { recursive: true, force: true })
+    await rm(target.archive, { force: true })
+  }
+  await mkdir(target.bundle, { recursive: true })
 
-for (const file of releaseFiles) {
-  await cp(resolve(root, file), resolve(bundle, file), { recursive: true })
+  for (const file of target.pkg.release.files) {
+    await cp(resolve(target.root, file), resolve(target.bundle, file), { recursive: true })
+  }
+  await mkdir(resolve(target.bundle, 'lib'), { recursive: true })
+  await cp(sdkSource, resolve(target.bundle, 'lib/lsplugin.user.js'))
+  await cp(licenseSource, resolve(target.bundle, 'LICENSE'))
+
+  const bundleName = target.pkg.name
+  const archivers = process.platform === 'win32'
+    ? [
+        ['powershell', ['-NoProfile', '-NonInteractive', '-Command',
+          `Compress-Archive -Path '${bundleName}' -DestinationPath '${target.archiveName}' -Force`]],
+        ['zip', ['-rq', target.archiveName, bundleName]]
+      ]
+    : [
+        ['zip', ['-rq', target.archiveName, bundleName]],
+        ['powershell', ['-NoProfile', '-NonInteractive', '-Command',
+          `Compress-Archive -Path '${bundleName}' -DestinationPath '${target.archiveName}' -Force`]]
+      ]
+
+  let zipped
+  for (const [command, args] of archivers) {
+    zipped = spawnSync(command, args, { cwd: distRoot, stdio: 'inherit' })
+    if (zipped.error?.code === 'ENOENT') continue
+    break
+  }
+  if (zipped?.error) throw zipped.error
+  if (zipped?.status !== 0) throw new Error(`archiving ${bundleName} exited with status ${zipped?.status}`)
+
+  for (const file of target.pkg.release.unpackedLocalFiles ?? []) {
+    const source = resolve(target.root, file)
+    if (await access(source, constants.R_OK).then(() => true, () => false)) {
+      await mkdir(resolve(target.bundle, file, '..'), { recursive: true })
+      await cp(source, resolve(target.bundle, file))
+      console.log(`Staged local ${file} into dist/${bundleName}/ for unpacked testing; it is not in the ZIP.`)
+    }
+  }
+
+  console.log(`Built dist/${basename(target.archive)}`)
 }
-
-/* `zip` ships with the CI runner and every mainstream Unix, but not with
- * Windows, where Compress-Archive is the built-in equivalent. */
-const archivers = process.platform === 'win32'
-  ? [
-      ['powershell', ['-NoProfile', '-NonInteractive', '-Command',
-        `Compress-Archive -Path '${bundleName}' -DestinationPath '${archive}' -Force`]],
-      ['zip', ['-rq', archive, bundleName]]
-    ]
-  : [
-      ['zip', ['-rq', archive, bundleName]],
-      ['powershell', ['-NoProfile', '-NonInteractive', '-Command',
-        `Compress-Archive -Path '${bundleName}' -DestinationPath '${archive}' -Force`]]
-    ]
-
-let zipped
-for (const [command, args] of archivers) {
-  zipped = spawnSync(command, args, { cwd: dist, stdio: 'inherit' })
-  if (zipped.error?.code === 'ENOENT') continue
-  break
-}
-
-if (zipped.error) throw zipped.error
-if (zipped.status !== 0) throw new Error(`archiving exited with status ${zipped.status}`)
-
-console.log(`Built dist/${archive}`)
