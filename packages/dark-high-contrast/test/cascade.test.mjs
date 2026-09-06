@@ -310,6 +310,7 @@ const railMetrics = [
   '.block-children-container{margin-left:29px;position:relative}',
   '.block-control-wrap{height:24px;margin-top:0;padding-right:6px}',
   '.bullet-container{align-items:center;border-radius:50%;display:flex;height:16px;justify-content:center;width:16px}',
+  '.bullet-container .bullet{border-radius:9999px;font-size:15px;height:6px;opacity:.8;width:6px}',
   '.bullet-container.as-order-list{justify-content:center;padding-left:3px;white-space:nowrap;width:22px}',
   '.block-control-wrap.is-order-list{margin-right:0;padding-right:0}',
   '.block-control-wrap.is-order-list .bullet-link-wrap{left:-3px;position:relative}',
@@ -327,7 +328,7 @@ const railMetrics = [
 ]
 
 /* Read back off the declarations above. */
-const rail = { indent: 29, arrow: 22, bullet: 16, box: 24, gutter: 6, orderList: 22, pagePad: 32 }
+const rail = { indent: 29, arrow: 22, bullet: 16, dot: 6, box: 24, gutter: 6, orderList: 22, pagePad: 32 }
 
 /* Logseq's heading sizes, as multiples of the block's own text size. */
 const headings = { h1: 2, h2: 1.5, h3: 1.2, h4: 1, h5: 0.83, h6: 0.75 }
@@ -465,9 +466,66 @@ test("a bullet sits on the middle of its block's first line", () => {
   // Everything else the rail draws for a row is measured from that one number,
   // so a bullet, the fold arrow beside it, an ordered list's number and both
   // ends of the line always meet.
-  assert.equal(value(rule(`${wrap} > .bullet-link-wrap`), 'margin-top'), `calc(var(--hc-rail-bullet-y) - ${rail.bullet / 2}px)`)
+  assert.equal(
+    value(rule(`${wrap} > .bullet-link-wrap`), 'margin-top'),
+    'calc(var(--hc-rail-bullet-y) - var(--hc-rail-bullet-size) / 2)'
+  )
   assert.equal(value(rule(`${wrap} > .block-control`), 'margin-top'), `calc(var(--hc-rail-bullet-y) - ${center}px)`)
   assert.equal(value(rule(`${wrap}::after`), 'top'), 'var(--hc-rail-bullet-y)')
+})
+
+test("a bullet is drawn at the size of its block's first line", () => {
+  // Ordinary prose is the baseline: exactly the bullet Logseq draws, so the
+  // scale is a plain multiple of its 16px halo and its 6px dot, and everything
+  // outside the rail — sidebars, dialogs, document mode — keeps that default.
+  // A custom property substitutes against the element it is declared on, so the
+  // two sizes are declared beside the scale, on the row that carries it: read
+  // from `:root` they would resolve against the root's scale and never follow a
+  // heading's.
+  const defaults = rule(row)
+  assert.equal(Number.parseFloat(value(defaults, '--hc-rail-bullet-scale')), 1)
+  assert.equal(value(defaults, '--hc-rail-bullet-size'), `calc(${rail.bullet}px * var(--hc-rail-bullet-scale))`)
+  assert.equal(value(defaults, '--hc-rail-bullet-dot'), `calc(${rail.dot}px * var(--hc-rail-bullet-scale))`)
+
+  // A first line that is X% larger than ordinary text draws a bullet X% larger,
+  // so each heading's scale is the size Logseq gives that level, in the
+  // rendered view and in the editor textarea alike.
+  const guard = ':not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)'
+  for (const [level, size] of Object.entries(headings)) {
+    const body = rule(
+      `${row}:has(> .block-content-wrapper ${level}${guard}), ${row}:has(> .editor-wrapper .${level})`
+    )
+    assert.equal(
+      Number.parseFloat(value(body, '--hc-rail-bullet-scale')),
+      size,
+      `a ${level} bullet is not drawn at the ${size}× its own line is set in`
+    )
+  }
+
+  // The halo, the dot inside it and the rings around that dot all follow.
+  const halo = rule(`${wrap} .bullet-container`)
+  assert.equal(value(halo, 'width'), 'var(--hc-rail-bullet-size)')
+  assert.equal(value(halo, 'height'), 'var(--hc-rail-bullet-size)')
+  for (const dot of [rule(`${wrap} .bullet-container .bullet`), rule(`${wrap} .bullet-container.typed-list .bullet`)]) {
+    assert.equal(value(dot, 'width'), 'var(--hc-rail-bullet-dot)')
+    assert.equal(value(dot, 'height'), 'var(--hc-rail-bullet-dot)')
+    assert.match(dot, /box-shadow: 0 0 0 calc\(1px \* var\(--hc-rail-bullet-scale\)\)/)
+    assert.match(dot, /0 0 0 calc\(2px \* var\(--hc-rail-bullet-scale\)\)/)
+  }
+  const hovered = `${block}:hover:not(:has(.ls-block:hover))`
+  assert.match(
+    rule(`${hovered} > .block-main-container > .block-control-wrap .bullet-container .bullet`),
+    /0 0 0 calc\(5px \* var\(--hc-rail-bullet-scale\)\)/,
+    'a hovered bullet keeps a ring sized for an ordinary bullet'
+  )
+
+  // A bullet grows around the rail rather than off it: half of whatever it grew
+  // by comes off either side, so its center stays on the line at every size,
+  // and the row's own width is unchanged.
+  const link = rule(`${wrap} > .bullet-link-wrap`)
+  const centering = `calc((${rail.bullet}px - var(--hc-rail-bullet-size)) / 2)`
+  assert.equal(value(link, 'margin-left'), centering)
+  assert.equal(value(link, 'margin-right'), centering)
 })
 
 test('the rail line runs from the first bullet to the end of the last block', () => {
@@ -518,8 +576,9 @@ test('the rail line runs from the first bullet to the end of the last block', ()
 
 test('an ordered list keeps its number beside the content and a bullet on the rail', () => {
   const marker = rule(`${wrap} .bullet-container.as-order-list`)
-  // On the rail it reads as a bullet like any other, so it takes a bullet's box.
-  assert.equal(px(marker, 'width'), rail.bullet)
+  // On the rail it reads as a bullet like any other, so it takes a bullet's box,
+  // sized like every other bullet by the line it hangs beside.
+  assert.equal(value(marker, 'width'), 'var(--hc-rail-bullet-size)')
   assert.equal(px(marker, 'padding-left'), 0)
   assert.match(rule(`${wrap} .bullet-container.typed-list .bullet`), /background-color:\s*var\(--vscode-hc-white\)/)
 
@@ -571,11 +630,18 @@ test('hovering a block lights its own bullet and no other', () => {
   assert.ok(channels, 'the rail color is no longer a hex literal')
   const rgb = channels.slice(1).map((pair) => Number.parseInt(pair, 16)).join(' ')
   assert.match(halo, new RegExp(`background-color:\\s*rgb\\(${rgb} / \\d+%\\)`), 'a hovered bullet is not lit in the rail color')
-  assert.match(dot, new RegExp(`0 0 0 \\d+px rgb\\(${rgb} / \\d+%\\)`), 'a hovered bullet has no ring in the rail color')
+  assert.match(
+    dot,
+    new RegExp(`0 0 0 calc\\(\\d+px \\* var\\(--hc-rail-bullet-scale\\)\\) rgb\\(${rgb} / \\d+%\\)`),
+    'a hovered bullet has no ring in the rail color'
+  )
 
   // The dot keeps the ring the theme draws it with, so hover adds to a bullet
   // rather than replacing it.
-  assert.match(dot, /0 0 0 1px var\(--vscode-hc-black\), 0 0 0 2px var\(--vscode-hc-white\)/)
+  assert.match(
+    dot,
+    /0 0 0 calc\(1px \* var\(--hc-rail-bullet-scale\)\) var\(--vscode-hc-black\),\s*\n?\s*0 0 0 calc\(2px \* var\(--hc-rail-bullet-scale\)\) var\(--vscode-hc-white\)/
+  )
 
   // Only the block the pointer is over: an ancestor holding a hovered block
   // keeps its own bullet plain, the way the block highlight already behaves.

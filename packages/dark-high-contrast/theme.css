@@ -542,13 +542,24 @@ hr {
 }
 
 /* The row is the stacking context the line is painted behind the bullets in,
- * and it carries where this block's bullet belongs: half of the 24px line an
- * ordinary block renders. */
+ * and it carries where this block's bullet belongs — half of the 24px line an
+ * ordinary block renders — and how large it is drawn: a bullet reads at the
+ * weight of the line it hangs beside, so a first line set larger than ordinary
+ * prose takes a bullet larger by the same multiple. Ordinary prose is the
+ * baseline at 1, which is exactly the 16px bullet and 6px dot Logseq draws.
+ *
+ * The two sizes are declared beside the scale rather than on `:root` because a
+ * custom property substitutes the properties of the element it is declared on:
+ * read from the root they would resolve against the root's scale once and never
+ * follow a heading's. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container {
   isolation: isolate;
 
   --hc-rail-bullet-y: 12px;
+  --hc-rail-bullet-scale: 1;
+  --hc-rail-bullet-size: calc(16px * var(--hc-rail-bullet-scale));
+  --hc-rail-bullet-dot: calc(6px * var(--hc-rail-bullet-scale));
 }
 
 /* A code block or a table is a box of its own, set off from the row by 1rem.
@@ -579,7 +590,8 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 /* A heading opens its block a long way below the row's top: the theme gives it
  * a margin of its own font size, and its line is half again as tall as that.
  * Both are proportions of the heading's font size, which Logseq sets per level,
- * so each level's bullet drops by 1.75 times its own size. The second selector
+ * so each level's bullet drops by 1.75 times its own size, and is drawn that
+ * many times the size of an ordinary bullet. The second selector
  * is the same heading in the editor, where Logseq renders it as a textarea
  * carrying the level as a class, so the bullet holds still while it is typed
  * in. Headings quoted inside a block reference or an embedded tree are not this
@@ -589,6 +601,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h1) {
   --hc-rail-bullet-y: 3.5em;
+  --hc-rail-bullet-scale: 2;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -596,6 +609,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h2) {
   --hc-rail-bullet-y: 2.625em;
+  --hc-rail-bullet-scale: 1.5;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -603,6 +617,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h3) {
   --hc-rail-bullet-y: 2.1em;
+  --hc-rail-bullet-scale: 1.2;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -610,6 +625,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h4) {
   --hc-rail-bullet-y: 1.75em;
+  --hc-rail-bullet-scale: 1;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -617,6 +633,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h5) {
   --hc-rail-bullet-y: 1.4525em;
+  --hc-rail-bullet-scale: 0.83;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -624,6 +641,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h6) {
   --hc-rail-bullet-y: 1.3125em;
+  --hc-rail-bullet-scale: 0.75;
 }
 
 /* The control column spans its row, so the line can run the height of it, and
@@ -657,23 +675,44 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   margin-top: calc(var(--hc-rail-bullet-y) - 12px);
 }
 
-/* Half the 16px bullet, so its center lands on the rail's line for this row.
- * Upstream hangs an ordered list's bullet off a relative box shifted 3px left;
- * that would take the bullet off the rail and become what the number below is
+/* Half the bullet, so its center lands on the rail's line for this row, and
+ * half of whatever the bullet grew by taken off either side, so a bullet drawn
+ * for a large first line grows around the rail rather than off it. Upstream
+ * hangs an ordered list's bullet off a relative box shifted 3px left; that
+ * would take the bullet off the rail and become what the number below is
  * measured from, so it is put back in flow. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > .bullet-link-wrap {
   position: static;
   left: auto;
-  margin-top: calc(var(--hc-rail-bullet-y) - 8px);
+  margin-top: calc(var(--hc-rail-bullet-y) - var(--hc-rail-bullet-size) / 2);
+  margin-left: calc((16px - var(--hc-rail-bullet-size)) / 2);
+  margin-right: calc((16px - var(--hc-rail-bullet-size)) / 2);
 }
 
 /* Bullets the theme hides elsewhere — code, centered text, verse, passages,
  * empty blocks — are part of the rail, so the suppression rules above are
- * answered here. They still hold everywhere the rail does not reach. */
+ * answered here. They still hold everywhere the rail does not reach.
+ *
+ * The bullet is also drawn at the size of the line it hangs beside: this halo,
+ * the dot inside it and the two rings around that dot all take the first line's
+ * font-size multiple, so an ordinary block keeps exactly the 16px bullet with
+ * the 6px dot Logseq draws, and a heading's bullet reads at the weight of its
+ * own heading. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container {
   opacity: 1 !important;
+  width: var(--hc-rail-bullet-size);
+  height: var(--hc-rail-bullet-size);
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container .bullet {
+  width: var(--hc-rail-bullet-dot);
+  height: var(--hc-rail-bullet-dot);
+  flex: none;
+  box-shadow: 0 0 0 calc(1px * var(--hc-rail-bullet-scale)) var(--vscode-hc-black),
+    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--vscode-hc-white);
 }
 
 /* An ordered list's marker is a label inside its bullet. The bullet rides the
@@ -682,18 +721,19 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
  * depth and follows the bullet down a tall first line. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container.as-order-list {
-  width: 16px;
+  width: var(--hc-rail-bullet-size);
   padding-left: 0;
   background-color: rgb(255 255 255 / 12%);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container.typed-list .bullet {
-  width: 6px;
-  height: 6px;
+  width: var(--hc-rail-bullet-dot);
+  height: var(--hc-rail-bullet-dot);
   border-radius: 9999px;
   background-color: var(--vscode-hc-white);
-  box-shadow: 0 0 0 1px var(--vscode-hc-black), 0 0 0 2px var(--vscode-hc-white);
+  box-shadow: 0 0 0 calc(1px * var(--hc-rail-bullet-scale)) var(--vscode-hc-black),
+    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--vscode-hc-white);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -829,8 +869,9 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *):hover:not(:has(.ls-block:hover))
   > .block-main-container > .block-control-wrap .bullet-container .bullet {
-  box-shadow: 0 0 0 1px var(--vscode-hc-black), 0 0 0 2px var(--vscode-hc-white),
-    0 0 0 5px rgb(156 220 254 / 30%);
+  box-shadow: 0 0 0 calc(1px * var(--hc-rail-bullet-scale)) var(--vscode-hc-black),
+    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--vscode-hc-white),
+    0 0 0 calc(5px * var(--hc-rail-bullet-scale)) rgb(156 220 254 / 30%);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)

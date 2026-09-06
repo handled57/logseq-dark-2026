@@ -43,9 +43,17 @@ margin so the content hierarchy does not move. The rail is scoped to the page
 tree, stops short of embeds, queries, references, sidebars, dialogs, document
 mode, and right-side fold controls, and uses smaller offsets for narrow and
 full-width layouts. `--hc-rail-bullet-y` aligns a bullet and fold arrow with the
-first rendered line, including headings and boxed block types. These numbers
-derive from pinned upstream declarations; change arithmetic, selectors, and
-cascade tests together.
+first rendered line, including headings and boxed block types, and
+`--hc-rail-bullet-scale` sizes the bullet by that line's font-size multiple:
+`--hc-rail-bullet-size` and `--hc-rail-bullet-dot` derive Logseq's 16px halo and
+6px dot from it, the rings scale with it, and half of the growth is taken back
+as margin so the bullet centre stays on the rail. All three are declared on the
+row alongside `--hc-rail-bullet-y`, because a custom property substitutes
+against the element it is declared on: derived from `:root`, the two sizes would
+resolve against the root's scale and never follow a heading's. The scale
+defaults to `1`, so every surface the rail does not reach is untouched. These numbers derive from pinned
+upstream declarations; change arithmetic, selectors, and cascade tests
+together.
 
 ## Host-DOM annotation and cleanup
 
