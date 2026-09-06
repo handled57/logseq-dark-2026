@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## 1.10.1 - 2026-09-05
+
+- Hovering a block no longer fills it with the raised gray background. The
+  hover outline stays, so the pointer still marks the block it is over, but
+  scanning down a page no longer washes each block in turn. The `#1f1f1f` fill
+  is now reserved for the deliberate, persistent states: a selected block and
+  Logseq's own block highlight. A visible property table still drops its border
+  while its own block is hovered, and now keeps it when the hovered block is a
+  descendant rather than the block the table belongs to.
+
 ## 1.10.0 - 2026-09-05
 
 - Hang every block's bullet on one vertical rail in the margin left of the main

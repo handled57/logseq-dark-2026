@@ -276,6 +276,65 @@ test('focused layout and nested-block behavior remain part of the theme', () => 
   assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left:\s*0\s*!important[\s\S]*?background-color:\s*transparent\s*!important/)
 })
 
+/* Hovering a block outlines it but must not fill it. The gray raised fill is
+ * reserved for the deliberate, persistent states: a selected block and
+ * Logseq's own `.block-highlight`. */
+test('block hover outlines without painting a background', () => {
+  const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)]
+    .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
+
+  /* The rail lights a hovered block's bullet through a selector that mentions
+   * `.block-content-wrapper` only inside a `:not()`. Match on the rule's
+   * subject instead: what it paints is the last simple selector. */
+  const paints = selector =>
+    selectors(selector).some(one =>
+      one.replace(/\([^()]*\)/g, '').trim().endsWith('.block-content-wrapper')
+    )
+
+  const hoverFill = rules.filter(
+    ([selector, body]) =>
+      selector.includes('.ls-block:hover') &&
+      paints(selector) &&
+      /(?:^|[;{\s])background(?:-color)?\s*:/.test(body)
+  )
+  assert.deepEqual(hoverFill, [], 'hovering a block must not set a background')
+
+  const hoverOutline = rules.find(
+    ([selector, body]) =>
+      selector.includes('.ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper') &&
+      /outline:\s*1px solid var\(--vscode-hc-border\)/.test(body)
+  )
+  assert.ok(hoverOutline, 'the hovered block keeps its outline')
+
+  const persistentFill = rules.find(
+    ([selector, body]) =>
+      selector.includes('.ls-block.selected > .flex > .block-content-wrapper') &&
+      selector.includes('.block-highlight') &&
+      /background:\s*var\(--ls-block-highlight-color\)/.test(body)
+  )
+  assert.ok(persistentFill, 'selected and highlighted blocks keep the raised fill')
+  assert.ok(
+    !persistentFill[0].includes(':hover'),
+    'the raised fill must not be shared with a hover selector'
+  )
+
+  /* The property table still drops its border on the hovered block, so the
+   * panel and the block read as one surface. Losing the fill did not change
+   * that, but the rule has to carry the innermost-hover guard: without it an
+   * ancestor's own table went borderless whenever a child was hovered. */
+  const propertyBorder = rules.find(
+    ([selector, body]) =>
+      selector.includes('.ls-block:hover') &&
+      selector.includes('.block-properties') &&
+      /border-color:\s*transparent/.test(body)
+  )
+  assert.ok(propertyBorder, 'the hovered block hides its property table border')
+  assert.ok(
+    propertyBorder[0].includes(':hover:not(:has(.ls-block:hover))'),
+    'only the innermost hovered block hides its property table border'
+  )
+})
+
 /* The bullet rail: every block in the page's own tree hangs its bullet on one
  * vertical line. cascade.test.mjs checks the arithmetic that places it; these
  * are the rules about where the rail is allowed to reach and what it shows. */
