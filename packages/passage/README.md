@@ -112,6 +112,11 @@ setup. `resources/bible.text.json` is the verse text; it is git-ignored, never
 packaged, and read from the plugin's own folder unless the **Passage text index**
 setting names another path.
 
+Your edition's licence is yours to observe. Nothing in this repository
+redistributes verse text: it is not committed, it is not in the release archive,
+and the checks in `scripts/verify-release.mjs` fail the build if it ever appears
+in one.
+
 ## Display options
 
 Three checkboxes under the reference field decide how that text is written. Each
@@ -190,6 +195,20 @@ No dependency installation or compilation is needed to use the plugin.
 npm test --workspace packages/passage            # the package's own suites
 npm run check --workspace packages/passage       # test, build and verify the ZIP
 ```
+
+### Testing against the built plugin
+
+`npm run build` stages the release into `dist/logseq-passage/` and zips it. That
+folder is also what you load as an unpacked plugin, so after the archive is
+closed the build copies your local `resources/bible.text.json` into it, if you
+have one. The unpacked folder is then a complete working plugin — verses
+included — across rebuilds, while the ZIP stays exactly the file list
+`scripts/verify-release.mjs` asserts. A clean checkout and CI have no local index
+and nothing is copied.
+
+The copy happens strictly after archiving, and `verify-release.mjs` checks the
+archive for verse text by name as well as by its exact file list, so a licensed
+edition cannot reach a release this way.
 
 ## Attribution
 

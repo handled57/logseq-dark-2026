@@ -17,6 +17,12 @@ All notable changes to this package are documented here.
   wrote, and unloading either package leaves the other's work intact.
 - The reference dialog paints itself, with a fallback for every colour it names,
   so the prompt is legible with any theme selected or none.
+- `npm run build` now copies a local `resources/bible.text.json` into
+  `dist/logseq-passage/` after the archive is closed, so the folder you load as
+  an unpacked plugin keeps its verse text across rebuilds. The verse text is
+  still never committed and never packaged: the copy happens after zipping, and
+  `scripts/verify-release.mjs` fails the release if verse text is ever found in
+  the archive.
 - The **Passage text index** setting (`biblePassageText`) is now a Passage
   setting. A path configured under the theme is not carried across: re-enter it
   once under **Plugins → Passage → Settings**. Passages already written need no

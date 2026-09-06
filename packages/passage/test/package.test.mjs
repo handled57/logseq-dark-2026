@@ -138,6 +138,26 @@ test('the tracked source carries no verse text', async () => {
   assert.match(ignored, /bible\.text\.json|resources\/\*/)
 })
 
+test('the build stages a local verse index only after the archive is closed', async () => {
+  const build = await readFile(resolve(root, 'scripts', 'build-release.mjs'), 'utf8')
+  const verify = await readFile(resolve(root, 'scripts', 'verify-release.mjs'), 'utf8')
+
+  /* The verse text is never one of the packaged files. It is copied into the
+   * unpacked folder afterwards so a developer's own install keeps working
+   * across rebuilds, and the ordering is what keeps it out of the ZIP. */
+  const list = build.slice(build.indexOf('const releaseFiles'), build.indexOf(']', build.indexOf('const releaseFiles')))
+  assert.doesNotMatch(list, /bible\.text\.json/, 'the verse text is in the release file list')
+
+  const archived = build.indexOf('archiving exited with status')
+  const staged = build.indexOf("'bible.text.json'")
+  assert.ok(archived >= 0, 'the build no longer archives')
+  assert.ok(staged >= 0, 'the build no longer stages a local verse index')
+  assert.ok(staged > archived, 'the verse index is staged before the archive is closed')
+
+  // And the archive is checked for it either way.
+  assert.match(verify, /bible\\.\(text\|index\)/)
+})
+
 test('the command script reads the host document and namespaces what it writes', () => {
   assert.match(script, /parent\.document/)
   assert.match(script, /logseq\.ready\(main\)/)

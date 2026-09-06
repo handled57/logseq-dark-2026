@@ -74,6 +74,17 @@ const expected = [
 
 assert.deepEqual(files, expected, 'release archive contains missing or unexpected files')
 
+/* The load-bearing check. `build-release.mjs` stages a local verse index into
+ * the unpacked folder after this archive is closed, so the only thing standing
+ * between a developer's licensed text and a published ZIP is this file list.
+ * Named explicitly as well as covered by the list above, because a change that
+ * loosened it should fail loudly and say why. */
+assert.deepEqual(
+  files.filter((name) => /bible\.(text|index)|\.text\.json$/i.test(name)),
+  [],
+  'release archive carries verse text, which is a licensed edition and must never ship'
+)
+
 /* Passage ships no stylesheet of its own: the block it writes is ordinary
  * Logseq markup, and painting it is a theme's business. */
 assert.deepEqual(
