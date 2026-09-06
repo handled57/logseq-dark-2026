@@ -461,7 +461,7 @@ test('named admonitions align their semantic icons with the first line', () => {
 
   assert.match(
     css,
-    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?--hc-admonition-font-size:\\s*1\\.125rem;[\\s\\S]*?--hc-admonition-first-line-height:\\s*1\\.75rem;[\\s\\S]*?--hc-admonition-icon-size:\\s*1em;[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?--hc-admonition-font-size:\\s*1\\.125rem;[\\s\\S]*?--hc-admonition-first-line-height:\\s*1\\.75rem;[\\s\\S]*?--hc-admonition-icon-size:\\s*1\\.5em;[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
   )
   assert.match(
     css,
@@ -489,7 +489,7 @@ test('the passage block reproduces the admonition treatment on its own selectors
   assert.doesNotMatch(css, /\.admonitionblock:is\([^)]*passage/)
   assert.match(
     css,
-    /\.block-body > \.passage \{[\s\S]*?--hc-admonition-accent:\s*var\(--vscode-hc-cyan\);[\s\S]*?--hc-admonition-first-line-height:\s*1\.75rem;[\s\S]*?--hc-admonition-icon-size:\s*1em/
+    /\.block-body > \.passage \{[\s\S]*?--hc-admonition-accent:\s*var\(--vscode-hc-cyan\);[\s\S]*?--hc-admonition-first-line-height:\s*1\.75rem;[\s\S]*?--hc-admonition-icon-size:\s*1\.5em/
   )
   assert.match(
     css,
@@ -511,7 +511,7 @@ test('the passage block reproduces the admonition treatment on its own selectors
   )
   assert.doesNotMatch(css, /\.block-body > \.passage::before \{[^}]*mask/)
 
-  // The glyph is the same one-em box as a named admonition icon, offset by half
+  // The glyph is the same 1.5em box as a named admonition icon, offset by half
   // the difference from the first 1.75rem text line. Its divider remains the
   // separate full-height pseudo-element above, and the column stays fixed.
   assert.match(

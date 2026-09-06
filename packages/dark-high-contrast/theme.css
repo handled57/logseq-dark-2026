@@ -1452,8 +1452,8 @@ textarea.block-editor:focus {
  * Logseq's icon column carries `justify-center`, which centers the icon over
  * the full height of a long admonition. Keep the column (and therefore its
  * divider) stretched to the full height, but pin its contents to the top. The
- * icon follows the `text-lg` content's 1.125rem font size while its first line
- * box is 1.75rem, so half their difference centers the icon on that first
+ * icon is 1.5 times the `text-lg` content's 1.125rem font size while its first
+ * line box is 1.75rem, so half their difference centers the icon on that first
  * rendered line. The fixed column geometry remains independent of the glyph. */
 .admonitionblock.tip {
   --hc-admonition-accent: var(--vscode-hc-focus);
@@ -1479,7 +1479,7 @@ textarea.block-editor:focus {
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) {
   --hc-admonition-font-size: 1.125rem;
   --hc-admonition-first-line-height: 1.75rem;
-  --hc-admonition-icon-size: 1em;
+  --hc-admonition-icon-size: 1.5em;
 
   border-color: transparent !important;
 }
@@ -1523,7 +1523,7 @@ textarea.block-editor:focus {
 .block-body > .passage {
   --hc-admonition-accent: var(--vscode-hc-cyan);
   --hc-admonition-first-line-height: 1.75rem;
-  --hc-admonition-icon-size: 1em;
+  --hc-admonition-icon-size: 1.5em;
   --hc-verse-gutter: 0px;
 
   position: relative;
@@ -1554,7 +1554,7 @@ textarea.block-editor:focus {
 
 /* The glyph. `mask-image` rather than a colored `background-image` keeps the
  * color a palette token. The SVG is inlined as a `data:` URI, so nothing is
- * fetched. Its 1em box uses the same first-line offset as a named admonition;
+ * fetched. Its 1.5em box uses the same first-line offset as a named admonition;
  * the separate `::before` divider remains stretched over the full block. */
 .block-body > .passage::after {
   content: "";

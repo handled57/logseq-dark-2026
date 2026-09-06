@@ -11,7 +11,7 @@ All notable changes to this project are documented here.
   `pinned` admonitions with the first rendered line while preserving the
   full-height semantic divider. The passage icon follows the same alignment
   while its separate divider continues through the full passage block.
-- Scale named-admonition and passage glyphs as one-em squares matching their
+- Scale named-admonition and passage glyphs as 1.5em squares based on their
   first-line font size. Their fixed icon columns, content indents, and
   full-height four-pixel dividers remain unchanged.
 

@@ -15,7 +15,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../passage) plugin's job, and the theme does not require it.
-- Sizes named-admonition and passage icons to the first line's font and aligns them with that line while their semantic divider continues through the full block height.
+- Sizes named-admonition and passage icons at 1.5 times the first line's font and aligns them with that line while their semantic divider continues through the full block height.
 - Adds **Open** immediately above **Open in sidebar** in a block bullet's context menu, opening that block in the main editor.
 - No build runtime, tracking, remote imports, or network access.
 
@@ -196,7 +196,7 @@ For God so loved the world…
 #+END_PASSAGE
 ```
 
-It renders bulletless, on the black admonition surface, with a cyan open-book icon and the same 4px accent divider the named admonitions carry. The icon is a one-em square, matching the first line's font size and vertically centered with that line, while the text keeps the same indent, so a passage and an admonition line up beside each other.
+It renders bulletless, on the black admonition surface, with a cyan open-book icon and the same 4px accent divider the named admonitions carry. The icon is a 1.5em square, scaling from the first line's font size and vertically centered with that line, while the text keeps the same indent, so a passage and an admonition line up beside each other.
 
 `PASSAGE` is not one of the admonition names compiled into Logseq's parser, and that list cannot be extended by a theme, a setting or a plugin. Logseq renders the block as a plain `div.passage` with no icon and no container styling, so the theme reproduces the admonition treatment on its own selectors and supplies the icon itself, inlined as an SVG mask so its color stays a palette token. The block is styled to *match* the admonitions; it is not parsed as one.
 
