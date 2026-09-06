@@ -473,7 +473,6 @@ test('named admonitions align their semantic icons with the first line', () => {
   )
 
   assert.doesNotMatch(css, /\.admonitionblock:not\(/)
-  assert.doesNotMatch(css, /\.block-body > \.passage::after \{[^}]*translateY/)
   assert.match(css, /blockquote\s*\{[\s\S]*?border-left:\s*4px solid var\(--vscode-hc-border\)/)
   assert.match(css, /\.notification-content\.warning,\s*\.warning\s*\{[\s\S]*?border-color:\s*var\(--vscode-hc-yellow\)\s*!important/)
 })
@@ -483,7 +482,10 @@ test('the passage block reproduces the admonition treatment on its own selectors
   // must not join the admonition type list; it carries the shared accent
   // vocabulary instead.
   assert.doesNotMatch(css, /\.admonitionblock:is\([^)]*passage/)
-  assert.match(css, /\.block-body > \.passage \{[\s\S]*?--hc-admonition-accent:\s*var\(--vscode-hc-cyan\)/)
+  assert.match(
+    css,
+    /\.block-body > \.passage \{[\s\S]*?--hc-admonition-accent:\s*var\(--vscode-hc-cyan\);[\s\S]*?--hc-admonition-first-line-height:\s*1\.75rem/
+  )
   assert.match(
     css,
     /\.block-body > \.passage \{[\s\S]*?background:\s*var\(--vscode-hc-black\)\s*!important[\s\S]*?border:\s*1px solid transparent\s*!important/
@@ -504,12 +506,14 @@ test('the passage block reproduces the admonition treatment on its own selectors
   )
   assert.doesNotMatch(css, /\.block-body > \.passage::before \{[^}]*mask/)
 
-  // The glyph: a full-height box with the icon centered in it, matching the
-  // `flex-col justify-center` column and `h-8 w-8` icon of an admonition.
+  // The glyph is the same 2rem box as a named admonition icon, offset by half
+  // the difference from the first 1.75rem text line. Its divider remains the
+  // separate full-height pseudo-element above.
   assert.match(
     css,
-    /\.block-body > \.passage::after \{[\s\S]*?width:\s*2rem;[\s\S]*?background-color:\s*var\(--hc-admonition-accent\)/
+    /\.block-body > \.passage::after \{[\s\S]*?top:\s*calc\(\(var\(--hc-admonition-first-line-height\) - 2rem\) \/ 2\);[\s\S]*?width:\s*2rem;[\s\S]*?height:\s*2rem;[\s\S]*?background-color:\s*var\(--hc-admonition-accent\)/
   )
+  assert.doesNotMatch(css, /\.block-body > \.passage::after \{[^}]*bottom:/)
   assert.match(css, /\.block-body > \.passage::after \{[^}]*?\n\s*mask-position:\s*50% 50%/)
   assert.match(css, /\.block-body > \.passage::after \{[^}]*?\n\s*mask-size:\s*2rem 2rem/)
   // `mask-image` over a colored `background-image`, so the icon's color stays a
