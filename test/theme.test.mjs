@@ -128,7 +128,7 @@ test('README and palette chart document every fixed stylesheet color', async () 
 
   assert.deepEqual(
     { hex: expected.hex.length, rgb: expected.rgb.length, hsl: expected.hsl.length },
-    { hex: 50, rgb: 26, hsl: 9 },
+    { hex: 50, rgb: 27, hsl: 9 },
     'stylesheet color inventory changed unexpectedly'
   )
   assert.deepEqual(readmeColors, expected, 'README fixed-color tables have drifted from theme.css')
@@ -274,6 +274,113 @@ test('focused layout and nested-block behavior remain part of the theme', () => 
   assert.doesNotMatch(css, /\.ls-block:(?:hover|focus-within)\s*> \.block-main-container > \.block-control-wrap \.bullet-container:not\(\.typed-list\)/)
   assert.match(css, /\.ls-block:hover:not\(:has\(\.ls-block:hover\)\)/)
   assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left:\s*0\s*!important[\s\S]*?background-color:\s*transparent\s*!important/)
+})
+
+/* The bullet rail: every block in the page's own tree hangs its bullet on one
+ * vertical line. cascade.test.mjs checks the arithmetic that places it; these
+ * are the rules about where the rail is allowed to reach and what it shows. */
+const railScope =
+  'main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)'
+const railRules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)]
+  .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
+  .filter(([selector]) => selector.includes('#main-content-container .page-blocks-inner'))
+
+/* A selector list, split at the commas that separate selectors rather than the
+ * ones inside `:is()` and `:has()`. */
+function selectors(list) {
+  const found = []
+  let depth = 0
+  let start = 0
+  for (let index = 0; index < list.length; index += 1) {
+    if (list[index] === '(') depth += 1
+    else if (list[index] === ')') depth -= 1
+    else if (list[index] === ',' && depth === 0) {
+      found.push(list.slice(start, index).trim())
+      start = index + 1
+    }
+  }
+  found.push(list.slice(start).trim())
+  return found
+}
+
+/* What a selector actually paints: its last compound, with the guards a rule
+ * qualifies itself by — `:has()`, `:not()` — taken back off. */
+function subject(selector) {
+  let plain = selector
+  let previous
+  do {
+    previous = plain
+    plain = plain.replace(/:(?:has|not|is|where)\([^()]*\)/g, '')
+  } while (plain !== previous)
+  return plain.split(/[\s>]+/).filter(Boolean).pop() ?? ''
+}
+
+test('the rail reaches the page tree in the main editor and nothing else', () => {
+  assert.ok(railRules.length >= 20, 'the rail is missing from the stylesheet')
+
+  for (const [selector] of railRules) {
+    for (const part of selectors(selector)) {
+      // Sidebars, whiteboards and dialogs render outside the main editor; the
+      // right-hand fold button and document mode re-measure the indentation the
+      // rail is drawn from. All four are out of reach by construction.
+      assert.ok(part.startsWith(railScope), `a rail rule escapes the main editor: "${part.slice(0, 60)}…"`)
+      // Embedded and queried trees render inside a block's content and keep
+      // Logseq's own layout rather than being pulled onto the page's rail.
+      assert.ok(
+        part.includes('.ls-block:not(.block-content-wrapper *)'),
+        `a rail rule reaches an embedded tree: "${part.slice(0, 60)}…"`
+      )
+    }
+  }
+
+  for (const surface of ['.cp__right-sidebar', '#right-sidebar', '.ui__modal', '.whiteboard', '.references']) {
+    assert.ok(
+      railRules.every(([selector]) => !selector.includes(surface)),
+      `the rail names ${surface}, which is not the primary editor`
+    )
+  }
+})
+
+test('every rendered block in the main editor keeps a bullet on the rail', () => {
+  const wrapSelector =
+    `${railScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap`
+  const declarations = (selector) => {
+    const found = railRules.find(([candidate]) => candidate === selector)
+    assert.ok(found, `no rail rule for "${selector}"`)
+    return found[1]
+  }
+
+  // The bullets the theme hides elsewhere — code, centered text, verse,
+  // passages, empty blocks — are all part of the rail.
+  assert.match(declarations(`${wrapSelector} .bullet-container`), /opacity:\s*1\s*!important/)
+
+  // The control column spans its row so the rail line can run the height of a
+  // block, and the bullet stays on the row's first line rather than drifting to
+  // the middle of a tall one.
+  const wrap = declarations(wrapSelector)
+  assert.match(wrap, /align-self:\s*stretch/)
+  assert.match(wrap, /align-items:\s*flex-start/)
+
+  // The nested connector lines the theme hides stay hidden: the rail replaces
+  // them, and this is the rule that keeps them from coming back.
+  assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left:\s*0\s*!important/)
+
+  // The rail reads `.block-children` as the record of how deep a block sits and
+  // declares nothing on those boxes: not a connector line, and not a display
+  // that would reveal the descendants a collapsed block never renders. Every
+  // rule paints a row or something in its control column, and nothing else —
+  // the block types a rule names to place a bullet are guards on the row, not
+  // boxes it touches.
+  const painted = /^(?:\.block-main-container|\.block-control-wrap|\.block-control|\.bullet-link-wrap|\.bullet-container|\.bullet|label)(?:\.[\w-]+)*(?:::(?:before|after))?$/
+  for (const [selector] of railRules) {
+    for (const part of selectors(selector)) {
+      assert.match(
+        subject(part),
+        painted,
+        `a rail rule paints something other than a block's own control column: "${part.slice(0, 60)}…"`
+      )
+    }
+  }
 })
 
 test('interactive chrome stays black with one-pixel orange borders', () => {

@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented here.
 
+## 1.10.0 - 2026-09-05
+
+- Hang every block's bullet on one vertical rail in the margin left of the main
+  editor, with a cyan line running behind the bullets from the centre of the
+  first to the end of the last block. Only the bullet moves: Logseq's own
+  control column is pulled left by the indentation its nesting level applied
+  plus the margin the rail stands in, and is handed the same distance back on
+  its other side, so the content column keeps the hierarchy Logseq renders, and
+  the bullet stays the real one — its click, right-click menu, drag and
+  collapsed-state styling are Logseq's own. Each bullet sits on the middle of
+  its block's first line of text, wherever that line starts: a heading's bullet
+  drops by 1.75 times the size Logseq gives that heading level, in view and in
+  the editor, and a quote, a passage, an admonition, a code block and a table
+  each drop their bullet into the box they open with. Hovering a block lights
+  its own bullet in the rail's cyan; an ancestor holding the hovered block keeps
+  its bullet plain. Every rendered block takes a bullet, including the empty,
+  code, `center`, `verse` and passage blocks the theme leaves bulletless
+  elsewhere; a collapsed block still renders no descendants, so none appear on
+  the rail. A numbered list keeps its number beside its content and takes an
+  ordinary bullet on the rail. How far left the rail stands is one number,
+  `--hc-rail-offset`, which a graph can retune from `custom.css`; a full-width
+  page and a narrow window are given less of it so the rail always fits in the
+  margin Logseq leaves. The rail covers pages, journals, narrow layouts and the
+  full-width route; sidebars, whiteboards, dialogs, linked references, and the
+  embedded and queried trees rendered inside a block keep Logseq's own layout,
+  as do document mode and the right-hand fold button, both of which re-measure
+  the indentation the rail is drawn from.
+
 ## 1.9.0 - 2026-09-05
 
 - Render a visible property table below the block's admonition or passage
