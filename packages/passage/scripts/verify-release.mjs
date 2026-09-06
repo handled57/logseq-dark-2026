@@ -60,30 +60,37 @@ const expected = [
   `${prefix}LICENSE`,
   `${prefix}README.md`,
   `${prefix}THIRD_PARTY_NOTICES.md`,
+  `${prefix}bible.js`,
   `${prefix}icon.svg`,
   `${prefix}index.html`,
   `${prefix}index.js`,
   `${prefix}lib/lsplugin.user.js`,
   `${prefix}manifest.json`,
   `${prefix}package.json`,
-  // The README embeds the palette chart, so the archive carries it too.
-  `${prefix}screenshots/color-palette.svg`,
-  `${prefix}screenshots/logseq-dark-high-contrast.png`,
-  `${prefix}theme.css`
+  /* The manifest, and only the manifest: the verse text it is built alongside
+   * is a licensed edition, and shipping it here would republish it. */
+  `${prefix}resources/bible.books.json`
 ].sort()
 
 assert.deepEqual(files, expected, 'release archive contains missing or unexpected files')
 
+/* Passage ships no stylesheet of its own: the block it writes is ordinary
+ * Logseq markup, and painting it is a theme's business. */
+assert.deepEqual(
+  files.filter((name) => name.endsWith('.css')),
+  [],
+  'release archive carries a stylesheet, which belongs to a theme rather than to Passage'
+)
+
 const archivedPackage = JSON.parse(entries.get(`${prefix}package.json`).toString('utf8'))
 assert.equal(archivedPackage.name, pkg.name)
 assert.equal(archivedPackage.version, pkg.version)
+assert.equal(archivedPackage.effect, true, 'the entry needs effect:true to read the host document')
 
-const sourceCss = await readFile(resolve(root, 'theme.css'), 'utf8')
-assert.equal(
-  entries.get(`${prefix}theme.css`).toString('utf8'),
-  sourceCss,
-  'archived theme.css differs from the canonical stylesheet'
-)
+const archivedManifest = JSON.parse(entries.get(`${prefix}manifest.json`).toString('utf8'))
+assert.equal(archivedManifest.id, pkg.logseq.id)
+assert.equal(archivedManifest.title, pkg.title)
+assert.equal(archivedManifest.effect, true)
 
 const sourceScript = await readFile(resolve(root, 'index.js'), 'utf8')
 assert.equal(
@@ -92,20 +99,31 @@ assert.equal(
   'archived index.js differs from the canonical plugin script'
 )
 
-/* Passage is a package of its own, and nothing of it belongs in the theme's
- * archive: neither the reference parser nor the book manifest it resolves
- * against, and least of all a verse text. */
-assert.deepEqual(
-  files.filter((name) => /bible|passage/i.test(name)),
-  [],
-  'release archive carries Passage files, which ship in the Passage package'
+const sourceParser = await readFile(resolve(root, 'bible.js'), 'utf8')
+assert.equal(
+  entries.get(`${prefix}bible.js`).toString('utf8'),
+  sourceParser,
+  'archived bible.js differs from the canonical reference parser'
 )
 
-const sourceScreenshot = await readFile(resolve(root, 'screenshots', 'logseq-dark-high-contrast.png'))
-assert.deepEqual(
-  entries.get(`${prefix}screenshots/logseq-dark-high-contrast.png`),
-  sourceScreenshot,
-  'archived screenshot differs from the public screenshot'
-)
+/* The archived manifest is the shipped one, and it has to hold no verse text:
+ * every book carries names, counts and offsets only. */
+const archivedBooks = JSON.parse(entries.get(`${prefix}resources/bible.books.json`).toString('utf8'))
+const bookKeys = ['bookId', 'shortName', 'longName', 'fromVerseId', 'chapters']
+const chapterKeys = ['chapter', 'verses', 'first', 'missing']
+for (const book of archivedBooks.books) {
+  assert.deepEqual(
+    Object.keys(book).filter((key) => !bookKeys.includes(key)),
+    [],
+    `${book.shortName} carries fields beyond the manifest's own`
+  )
+  for (const chapter of book.chapters) {
+    assert.deepEqual(
+      Object.keys(chapter).filter((key) => !chapterKeys.includes(key)),
+      [],
+      `${book.shortName} ${chapter.chapter} carries fields beyond the manifest's own`
+    )
+  }
+}
 
 console.log(`Verified dist/${archiveName}`)

@@ -2,7 +2,7 @@
  *
  * `bible.js` is a classic script like `index.js`, so it is run in a `vm`
  * context and its top-level declarations are read off that context's global.
- * Everything here resolves against the manifest the theme actually ships,
+ * Everything here resolves against the manifest the plugin actually ships,
  * because the counts and names in that file are half of what is being tested.
  */
 
@@ -399,9 +399,9 @@ test('a verse number carries the markup that gives it an element of its own', ()
           // text between them into the number.
           assert.equal((line.match(/\^\^/g) ?? []).length % 2, 0, `${reference}: ${line}`)
 
-          // One verse to a line is what lets `index.js` tell the theme to hang
-          // the numbers in a gutter: every number there opens its own line, and
-          // the lines without one are an edition's poetry inside a verse.
+          // One verse to a line is what lets a reader of the contract hang the
+          // numbers in a gutter: every number there opens its own line, and the
+          // lines without one are an edition's poetry inside a verse.
           const numbers = line.match(highlights)
           if (!perLine || !numbers) continue
           assert.equal(numbers.length, 1, `${reference}: ${line}`)

@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented here.
 
+## 2.0.0 - 2026-09-05
+
+- **Breaking.** Inserting a passage is no longer part of this theme. The
+  Passage command, its reference parser, its Bible manifest and its index
+  generator now ship as [`logseq-passage`](../passage), installable on its own;
+  install it alongside the theme to keep the `/passage` and `<` commands. This
+  theme still paints passage blocks exactly as it did — a passage already in
+  your graph is a passage still, whether Passage is installed or not, because
+  what the two agree on is a block shape rather than a runtime. That shape is
+  published as [`docs/contracts/passage-v1.md`](../../docs/contracts/passage-v1.md).
+- **Breaking.** The **Passage text index** setting (`biblePassageText`) moved
+  with the command. A path configured here is not carried across: re-enter it
+  once under **Plugins → Passage → Settings**. **Properties that hide the
+  property table** (`hiddenProperties`) is unchanged, keeps its `type: passage`
+  default, and still migrates a 1.2.0 key-and-values configuration.
+- The theme's entry script now writes and clears `data-hc-*` attributes and one
+  `hc-hidden-properties` style key, and nothing else. It no longer registers a
+  slash command, injects a menu entry, opens a dialog, or reads any file, so a
+  graph running both packages has neither one clearing the other's work on
+  unload.
+- The release archive no longer carries `bible.js` or `resources/`, and the
+  theme's third-party notices no longer cover the Bible manifest; both moved to
+  the Passage package's own.
+
 ## 1.10.1 - 2026-09-05
 
 - Hovering a block no longer fills it with the raised gray background. The

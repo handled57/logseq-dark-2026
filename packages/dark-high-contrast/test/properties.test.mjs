@@ -1,9 +1,14 @@
-/* Behavioral tests for the property-hiding entry script.
+/* Behavioral tests for the theme's entry script.
  *
  * `index.js` is a classic script, not a module, so it exports nothing. Running
  * it in a `vm` context against a stub host puts its top-level function
  * declarations on that context's global object, which is enough to drive
  * `paint()` over a fake block tree and read the attributes it writes.
+ *
+ * Everything the theme annotates is a block that already exists. Writing a
+ * passage belongs to the Passage package and is tested there; what is tested
+ * here is that the theme reads a passage block correctly, from the content
+ * shape both sides agree on in `docs/contracts/passage-v1.md`.
  */
 
 import assert from 'node:assert/strict'
@@ -14,14 +19,7 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-/* `index.html` loads the reference parser ahead of the entry script, and they
- * share one global scope; the context below is built the same way. */
-const parser = new vm.Script(await readFile(resolve(root, 'bible.js'), 'utf8'))
 const source = new vm.Script(await readFile(resolve(root, 'index.js'), 'utf8'))
-const BIBLE_MANIFEST = JSON.parse(
-  await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8')
-)
-
 function element() {
   const attributes = new Map()
 
@@ -54,10 +52,9 @@ function block(properties) {
   return { host, table }
 }
 
-/* A stand-in for the parts of the host document the command path touches: the
- * `<` command popup, the editing textarea, and the reference dialog. Only the
- * selector forms `index.js` actually uses are supported — a compound of tag,
- * id, class and attribute-presence tokens, optionally in a comma list. */
+/* A stand-in for the parts of the host document `index.js` reads. Only the
+ * selector forms it actually uses are supported — a compound of tag, id, class
+ * and attribute-presence tokens, optionally in a comma list. */
 function matchesSelector(target, selector) {
   return selector.split(',').some((part) => {
     const tokens = part.trim().match(/^[a-z]+|[.#][\w-]+|\[[^\]]+\]/gi) ?? []
@@ -138,103 +135,20 @@ function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
   return self
 }
 
-const PASSAGE_UUID = '65f00000-0000-0000-0000-00000000000a'
 const PASSAGE_SOURCE = '#+BEGIN_PASSAGE\n**John 3:16**\n\n#+END_PASSAGE'
-/* What the commands actually write: the block's property drawer, then the
- * markup. The drawer belongs at the top of the block, not beside the marker. */
+/* What the Passage v1 contract says a passage block holds: the block's property
+ * drawer, then the markup. The drawer belongs at the top of the block, not
+ * beside the marker. */
 const PASSAGE_PROPERTIES = 'tags:: \ntype:: Passage'
 const PASSAGE_BLOCK = `${PASSAGE_PROPERTIES}\n${PASSAGE_SOURCE}`
-/* The blank line under the bold reference: the writing line. */
-const WRITING_LINE = PASSAGE_BLOCK.indexOf('\n\n') + 1
-
-function editingArea({ value = '', cursor = value.length, uuid = PASSAGE_UUID } = {}) {
-  return node('textarea', {
-    id: `edit-block-1-${uuid}`,
-    classes: ['block-editor'],
-    value,
-    selectionStart: cursor
-  })
-}
-
-function commandPopup(labels = ['Query']) {
-  const menu = node('div', { id: 'ui__ac' })
-  for (const label of labels) {
-    const item = node('a', { classes: ['menu-link'] })
-    item.textContent = label
-    menu.appendChild(item)
-  }
-  return menu
-}
-
-/* `insertPassage` awaits the invocation capture before the dialog is built, so
- * the dialog exists only after the microtask queue has drained. */
-const flush = () => new Promise((resolve) => setImmediate(resolve))
-
-const dialogOf = (context) => context.parent.document.querySelector('[data-hc-passage-dialog]')
-
-function control(dialog, tag, label) {
-  return dialog.querySelectorAll(tag).find((candidate) => candidate.textContent === label)
-}
-
-function fill(dialog, reference) {
-  const input = dialog.querySelector('input')
-  input.value = reference
-  input.dispatch('input')
-  return input
-}
-
-/* The Bible files as the loader finds them, by either of the two routes that
- * can answer: `fetch`, which is what a sandbox served over http has, and the
- * host's own `readFile` action, which is what the desktop app has because
- * `fetch` cannot read `file://`. A test that names no files leaves every route
- * failing, which is the Marketplace install with no Bible data present. */
-const PLUGIN_ROOT = 'file:///plugins/logseq-dark-high-contrast-theme'
-
-function bibleRoutes({ files, via = 'fetch' }) {
-  if (via === 'fetch') {
-    return {
-      fetch: async (path) => ({
-        ok: path in files,
-        async text() {
-          return JSON.stringify(files[path])
-        }
-      })
-    }
-  }
-
-  const read = (path) => {
-    const name = path.replace(`${PLUGIN_ROOT.replace('file://', '')}/`, '')
-    if (!(name in files)) throw new Error(`no such file: ${path}`)
-    return JSON.stringify(files[name])
-  }
-
-  return {
-    lsr: PLUGIN_ROOT,
-    apis: {
-      async doAction([action, path]) {
-        assert.equal(action, 'readFile')
-        return read(path)
-      }
-    }
-  }
-}
-
-function load(settings, blocks = [], storedBlocks = {}, host = node('body'), bible = null) {
-  const routes = bible ? bibleRoutes(bible) : {}
-  const listeners = []
+function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   const provided = []
   const observers = []
-  const commands = []
-  const updates = []
-  const edits = []
   const unloads = []
   let blockReads = 0
-  const messages = []
   const context = {
     console,
     setImmediate,
-    messages,
-    ...(routes.fetch ? { fetch: routes.fetch } : {}),
     MutationObserver: class {
       constructor() {
         this.connected = false
@@ -250,30 +164,15 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body'), bib
       }
     },
     parent: {
-      ...(routes.apis ? { apis: routes.apis } : {}),
       requestAnimationFrame(callback) {
         callback()
       },
       document: {
         body: host,
-        listeners,
         getElementById: () => element(),
         createElement: (tag) => node(tag),
-        /* The host's own shortcuts are bound here, which is why the dialog
-         * claims its keys here too; only the capturing phase is recorded,
-         * because that is the only phase it uses. */
-        addEventListener(type, handler, capture) {
-          if (capture) listeners.push({ type, handler })
-        },
-        removeEventListener(type, handler) {
-          const index = listeners.findIndex(
-            (entry) => entry.type === type && entry.handler === handler
-          )
-          if (index !== -1) listeners.splice(index, 1)
-        },
-        /* The two block collections keep their purpose-built stubs; everything
-         * else — the popup, the editor, the dialog — is served by the host
-         * stand-in. */
+        /* The two block collections keep their purpose-built stubs; anything
+         * else is served by the host stand-in. */
         querySelector: (selector) => host.querySelector(selector),
         querySelectorAll: (selector) =>
           selector === '.block-properties' ? blocks.map(({ table }) => table)
@@ -283,29 +182,13 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body'), bib
     },
     logseq: {
       settings,
-      ...(routes.lsr ? { baseInfo: { lsr: routes.lsr } } : {}),
       provided,
       observers,
       unloads,
       Editor: {
-        commands,
-        updates,
-        edits,
         async getBlock(uuid) {
           blockReads += 1
           return storedBlocks[uuid] ?? null
-        },
-        async getCurrentBlock() {
-          return storedBlocks[PASSAGE_UUID] ?? null
-        },
-        registerSlashCommand(name, action) {
-          commands.push({ name, action })
-        },
-        async updateBlock(uuid, content) {
-          updates.push({ uuid, content })
-        },
-        async editBlock(uuid, options) {
-          edits.push({ uuid, ...options })
         }
       },
       beforeunload(handler) {
@@ -324,11 +207,6 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body'), bib
         provided.push(style)
       },
       onSettingsChanged() {},
-      UI: {
-        showMsg(text, status) {
-          messages.push({ text, status })
-        }
-      },
       App: { onRouteChanged() {} },
       ready(main) {
         return Promise.resolve(main())
@@ -336,27 +214,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body'), bib
     }
   }
 
-  /* A key as the host delivers it: to the document's capturing listeners, in
-   * order, before anything nested has seen it. */
-  context.press = (key) => {
-    let stopped = false
-    const event = {
-      key,
-      preventDefault() {},
-      stopPropagation() {
-        stopped = true
-      },
-      stopImmediatePropagation() {
-        stopped = true
-      }
-    }
-
-    for (const { handler } of [...listeners]) handler(event)
-    return stopped
-  }
-
   vm.createContext(context)
-  parser.runInContext(context)
   source.runInContext(context)
   context.blockReads = () => blockReads
 
@@ -502,7 +360,7 @@ test('an already-configured graph is not overwritten by migration', async () => 
   assert.equal(context.logseq.settings.hiddenProperties, 'status: done')
 })
 
-test('the entry provides the one style rule that does the hiding', async () => {
+test('the entry provides the one style rule that does the hiding, and only that', async () => {
   const context = await render({}, [])
 
   // Structural, not deep-equal: the object crosses out of the vm realm, so it
@@ -510,27 +368,9 @@ test('the entry provides the one style rule that does the hiding', async () => {
   const hiding = context.logseq.provided.find(({ key }) => key === 'hc-hidden-properties')
   assert.equal(hiding.style, '.block-properties[data-hc-hidden] { display: none; }')
 
-  // The reference dialog is chrome the plugin owns, so it is styled here rather
-  // than in theme.css, which only applies while this theme is the selected one.
-  const dialog = context.logseq.provided.find(({ key }) => key === 'hc-passage-dialog')
-  assert.match(dialog.style, /\[data-hc-passage-dialog\]/)
-  assert.equal(context.logseq.provided.length, 2)
-
-  // A dialog button is black with white text in every state it has, so focus
-  // shows as the orange border and never as an orange fill. Logseq's own button
-  // rules are weighted, so these have to be.
-  const fill = dialog.style.slice(dialog.style.indexOf('] button,')).split('}')[0]
-  assert.match(fill, /--vscode-hc-white, #ffffff\) !important/)
-  assert.match(fill, /--vscode-hc-black, #000000\) !important/)
-  const states = fill.split('{')[0]
-  for (const state of ['button', 'button:hover', 'button:focus', 'button:focus-visible', 'button:active']) {
-    assert.match(states, new RegExp(`\\] ${state}\\b(?!-)`), `no black fill declared for ${state}`)
-  }
-  // The focus token marks an edge and never a surface: nowhere in the dialog is
-  // it a fill.
-  for (const declaration of dialog.style.match(/[a-z-]+:[^;{}]*--vscode-hc-focus[^;]*;/g) ?? []) {
-    assert.match(declaration, /^(border-color|outline):/, declaration)
-  }
+  // The entry provides no other style: everything the theme paints is in
+  // theme.css, and the Passage dialog is styled by the plugin that owns it.
+  assert.equal(context.logseq.provided.length, 1)
 })
 
 function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '', wrapperSelector = '', uuid = '' } = {}) {
@@ -731,228 +571,9 @@ test('a passage that runs its verses together keeps its numbers where they are',
   }
 })
 
-/* The display options, by the id each checkbox carries. */
-const DISPLAY_BOXES = {
-  headings: '#hc-passage-headings',
-  numbers: '#hc-passage-numbers',
-  perLine: '#hc-passage-lines'
-}
-
-function choose(dialog, keys) {
-  for (const key of keys) {
-    const box = dialog.querySelector(DISPLAY_BOXES[key])
-    assert.ok(box, `the dialog has no ${key} checkbox`)
-    box.checked = true
-  }
-}
-
-/* Drives one insertion from invocation to the reference being submitted, with
- * the named display options checked beside it. */
-async function invoke(context, run, reference = 'John 3:16', options = []) {
-  const invocation = run()
-  await flush()
-
-  const dialog = dialogOf(context)
-  fill(dialog, reference)
-  choose(dialog, options)
-  dialog.querySelector('form').dispatch('submit')
-  await invocation
-  await flush()
-
-  return dialog
-}
-
-function commandContext({ value = '', cursor, menu = null, bible = null } = {}) {
+test('unloading clears every attribute the theme wrote and stops observing', async () => {
   const host = node('body')
-  if (menu) host.appendChild(menu)
-  host.appendChild(editingArea({ value, cursor }))
-  return { host, context: load({}, [], {}, host, bible) }
-}
-
-test('the slash command writes the passage source and leaves the cursor on the writing line', async () => {
-  const { context } = commandContext()
-  await Promise.resolve()
-
-  const [command] = context.logseq.Editor.commands
-  assert.equal(command.name, 'Passage')
-
-  await invoke(context, () => command.action())
-
-  assert.deepEqual(context.logseq.Editor.updates, [{ uuid: PASSAGE_UUID, content: PASSAGE_BLOCK }])
-  assert.deepEqual(context.logseq.Editor.edits, [{ uuid: PASSAGE_UUID, pos: WRITING_LINE }])
-  // The cursor sits at the start of the blank line, with the terminator below.
-  assert.equal(PASSAGE_BLOCK.slice(WRITING_LINE), '\n#+END_PASSAGE')
-})
-
-test('the passage properties join the drawer the block already has', async () => {
-  // A block holds one property drawer, so a key the user already wrote is left
-  // exactly as it stands and only the missing one is added beneath it.
-  const value = 'type:: Note\n'
-  const { context } = commandContext({ value })
-  await Promise.resolve()
-
-  await invoke(context, () => context.logseq.Editor.commands[0].action())
-
-  assert.equal(
-    context.logseq.Editor.updates[0].content,
-    `type:: Note\ntags:: \n${PASSAGE_SOURCE}`
-  )
-  // The cursor still lands on the writing line, one 'tags:: ' line further down.
-  const [edit] = context.logseq.Editor.edits
-  assert.equal(
-    context.logseq.Editor.updates[0].content.slice(edit.pos),
-    '\n#+END_PASSAGE'
-  )
-})
-
-test('only the invocation text is removed, and the text around it is kept', async () => {
-  const { context } = commandContext({ value: 'see /pass then', cursor: 9 })
-  await Promise.resolve()
-
-  await invoke(context, () => context.logseq.Editor.commands[0].action())
-
-  assert.equal(
-    context.logseq.Editor.updates[0].content,
-    `${PASSAGE_PROPERTIES}\nsee \n${PASSAGE_SOURCE}\n then`
-  )
-})
-
-test('a slash that belongs to the prose is never eaten', async () => {
-  // Logseq's own `editor/clear-current-slash` has already removed the
-  // invocation by the time the hook runs, so a bare trailing slash is text.
-  const { context } = commandContext({ value: 'and/or ' })
-  await Promise.resolve()
-
-  await invoke(context, () => context.logseq.Editor.commands[0].action())
-
-  assert.equal(
-    context.logseq.Editor.updates[0].content,
-    `${PASSAGE_PROPERTIES}\nand/or \n${PASSAGE_SOURCE}`
-  )
-})
-
-test('the reference dialog autofocuses, and stays open until it has a reference', async () => {
-  const { context } = commandContext()
-  await Promise.resolve()
-
-  const invocation = context.logseq.Editor.commands[0].action()
-  await flush()
-
-  const dialog = dialogOf(context)
-  const input = dialog.querySelector('input')
-  assert.equal(input.focused, true)
-
-  const insert = control(dialog, 'button', 'Insert')
-  assert.equal(insert.disabled, true, 'an empty reference is not submittable')
-
-  fill(dialog, '   ')
-  assert.equal(insert.disabled, true, 'whitespace is not a reference')
-  dialog.querySelector('form').dispatch('submit')
-  await flush()
-  assert.ok(dialogOf(context), 'the dialog closed on a blank reference')
-  assert.deepEqual(context.logseq.Editor.updates, [])
-
-  fill(dialog, 'John 3:16')
-  assert.equal(insert.disabled, false)
-  // Enter submits.
-  dialog.dispatch('keydown', { key: 'Enter' })
-  await invocation
-
-  assert.equal(context.logseq.Editor.updates[0].content, PASSAGE_BLOCK)
-  assert.equal(dialogOf(context), null, 'the dialog outlived the insertion')
-})
-
-test('Escape and Cancel dismiss the dialog without touching the block', async () => {
-  for (const dismiss of [
-    (dialog) => dialog.dispatch('keydown', { key: 'Escape' }),
-    (dialog) => control(dialog, 'button', 'Cancel').dispatch('click')
-  ]) {
-    const { context } = commandContext({ value: 'untouched' })
-    await Promise.resolve()
-
-    const invocation = context.logseq.Editor.commands[0].action()
-    await flush()
-
-    const dialog = dialogOf(context)
-    fill(dialog, 'John 3:16')
-    dismiss(dialog)
-    await invocation
-
-    assert.deepEqual(context.logseq.Editor.updates, [])
-    assert.deepEqual(context.logseq.Editor.edits, [])
-    assert.equal(dialogOf(context), null)
-  }
-})
-
-test('the angle-bracket picker gains exactly one Passage entry, however often it repaints', async () => {
-  const menu = commandPopup(['Query', 'Embed'])
-  const { context } = commandContext({ value: 'note <pas', menu })
-  await Promise.resolve()
-
-  const entries = () => menu.querySelectorAll('[data-hc-command]')
-  assert.equal(entries().length, 1)
-  assert.equal(entries()[0].textContent, 'Passage')
-  // Cloned from the host's own entry, so it inherits the popup's markup.
-  assert.equal(entries()[0].classList.has('menu-link'), true)
-
-  // Repainting is what the childList observer does after the injection, so the
-  // bridge has to recognize its own node and settle.
-  context.paint()
-  context.paint()
-  assert.equal(entries().length, 1)
-
-  // Unrelated entries are left exactly as the host wrote them.
-  assert.deepEqual(menu.children.slice(0, 2).map(({ textContent }) => textContent), ['Query', 'Embed'])
-})
-
-test('the Passage entry is withdrawn once the trigger no longer matches', async () => {
-  const menu = commandPopup()
-  const { context, host } = commandContext({ value: 'note <pas', menu })
-  await Promise.resolve()
-
-  assert.equal(menu.querySelectorAll('[data-hc-command]').length, 1)
-
-  // A filter Passage cannot match, then no editor at all: a route change.
-  const editor = host.querySelector('textarea')
-  editor.value = 'note <query'
-  editor.selectionStart = editor.value.length
-  context.paint()
-  assert.equal(menu.querySelectorAll('[data-hc-command]').length, 0)
-
-  editor.remove()
-  context.paint()
-  assert.equal(host.querySelectorAll('[data-hc-command]').length, 0)
-})
-
-test('the picker entry routes through the same insertion path as the slash command', async () => {
-  const menu = commandPopup()
-  const { context } = commandContext({ value: 'note <pas', menu })
-  await Promise.resolve()
-
-  const [entry] = menu.querySelectorAll('[data-hc-command]')
-  await invoke(context, () => entry.dispatch('mousedown'))
-
-  // The `<` picker clears nothing itself, so the bridge removes the trigger.
-  assert.equal(
-    context.logseq.Editor.updates[0].content,
-    `${PASSAGE_PROPERTIES}\nnote \n${PASSAGE_SOURCE}`
-  )
-  assert.deepEqual(context.logseq.Editor.edits, [{ uuid: PASSAGE_UUID, pos: 5 + 1 + WRITING_LINE }])
-})
-
-test('a popup that is not the angle-bracket picker is left alone', async () => {
-  const menu = commandPopup()
-  // The `/` menu renders in the same popup, and has its own plugin API.
-  const { context } = commandContext({ value: 'note /pas', menu })
-  await Promise.resolve()
-
-  assert.equal(menu.querySelectorAll('[data-hc-command]').length, 0)
-  assert.equal(context.logseq.Editor.commands.length, 1)
-})
-
-test('unloading leaves no injected node or written attribute behind', async () => {
-  const menu = commandPopup()
-  const { context, host } = commandContext({ value: 'note <pas', menu })
+  const context = load({}, [], {}, host)
   await Promise.resolve()
 
   const painted = node('div', {
@@ -967,386 +588,34 @@ test('unloading leaves no injected node or written attribute behind', async () =
   host.appendChild(painted)
   host.appendChild(table)
 
-  const invocation = context.logseq.Editor.commands[0].action()
-  await flush()
-  assert.ok(dialogOf(context))
-
   const [unload] = context.logseq.unloads
   await unload()
 
-  assert.equal(host.querySelectorAll('[data-hc-command]').length, 0)
-  assert.equal(dialogOf(context), null)
   assert.equal(painted.attributes.has('data-hc-hide-bullet'), false)
   assert.equal(painted.attributes.has('data-hc-block-type'), false)
   assert.equal(painted.attributes.has('data-hc-verse-lines'), false)
   assert.equal(table.attributes.has('data-hc-hidden'), false)
   assert.equal(context.logseq.observers[0].connected, false)
-
-  // The prompt that was open when the plugin unloaded settles as a
-  // cancellation rather than hanging, and writes nothing.
-  await invocation
-  assert.deepEqual(context.logseq.Editor.updates, [])
 })
 
-/* The Bible files the loader reads, keyed by the paths `index.js` asks for. */
-const MANIFEST_FILE = 'resources/bible.books.json'
-const TEXT_FILE = 'resources/bible.text.json'
-const TEXT_SETTING = 'biblePassageText'
-
-const TEXT_INDEX = {
-  books: {
-    John: {
-      3: {
-        verses: ['For God so loved the world.', 'Indeed, God did not send the Son.'],
-        numbers: [16, 17],
-        paragraphs: [16]
-      }
-    },
-    Gen: {
-      1: {
-        verses: ['In the beginning.', 'And the earth was a formless void.'],
-        paragraphs: [1, 2]
-      }
-    }
-  }
-}
-
-/* The dialog is only reached once the manifest has been read, and the read is a
- * promise chain, so the whole queue is drained before the invocation starts. */
-async function bibleContext(options) {
-  const { context, host } = commandContext(options)
-  await flush()
-  return { context, host }
-}
-
-test('a resolved reference is written canonically, with its chapter tags and text', async () => {
-  const { context } = await bibleContext({
-    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
-  })
-
-  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'jn 3:16-17')
-
-  const [{ content }] = context.logseq.Editor.updates
-  assert.equal(
-    content,
-    'tags:: John/3\ntype:: Passage\n' +
-      '#+BEGIN_PASSAGE\n**John 3:16-17**\n\n' +
-      'For God so loved the world. Indeed, God did not send the Son.\n' +
-      '#+END_PASSAGE'
-  )
-  // The cursor lands at the end of the text that was written, ready to continue.
-  const [edit] = context.logseq.Editor.edits
-  assert.equal(content.slice(edit.pos), '\n#+END_PASSAGE')
-  assert.deepEqual(context.messages, [])
-})
-
-test('a passage of more than one paragraph is written with a blank line between them', async () => {
-  const { context } = await bibleContext({
-    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
-  })
-
-  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Gen 1:1-2')
-
-  assert.equal(
-    context.logseq.Editor.updates[0].content,
-    'tags:: Gen/1\ntype:: Passage\n' +
-      '#+BEGIN_PASSAGE\n**Genesis 1:1-2**\n\n' +
-      'In the beginning.\n\nAnd the earth was a formless void.\n' +
-      '#+END_PASSAGE'
-  )
-})
-
-test('a passage spanning books is tagged with every chapter it covers', async () => {
-  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
-
-  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Gen 50 - Ex 2')
-
-  assert.equal(
-    context.logseq.Editor.updates[0].content,
-    'tags:: Gen/50, Ex/1, Ex/2\ntype:: Passage\n' +
-      '#+BEGIN_PASSAGE\n**Genesis 50 - Exodus 2**\n\n#+END_PASSAGE'
-  )
-})
-
-test('a reference that does not resolve keeps the dialog open with the reason', async () => {
-  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
-
-  const invocation = context.logseq.Editor.commands[0].action()
-  await flush()
-  const dialog = dialogOf(context)
-  const reason = () => dialog.querySelector('p').textContent
-
-  for (const [reference, expected] of [
-    ['Ex 2-Gen 50', /backwards/],
-    ['Gen 51', /50 chapters/],
-    ['John 3:37', /no verse 37/],
-    ['Habbakuk 1', /No book named/],
-    ['nonsense', /not a passage reference/]
-  ]) {
-    fill(dialog, reference)
-    dialog.querySelector('form').dispatch('submit')
-    await flush()
-
-    assert.ok(dialogOf(context), `the dialog closed on ${reference}`)
-    assert.match(reason(), expected)
-    assert.deepEqual(context.logseq.Editor.updates, [], reference)
-  }
-
-  // Typing again clears the message, and a reference that resolves is written.
-  fill(dialog, 'John 3:16')
-  assert.equal(reason(), '')
-  dialog.querySelector('form').dispatch('submit')
-  await invocation
-  await flush()
-
-  assert.equal(context.logseq.Editor.updates.length, 1)
-  assert.match(context.logseq.Editor.updates[0].content, /\*\*John 3:16\*\*/)
-  assert.equal(dialogOf(context), null)
-})
-
-test('without the text index the reference and tags are still written, with a notice', async () => {
-  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
-
-  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Psalms 23')
-
-  assert.equal(
-    context.logseq.Editor.updates[0].content,
-    `tags:: Ps/23\ntype:: Passage\n#+BEGIN_PASSAGE\n**Psalms 23**\n\n#+END_PASSAGE`
-  )
-  assert.equal(context.messages.length, 1)
-  assert.match(context.messages[0].text, /build-bible-index/)
-
-  // The notice is a standing condition, not something to repeat per passage.
-  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Ps 24')
-  assert.equal(context.messages.length, 1)
-})
-
-test('with no Bible data at all the reference is written exactly as it was typed', async () => {
-  // A Marketplace install carries the manifest, but a graph that cannot read it
-  // still has a working command: the theme never depends on the Bible files.
-  const { context } = await bibleContext({})
-
-  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'my own note')
-
-  assert.equal(
-    context.logseq.Editor.updates[0].content,
-    `${PASSAGE_PROPERTIES}\n#+BEGIN_PASSAGE\n**my own note**\n\n#+END_PASSAGE`
-  )
-  assert.deepEqual(context.messages, [])
-})
-
-test('the desktop route reads the Bible files through the host, not through fetch', async () => {
-  // `fetch` cannot read `file://`, and the sandbox runs from `file://` on the
-  // desktop, so the files are read with the host's own action against a path
-  // built from the plugin root. No `fetch` exists in this context at all.
-  const { context } = await bibleContext({
-    bible: {
-      via: 'file',
-      files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX }
-    }
-  })
-
-  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'John 3:16')
-
-  assert.equal(
-    context.logseq.Editor.updates[0].content,
-    'tags:: John/3\ntype:: Passage\n' +
-      '#+BEGIN_PASSAGE\n**John 3:16**\n\nFor God so loved the world.\n#+END_PASSAGE'
-  )
-})
-
-test('a configured text index is read from its own path, not from the theme folder', async () => {
+/* The theme owns `data-hc-*` and nothing else. Passage writes its own
+ * `data-passage-*` nodes into the same host document, and a teardown that
+ * reached for those would clear a sibling plugin's UI out from under it. */
+test('the theme neither writes nor clears a node another plugin owns', async () => {
   const host = node('body')
-  host.appendChild(editingArea())
-  const context = load(
-    { [TEXT_SETTING]: '/graph/bible.text.json' },
-    [],
-    {},
-    host,
-    { via: 'file', files: { [MANIFEST_FILE]: BIBLE_MANIFEST } }
-  )
-  // The host answers for the configured path alone: an absolute path is never
-  // joined to the plugin root.
-  context.parent.apis.doAction = async ([, path]) => {
-    if (path === '/graph/bible.text.json') return JSON.stringify(TEXT_INDEX)
-    if (path.endsWith(MANIFEST_FILE)) return JSON.stringify(BIBLE_MANIFEST)
-    throw new Error(`no such file: ${path}`)
-  }
-  await flush()
+  const context = load({}, [], {}, host)
+  await Promise.resolve()
 
-  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'John 3:17')
+  const foreign = node('div', { attributes: { 'data-passage-command': 'passage' } })
+  host.appendChild(foreign)
 
-  assert.match(context.logseq.Editor.updates[0].content, /Indeed, God did not send the Son\./)
-  assert.deepEqual(context.messages, [])
-})
+  const [unload] = context.logseq.unloads
+  await unload()
 
-test('the display options open unchecked, and open unchecked again next time', async () => {
-  const { context } = await bibleContext({
-    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
-  })
-
-  const invocation = context.logseq.Editor.commands[0].action()
-  await flush()
-  const dialog = dialogOf(context)
-
-  // Three boxes, in the order the issue names them, each with its own label.
-  const boxes = dialog.querySelectorAll('input').filter(({ type }) => type === 'checkbox')
-  assert.deepEqual(boxes.map(({ id }) => id), [
-    'hc-passage-headings',
-    'hc-passage-numbers',
-    'hc-passage-lines'
-  ])
-  assert.deepEqual(boxes.map(({ checked }) => checked), [false, false, false])
-  assert.deepEqual(dialog.querySelectorAll('span').map(({ textContent }) => textContent), [
-    'View chapter headings',
-    'View verse numbers',
-    'One verse per line'
-  ])
-
-  choose(dialog, ['headings', 'numbers', 'perLine'])
-  fill(dialog, 'John 3:16')
-  dialog.querySelector('form').dispatch('submit')
-  await invocation
-  await flush()
-
-  // A display option is a choice about the passage in front of you, not a
-  // setting: the next dialog opens with all three off again.
-  const second = context.logseq.Editor.commands[0].action()
-  await flush()
-  const reopened = dialogOf(context)
-  assert.notEqual(reopened, dialog, 'the dialog was reused rather than rebuilt')
+  assert.equal(host.querySelectorAll('[data-passage-command]').length, 1)
   assert.deepEqual(
-    reopened.querySelectorAll('input').filter(({ type }) => type === 'checkbox')
-      .map(({ checked }) => checked),
-    [false, false, false]
+    context.logseq.provided.map(({ key }) => key),
+    ['hc-hidden-properties'],
+    'the theme provides one style key, and it is namespaced to the theme'
   )
-
-  control(reopened, 'button', 'Cancel').dispatch('click')
-  await second
-})
-
-test('each display option formats the passage on its own', async () => {
-  const reference = 'jn 3:16-17'
-  const head = 'tags:: John/3\ntype:: Passage\n#+BEGIN_PASSAGE\n**John 3:16-17**\n\n'
-
-  for (const [options, body] of [
-    [[], 'For God so loved the world. Indeed, God did not send the Son.'],
-    [['headings'], '**John 3**\n\nFor God so loved the world. Indeed, God did not send the Son.'],
-    [
-      ['numbers'],
-      '^^\u00b9\u2076^^For God so loved the world. ^^\u00b9\u2077^^Indeed, God did not send the Son.'
-    ],
-    [['perLine'], 'For God so loved the world.\nIndeed, God did not send the Son.']
-  ]) {
-    const { context } = await bibleContext({
-      bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
-    })
-
-    await invoke(context, () => context.logseq.Editor.commands[0].action(), reference, options)
-
-    assert.equal(
-      context.logseq.Editor.updates[0].content,
-      `${head}${body}\n#+END_PASSAGE`,
-      options.join(' + ') || 'no options'
-    )
-  }
-})
-
-test('the three display options are written together, and the cursor still lands after them', async () => {
-  const { context } = await bibleContext({
-    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
-  })
-
-  await invoke(
-    context,
-    () => context.logseq.Editor.commands[0].action(),
-    'jn 3:16-17',
-    ['headings', 'numbers', 'perLine']
-  )
-
-  const [{ content }] = context.logseq.Editor.updates
-  assert.equal(
-    content,
-    'tags:: John/3\ntype:: Passage\n' +
-      '#+BEGIN_PASSAGE\n**John 3:16-17**\n\n' +
-      '**John 3**\n\n' +
-      '^^\u00b9\u2076^^For God so loved the world.\n' +
-      '^^\u00b9\u2077^^Indeed, God did not send the Son.\n' +
-      '#+END_PASSAGE'
-  )
-  const [edit] = context.logseq.Editor.edits
-  assert.equal(content.slice(edit.pos), '\n#+END_PASSAGE')
-})
-
-test('without the text index the options add nothing to an empty body', async () => {
-  // The body is the reader's to write, so a heading or a verse number would be
-  // metadata standing in for a passage that is not there.
-  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
-
-  await invoke(
-    context,
-    () => context.logseq.Editor.commands[0].action(),
-    'Psalms 23',
-    ['headings', 'numbers', 'perLine']
-  )
-
-  assert.equal(
-    context.logseq.Editor.updates[0].content,
-    'tags:: Ps/23\ntype:: Passage\n#+BEGIN_PASSAGE\n**Psalms 23**\n\n#+END_PASSAGE'
-  )
-  assert.equal(context.messages.length, 1)
-  assert.match(context.messages[0].text, /build-bible-index/)
-})
-
-test('Enter inserts and Escape cancels ahead of the host, wherever the key lands', async () => {
-  // Logseq binds its editor shortcuts on the document, so a key reaches those
-  // before it reaches the dialog: Enter would open a new block behind the
-  // prompt. The dialog claims Enter and Escape in the same capturing phase.
-  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
-
-  const invocation = context.logseq.Editor.commands[0].action()
-  await flush()
-
-  const dialog = dialogOf(context)
-  // A key the dialog does not own is left to whatever has focus.
-  assert.equal(context.press('a'), false)
-
-  fill(dialog, 'Ex 2-Gen 50')
-  assert.equal(context.press('Enter'), true, 'the host still saw Enter')
-  await flush()
-  assert.ok(dialogOf(context), 'a reference that does not resolve closed the dialog')
-  assert.match(dialog.querySelector('p').textContent, /backwards/)
-
-  fill(dialog, 'John 3:16')
-  context.press('Enter')
-  await invocation
-
-  assert.match(context.logseq.Editor.updates[0].content, /\*\*John 3:16\*\*/)
-  assert.equal(dialogOf(context), null)
-  // The claim lasts exactly as long as the dialog does.
-  assert.equal(context.press('Enter'), false)
-  assert.equal(context.parent.document.listeners.length, 0)
-})
-
-test('the document listener is released however the dialog closes', async () => {
-  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
-  const listeners = context.parent.document.listeners
-
-  for (const dismiss of [
-    () => context.press('Escape'),
-    () => control(dialogOf(context), 'button', 'Cancel').dispatch('click'),
-    async () => (await context.logseq.unloads[0]())
-  ]) {
-    const invocation = context.logseq.Editor.commands[0].action()
-    await flush()
-    assert.equal(listeners.length, 1)
-
-    await dismiss()
-    await invocation
-
-    assert.equal(listeners.length, 0)
-    assert.equal(dialogOf(context), null)
-  }
-
-  assert.deepEqual(context.logseq.Editor.updates, [])
 })
