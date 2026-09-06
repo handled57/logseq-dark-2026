@@ -439,7 +439,7 @@ test('fenced code has a single outer border', () => {
   assert.match(css, /pre\s*>\s*code[\s\S]*?background:\s*transparent[\s\S]*?border:\s*0/)
 })
 
-test('named admonitions share their icon color with a four-pixel divider', () => {
+test('named admonitions align their semantic icons with the first line', () => {
   const types = ['tip', 'note', 'important', 'caution', 'pinned', 'warning']
   const scopedTypes = types.map((type) => `.${type}`).join(', ')
   const semanticAccents = {
@@ -461,18 +461,19 @@ test('named admonitions share their icon color with a four-pixel divider', () =>
 
   assert.match(
     css,
-    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?--hc-admonition-first-line-height:\\s*1\\.75rem;[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
   )
   assert.match(
     css,
-    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon\\s*\\{[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?border-right:\\s*4px solid var\\(--hc-admonition-accent\\)\\s*!important`)
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon\\s*\\{[\\s\\S]*?justify-content:\\s*flex-start\\s*!important[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?border-right:\\s*4px solid var\\(--hc-admonition-accent\\)\\s*!important`)
   )
   assert.match(
     css,
-    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon svg\\s*\\{[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?fill:\\s*var\\(--hc-admonition-accent\\)\\s*!important`)
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon svg\\s*\\{[\\s\\S]*?transform:\\s*translateY\\(calc\\(\\(var\\(--hc-admonition-first-line-height\\) - 2rem\\) \\/ 2\\)\\);[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?fill:\\s*var\\(--hc-admonition-accent\\)\\s*!important`)
   )
 
   assert.doesNotMatch(css, /\.admonitionblock:not\(/)
+  assert.doesNotMatch(css, /\.block-body > \.passage::after \{[^}]*translateY/)
   assert.match(css, /blockquote\s*\{[\s\S]*?border-left:\s*4px solid var\(--vscode-hc-border\)/)
   assert.match(css, /\.notification-content\.warning,\s*\.warning\s*\{[\s\S]*?border-color:\s*var\(--vscode-hc-yellow\)\s*!important/)
 })

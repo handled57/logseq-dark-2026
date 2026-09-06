@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased
+
+- Align the icons in `tip`, `note`, `important`, `caution`, `warning`, and
+  `pinned` admonitions with the first rendered line while preserving the
+  full-height semantic divider. Passage blocks retain their existing layout.
+
 ## 2.0.0 - 2026-09-05
 
 - **Breaking.** Inserting a passage is no longer part of this theme. The

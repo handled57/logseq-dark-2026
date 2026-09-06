@@ -15,6 +15,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../passage) plugin's job, and the theme does not require it.
+- Aligns named-admonition icons with the first rendered line while their semantic divider continues through the full block height.
 - No build runtime, tracking, remote imports, or network access.
 
 ## Color palette

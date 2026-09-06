@@ -1447,7 +1447,13 @@ textarea.block-editor:focus {
 
 /* Rendered admonitions keep Logseq's semantic icon colors, but use the same
  * color for their heavier internal divider. A transparent outer border keeps
- * the existing box dimensions while removing the visible container edge. */
+ * the existing box dimensions while removing the visible container edge.
+ *
+ * Logseq's icon column carries `justify-center`, which centers the icon over
+ * the full height of a long admonition. Keep the column (and therefore its
+ * divider) stretched to the full height, but pin its contents to the top. The
+ * icon is 2rem square while the `text-lg` content's first line box is 1.75rem,
+ * so half their difference centers the icon on that first rendered line. */
 .admonitionblock.tip {
   --hc-admonition-accent: var(--vscode-hc-focus);
 }
@@ -1470,15 +1476,19 @@ textarea.block-editor:focus {
 }
 
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) {
+  --hc-admonition-first-line-height: 1.75rem;
+
   border-color: transparent !important;
 }
 
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon {
+  justify-content: flex-start !important;
   color: var(--hc-admonition-accent) !important;
   border-right: 4px solid var(--hc-admonition-accent) !important;
 }
 
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon svg {
+  transform: translateY(calc((var(--hc-admonition-first-line-height) - 2rem) / 2));
   color: var(--hc-admonition-accent) !important;
   fill: var(--hc-admonition-accent) !important;
 }
