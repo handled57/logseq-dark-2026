@@ -1,0 +1,59 @@
+{
+  "name": "logseq-anno",
+  "version": "0.1.0",
+  "description": "Import a PDF into a Logseq graph and open the page that carries its annotations and highlights.",
+  "author": "Peter Cole",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/handled57/logseq-dark-2026.git"
+  },
+  "homepage": "https://github.com/handled57/logseq-dark-2026#readme",
+  "bugs": "https://github.com/handled57/logseq-dark-2026/issues",
+  "keywords": [
+    "logseq",
+    "plugin",
+    "pdf",
+    "annotation",
+    "highlights"
+  ],
+  "scripts": {
+    "test": "node --test test/package.test.mjs test/anno.test.mjs",
+    "build": "node ../../scripts/build-release.mjs",
+    "verify:release": "node ../../scripts/verify-release.mjs",
+    "check": "npm test && npm run build && npm run verify:release"
+  },
+  "files": [
+    "index.html",
+    "index.js",
+    "lib",
+    "icon.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "manifest.json"
+  ],
+  "release": {
+    "files": [
+      "package.json",
+      "manifest.json",
+      "index.html",
+      "index.js",
+      "icon.svg",
+      "README.md",
+      "CHANGELOG.md",
+      "THIRD_PARTY_NOTICES.md"
+    ]
+  },
+  "repo": "handled57/logseq-dark-2026",
+  "title": "Anno",
+  "main": "index.html",
+  "effect": true,
+  "logseq": {
+    "id": "logseq-anno",
+    "title": "Anno",
+    "icon": "./icon.svg",
+    "main": "index.html"
+  }
+}

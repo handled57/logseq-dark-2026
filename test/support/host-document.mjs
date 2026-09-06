@@ -18,7 +18,7 @@ export function node(tag, { id = '', classes = [], attributes = {}, ...rest } = 
   const self = {
     tagName: tag.toUpperCase(), id, classList: new Set(classes),
     attributes: new Map(Object.entries(attributes)), children: [], listeners: new Map(),
-    parentElement: null, textContent: '', focused: false, ...rest,
+    parentElement: null, textContent: '', focused: false, clicks: 0, ...rest,
     setAttribute(name, value) { self.attributes.set(name, value) },
     getAttribute(name) { return self.attributes.has(name) ? self.attributes.get(name) : null },
     removeAttribute(name) { self.attributes.delete(name); if (name === 'id') self.id = '' },
@@ -31,6 +31,10 @@ export function node(tag, { id = '', classes = [], attributes = {}, ...rest } = 
     },
     cloneNode() { return node(tag, { id: self.id, classes: [...self.classList], attributes: Object.fromEntries(self.attributes) }) },
     focus() { self.focused = true },
+    /* A click a script performs on an element rather than one a user delivers:
+     * a hidden file input is opened this way, and the host reads it as the same
+     * event either way. */
+    click() { self.clicks += 1; self.dispatch('click') },
     setSelectionRange(start, end) { self.selectionStart = start; self.selectionEnd = end },
     matches: (selector) => matchesSelector(self, selector),
     querySelector: (selector) => descendants(self).find((child) => matchesSelector(child, selector)) ?? null,

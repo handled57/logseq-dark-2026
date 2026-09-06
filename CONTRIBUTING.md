@@ -22,6 +22,9 @@ behavior lives in one package:
 - Passage behavior: `packages/passage/index.js` and classic script
   `bible.js`; its distributable structural manifest is
   `resources/bible.books.json`.
+- Anno behavior: `packages/anno/index.js`, which owns both the import prompt
+  and the asset-naming rule that decides which page Logseq collects a PDF's
+  highlights on.
 - Package identity and exact archive allowlist: each package's `package.json`,
   cross-checked with its `manifest.json`.
 - Shared SDK: `vendor/logseq/lsplugin.user.js`; never copy it into a source
@@ -75,8 +78,10 @@ that Logseq rendered correctly.
 2. In Logseq, enable **Settings → Advanced → Developer mode**.
 3. Open **Plugins → Load unpacked plugin** and choose the relevant extracted
    folder under `dist/`, not `packages/`.
-4. Test Dark High Contrast by itself, Passage by itself, and both together when
-   a change can affect their contract or host-DOM coexistence.
+4. Test each package by itself, and together when a change can affect their
+   content contract or their host-DOM coexistence. For Anno, import a PDF into
+   a scratch graph and confirm the asset, the page, the link, and the
+   `hls__<page title>` page Logseq writes on the first highlight.
 5. Restart or reload the package and check teardown/reload behavior. Exercise
    hover, focus, selection, narrow desktop layouts, and settings affected by the
    change.
@@ -105,10 +110,10 @@ Changes follow the issue and linked-branch workflow:
 
 ## Versions and releases
 
-Theme and Passage versions are independent. A release changes only the selected
-package's `package.json`, `manifest.json` when applicable, and changelog, then
-builds and verifies that package's archive. The package-scoped tag names are
-`theme-vX.Y.Z` and `passage-vX.Y.Z`. A tag must match both the selected
+Theme, Passage and Anno versions are independent. A release changes only the
+selected package's `package.json`, `manifest.json` when applicable, and
+changelog, then builds and verifies that package's archive. The package-scoped
+tag names are `theme-vX.Y.Z`, `passage-vX.Y.Z` and `anno-vX.Y.Z`. A tag must match both the selected
 workspace's package version and the newest version in its changelog. The release
 job runs the full repository gate, rebuilds and verifies the selected workspace,
 and attaches only that workspace's ZIP to its GitHub release. Historical `v*`
@@ -118,7 +123,7 @@ Every user-visible change to a package is released. Bump that package's version
 in the topic branch alongside the change, so its changelog entry is a dated
 version heading rather than an `Unreleased` one and the merge commit is
 releasable; a fix is a patch, a feature a minor, a breaking change a major.
-Shared release-tool changes do not require either package version to change.
+Shared release-tool changes do not require any package version to change.
 Increment a package only when releasing that package, put the same version in
 the newest changelog entry, merge the change, complete manual Logseq acceptance,
 and then create its package-scoped tag. CI is responsible only for validation

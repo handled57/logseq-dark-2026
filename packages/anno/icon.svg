@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Anno for Logseq</title>
+  <desc id="desc">A document with a folded corner, cyan text lines and an orange highlight on black</desc>
+  <rect width="128" height="128" rx="12" fill="#000000"/>
+  <path d="M30 18h44l24 24v68H30z" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M74 18v24h24" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M44 62h40M44 92h40" fill="none" stroke="#6fc3df" stroke-width="6" stroke-linecap="square"/>
+  <path d="M44 77h40" fill="none" stroke="#f38518" stroke-width="12" stroke-linecap="square"/>
+</svg>

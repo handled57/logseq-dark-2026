@@ -5,12 +5,13 @@ import { fileURLToPath } from 'node:url'
 import { repositoryRoot, workspace } from './release-support.mjs'
 
 const releases = {
+  anno: 'packages/anno',
   passage: 'packages/passage',
   theme: 'packages/dark-high-contrast'
 }
 
 export async function selectRelease(tag) {
-  const match = /^(passage|theme)-v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/.exec(tag)
+  const match = /^(anno|passage|theme)-v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/.exec(tag)
   assert.ok(match, `unsupported release tag: ${tag}`)
 
   const [, product, version] = match

@@ -38,9 +38,9 @@ test('shared host fixture models host descendants and event delivery', () => {
 
 test('repository documentation covers package ownership and independent migration', async () => {
   const required = [
-    ['README.md', ['Dark High Contrast', 'Passage', 'CONTRIBUTING.md']],
-    ['CONTRIBUTING.md', ['Node.js 22', 'LOGSEQ_CSS', 'Marketplace submission']],
-    ['docs/architecture.md', ['effect: true', 'MutationObserver', 'release.files']],
+    ['README.md', ['Dark High Contrast', 'Passage', 'Anno', 'CONTRIBUTING.md']],
+    ['CONTRIBUTING.md', ['Node.js 22', 'LOGSEQ_CSS', 'Marketplace submission', 'anno-vX.Y.Z']],
+    ['docs/architecture.md', ['effect: true', 'MutationObserver', 'release.files', 'hls__']],
     ['docs/adding-a-package.md', ['SDK', 'allowlist', 'Manual acceptance']],
     ['docs/migrating-theme-2.md', ['hiddenProperties', 'biblePassageText', 'separately']]
   ]

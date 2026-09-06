@@ -16,6 +16,11 @@ test('package tags select one version-matched release archive', async () => {
     release_name: 'Passage 0.2.0',
     workspace: 'packages/passage'
   })
+  assert.deepEqual(await selectRelease('anno-v0.1.0'), {
+    archive: 'dist/logseq-anno-0.1.0.zip',
+    release_name: 'Anno 0.1.0',
+    workspace: 'packages/anno'
+  })
 })
 
 test('release selection rejects legacy, unknown, and mismatched tags', async () => {
@@ -23,6 +28,7 @@ test('release selection rejects legacy, unknown, and mismatched tags', async () 
   await assert.rejects(selectRelease('unknown-v2.0.0'), /unsupported release tag/)
   await assert.rejects(selectRelease('theme-v2.0.1'), /does not match .*package.json version/)
   await assert.rejects(selectRelease('passage-v1.0.0'), /does not match .*package.json version/)
+  await assert.rejects(selectRelease('anno-v9.9.9'), /does not match .*package.json version/)
 })
 
 test('workflows validate all changes and publish only the selected archive', async () => {
@@ -34,6 +40,7 @@ test('workflows validate all changes and publish only the selected archive', asy
   assert.match(testWorkflow, /git diff --check/)
   assert.match(publishWorkflow, /- "theme-v\*"/)
   assert.match(publishWorkflow, /- "passage-v\*"/)
+  assert.match(publishWorkflow, /- "anno-v\*"/)
   assert.doesNotMatch(publishWorkflow, /- "v\*"/)
   assert.match(publishWorkflow, /scripts\/select-release\.mjs/)
   assert.match(publishWorkflow, /npm run check --workspace "\$\{\{ steps\.package\.outputs\.workspace \}\}"/)
