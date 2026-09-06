@@ -214,7 +214,7 @@ Through version 1.10.1 the Passage command was part of this theme. Upgrading to 
 
 ## Compatibility
 
-Version 2.0.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
+Version 2.1.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
 
 Left-clicking a block bullet expands or collapses that block, the way the fold
 arrow beside it does; a block with nothing to fold stays where it is. To open a
