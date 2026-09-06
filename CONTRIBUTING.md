@@ -31,7 +31,8 @@ behavior lives in one package:
 
 Keep package-specific tests, README, changelog, icons, and notices in that
 package. Update public documentation, changelog, and version metadata with
-user-visible changes.
+user-visible changes, which are released rather than accumulated; see
+[Versions and releases](#versions-and-releases).
 
 ## Commands
 
@@ -100,8 +101,8 @@ Changes follow the issue and linked-branch workflow:
    side, then run the complete gate.
 5. Push the topic branch and leave the issue open for user testing. Do not merge,
    tag, or close it before approval.
-6. After approval, merge into the integration branch, push, and only then close
-   the issue. Tags are created only for an actual release.
+6. After approval, merge into the integration branch, push, tag the release, and
+   only then close the issue.
 
 ## Versions and releases
 
@@ -114,6 +115,10 @@ job runs the full repository gate, rebuilds and verifies the selected workspace,
 and attaches only that workspace's ZIP to its GitHub release. Historical `v*`
 tags remain in Git history but do not trigger the independent release workflow.
 
+Every user-visible change to a package is released. Bump that package's version
+in the topic branch alongside the change, so its changelog entry is a dated
+version heading rather than an `Unreleased` one and the merge commit is
+releasable; a fix is a patch, a feature a minor, a breaking change a major.
 Shared release-tool changes do not require either package version to change.
 Increment a package only when releasing that package, put the same version in
 the newest changelog entry, merge the change, complete manual Logseq acceptance,
