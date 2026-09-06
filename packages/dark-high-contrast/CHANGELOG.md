@@ -5,8 +5,11 @@ All notable changes to this project are documented here.
 ## Unreleased
 
 - Add **Open** immediately above **Open in sidebar** in the context menu opened
-  from a block bullet. It opens that block in the main editor, matching the
-  bullet's ordinary click behavior.
+  from every block bullet. It opens that block in the main editor, matching the
+  bullet's ordinary click behavior, and uses Logseq's native block-menu hook so
+  ordinary, special, top-level, and nested blocks all receive it. Observe the
+  body-level menu portal so the entry is moved into position for every block,
+  rather than only when a special block happens to trigger another repaint.
 - Align the icons in `tip`, `note`, `important`, `caution`, `warning`, and
   `pinned` admonitions with the first rendered line while preserving the
   full-height semantic divider. The passage icon follows the same alignment

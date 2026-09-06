@@ -107,6 +107,8 @@ function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
       return child
     },
     insertBefore(child, before) {
+      const previous = child.parentElement?.children
+      if (previous) previous.splice(previous.indexOf(child), 1)
       child.parentElement = self
       self.children.splice(self.children.indexOf(before), 0, child)
       return child
@@ -162,6 +164,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   const provided = []
   const observers = []
   const unloads = []
+  const blockMenuItems = []
   let blockReads = 0
   const navigations = []
   const documentListeners = new Map()
@@ -174,8 +177,10 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
         observers.push(this)
       }
 
-      observe() {
+      observe(target, options) {
         this.connected = true
+        this.target = target
+        this.options = options
       }
 
       disconnect() {
@@ -217,6 +222,9 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
         async getBlock(uuid) {
           blockReads += 1
           return storedBlocks[uuid] ?? null
+        },
+        registerBlockContextMenuItem(label, action) {
+          blockMenuItems.push({ label, action })
         }
       },
       beforeunload(handler) {
@@ -251,6 +259,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   source.runInContext(context)
   context.blockReads = () => blockReads
   context.navigations = navigations
+  context.blockMenuItems = blockMenuItems
   context.dispatchDocument = (type, event) => {
     for (const handler of documentListeners.get(type) ?? []) handler(event)
   }
@@ -641,13 +650,18 @@ function bulletMenuHost(uuid) {
   return { host, block, bullet, menu }
 }
 
-test('the bullet menu puts one Open action immediately above Open in sidebar', async () => {
+test('the native block menu puts one Open action immediately above Open in sidebar', async () => {
   const uuid = '65f00000-0000-0000-0000-000000000020'
   const fixture = bulletMenuHost(uuid)
   const context = load({}, [], {}, fixture.host)
   await Promise.resolve()
 
-  context.dispatchDocument('contextmenu', { target: fixture.bullet })
+  assert.equal(context.blockMenuItems.length, 1)
+  assert.equal(context.blockMenuItems[0].label, 'Open')
+  assert.equal(context.logseq.observers[0].target, fixture.host)
+  assert.equal(context.logseq.observers[0].options.childList, true)
+  assert.equal(context.logseq.observers[0].options.subtree, true)
+  fixture.menu.appendChild(menuLink(context.blockMenuItems[0].label))
   context.paint()
   context.paint()
 
@@ -655,13 +669,13 @@ test('the bullet menu puts one Open action immediately above Open in sidebar', a
   assert.deepEqual(labels, ['Heading', 'Open', 'Open in sidebar', 'Copy block ref'])
   assert.equal(fixture.menu.querySelectorAll('[data-hc-open-block]').length, 1)
 
-  fixture.menu.querySelector('[data-hc-open-block]').dispatch('click')
+  context.blockMenuItems[0].action({ uuid })
   assert.equal(context.navigations.length, 1)
   assert.equal(context.navigations[0].route, 'page')
   assert.equal(context.navigations[0].parameters.name, uuid)
 })
 
-test('Open targets the nested block whose bullet opened the menu', async () => {
+test('Open uses the UUID Logseq supplies for every block, including a nested block', async () => {
   const outerUuid = '65f00000-0000-0000-0000-000000000021'
   const innerUuid = '65f00000-0000-0000-0000-000000000022'
   const fixture = bulletMenuHost(outerUuid)
@@ -674,32 +688,31 @@ test('Open targets the nested block whose bullet opened the menu', async () => {
 
   const context = load({}, [], {}, fixture.host)
   await Promise.resolve()
-  context.dispatchDocument('contextmenu', { target: bullet })
+  fixture.menu.appendChild(menuLink('Open'))
   context.paint()
-  fixture.menu.querySelector('[data-hc-open-block]').dispatch('click')
+  context.blockMenuItems[0].action({ uuid: innerUuid })
 
   assert.equal(context.navigations.length, 1)
   assert.equal(context.navigations[0].route, 'page')
   assert.equal(context.navigations[0].parameters.name, innerUuid)
 })
 
-test('non-bullet context menus get no Open action and unload removes the bridge', async () => {
+test('a non-block menu is left alone and unload clears the placement marker', async () => {
   const fixture = bulletMenuHost('65f00000-0000-0000-0000-000000000023')
   const context = load({}, [], {}, fixture.host)
   await Promise.resolve()
 
-  context.dispatchDocument('contextmenu', { target: fixture.block })
+  fixture.menu.appendChild(menuLink('Unrelated action'))
   context.paint()
   assert.equal(fixture.menu.querySelector('[data-hc-open-block]'), null)
 
-  context.dispatchDocument('contextmenu', { target: fixture.bullet })
+  fixture.menu.appendChild(menuLink('Open'))
   context.paint()
   assert.ok(fixture.menu.querySelector('[data-hc-open-block]'))
 
   const [unload] = context.logseq.unloads
   await unload()
   assert.equal(fixture.menu.querySelector('[data-hc-open-block]'), null)
-  assert.equal(context.documentListeners.get('contextmenu').length, 0)
 })
 
 test('unloading clears every attribute the theme wrote and stops observing', async () => {
