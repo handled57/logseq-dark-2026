@@ -1,7 +1,8 @@
 {
-  "name": "logseq-dark-high-contrast-theme",
-  "version": "1.10.1",
-  "description": "A Logseq port of Visual Studio Code's Dark High Contrast workbench.",
+  "name": "logseq-dark-2026",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monorepo coordinator for the Dark High Contrast Logseq theme and its sibling packages.",
   "author": "Peter Cole",
   "license": "MIT",
   "repository": {
@@ -10,52 +11,13 @@
   },
   "homepage": "https://github.com/handled57/logseq-dark-2026#readme",
   "bugs": "https://github.com/handled57/logseq-dark-2026/issues",
-  "keywords": [
-    "logseq",
-    "theme",
-    "dark",
-    "high-contrast",
-    "accessibility",
-    "vscode"
+  "workspaces": [
+    "packages/*"
   ],
   "scripts": {
-    "test": "node --test test/theme.test.mjs test/cascade.test.mjs test/properties.test.mjs test/bible.test.mjs",
-    "build": "node scripts/build-release.mjs",
-    "verify:release": "node scripts/verify-release.mjs",
-    "check": "npm test && npm run build && npm run verify:release"
-  },
-  "files": [
-    "theme.css",
-    "index.html",
-    "index.js",
-    "bible.js",
-    "resources/bible.books.json",
-    "lib",
-    "icon.svg",
-    "screenshots",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE",
-    "THIRD_PARTY_NOTICES.md",
-    "manifest.json"
-  ],
-  "repo": "handled57/logseq-dark-2026",
-  "title": "Dark High Contrast",
-  "main": "index.html",
-  "effect": true,
-  "theme": true,
-  "logseq": {
-    "id": "logseq-dark-high-contrast-theme",
-    "title": "Dark High Contrast",
-    "icon": "./icon.svg",
-    "main": "index.html",
-    "themes": [
-      {
-        "name": "Dark High Contrast",
-        "url": "./theme.css",
-        "mode": "dark",
-        "description": "VS Code's Dark High Contrast workbench, adapted for Logseq classic graphs."
-      }
-    ]
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "verify:release": "npm run verify:release --workspaces --if-present",
+    "check": "npm run check --workspaces --if-present"
   }
 }

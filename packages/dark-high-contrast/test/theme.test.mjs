@@ -692,3 +692,29 @@ test('principal foreground/background pairs meet WCAG thresholds', () => {
     assert.ok(contrast(foreground, background) >= minimum, `${name} contrast is too low`)
   }
 })
+
+test('the theme is a self-contained workspace of the monorepo root', async () => {
+  const repo = resolve(root, '..', '..')
+  const workspace = JSON.parse(await readFile(resolve(repo, 'package.json'), 'utf8'))
+
+  assert.equal(workspace.private, true, 'the coordinator would otherwise be publishable')
+  assert.ok(workspace.workspaces.includes('packages/*'), 'the package is outside the workspaces glob')
+  assert.equal(resolve(repo, 'packages', 'dark-high-contrast'), root)
+
+  // The coordinator aggregates; it owns no sources and no dependencies of its
+  // own, so a package stays installable without `npm install`.
+  for (const script of ['test', 'build', 'verify:release', 'check']) {
+    assert.match(workspace.scripts[script], /--workspaces/, `root ${script} does not aggregate`)
+    assert.ok(pkg.scripts[script], `the theme does not define ${script}`)
+  }
+  for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+    assert.equal(workspace[field], undefined, `the root declares ${field}`)
+    assert.equal(pkg[field], undefined, `the theme declares ${field}`)
+  }
+
+  // Everything the archive ships is resolved inside this package: nothing is
+  // read from the repository root or from a sibling package.
+  for (const file of pkg.files) await access(resolve(root, file), constants.R_OK)
+  const build = await readFile(resolve(root, 'scripts', 'build-release.mjs'), 'utf8')
+  assert.ok(!/\.\.\/\.\.|packages\//.test(build), 'the build reaches outside the package')
+})
