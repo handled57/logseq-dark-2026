@@ -21,6 +21,11 @@ All notable changes to this package are documented here.
   host puts the caret back in its own textarea once the command menu closes,
   which sent the reference into the block and left Insert disabled and Enter
   with a blank field to read.
+- The block leaves edit mode before the passage is written. The host saves the
+  textarea it was editing back to the block whenever that session ends, which
+  landed after the insertion and replaced the passage with the line that had
+  been there: the passage appeared and then vanished, leaving an empty block
+  out of edit mode.
 - `npm run build` now copies a local `resources/bible.text.json` into
   `dist/logseq-passage/` after the archive is closed, so the folder you load as
   an unpacked plugin keeps its verse text across rebuilds. The verse text is

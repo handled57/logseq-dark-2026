@@ -280,6 +280,13 @@ async function writePassage({ uuid, content, cursor, trigger }, resolved, displa
     resolved.tags ?? []
   )
 
+  /* The block behind the dialog is still being edited: the slash command puts
+   * the caret back in its own textarea before this handler runs, and the host
+   * writes that textarea back to the block when the session ends. Ending the
+   * session first makes that save happen before the passage is written rather
+   * than after it, where it replaced the passage with the line that had been
+   * there — an empty block, and no edit session left to undo it in. */
+  await logseq.Editor.exitEditingMode?.()
   await logseq.Editor.updateBlock(uuid, written.content)
   await logseq.Editor.editBlock?.(uuid, { pos: written.cursor })
 }

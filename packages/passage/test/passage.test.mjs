@@ -190,12 +190,16 @@ function bibleRoutes({ files, via = 'fetch' }) {
 
 function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
   const routes = bible ? bibleRoutes(bible) : {}
+  /* A command is invoked from a block being edited, so the session is open
+   * until something closes it. */
+  let editing = true
   const listeners = []
   const provided = []
   const observers = []
   const commands = []
   const updates = []
   const edits = []
+  const exits = []
   const unloads = []
   const messages = []
   const context = {
@@ -255,6 +259,7 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
         commands,
         updates,
         edits,
+        exits,
         async getCurrentBlock() {
           return storedBlocks[PASSAGE_UUID] ?? null
         },
@@ -266,6 +271,13 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
         },
         async editBlock(uuid, options) {
           edits.push({ uuid, ...options })
+        },
+        /* Ending the edit session is a write of its own: the host saves the
+         * editing textarea back to the block on the way out. What matters is
+         * where in the order of writes it falls. */
+        async exitEditingMode() {
+          exits.push({ after: updates.length })
+          editing = false
         }
       },
       beforeunload(handler) {
@@ -325,6 +337,17 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
 
   context.bound = (type) => listeners.filter((entry) => entry.type === type).length
 
+  /* The host's edit session ending on its own schedule, which is whenever the
+   * user leaves the block. It writes the textarea it was editing back to the
+   * block, so a session still open at this point overwrites whatever the
+   * plugin wrote. Returns what would be saved, or null if the session is
+   * already closed and nothing is written. */
+  context.endEditSession = () => {
+    if (!editing) return null
+    editing = false
+    return host.querySelector('textarea')?.value ?? ''
+  }
+
   vm.createContext(context)
   parser.runInContext(context)
   source.runInContext(context)
@@ -383,6 +406,27 @@ test('the slash command writes the passage source and leaves the cursor on the w
   assert.deepEqual(context.logseq.Editor.edits, [{ uuid: PASSAGE_UUID, pos: WRITING_LINE }])
   // The cursor sits at the start of the blank line, with the terminator below.
   assert.equal(PASSAGE_BLOCK.slice(WRITING_LINE), '\n#+END_PASSAGE')
+})
+
+test('the block leaves edit mode before the passage is written', async () => {
+  /* The slash command puts the caret back in the block's own textarea before
+   * the plugin's handler runs, so the block is still being edited while the
+   * dialog is open. The host writes that textarea back to the block when the
+   * session ends: left open, the save lands after the passage and replaces it
+   * with the line that was there — an empty block, out of edit mode, and no
+   * session left to undo it in. */
+  const { context } = commandContext()
+  await Promise.resolve()
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action())
+
+  const [exit, ...rest] = context.logseq.Editor.exits
+  assert.ok(exit, 'the block was left in edit mode')
+  assert.equal(exit.after, 0, 'the edit session ended after the passage was written')
+  assert.deepEqual(rest, [], 'the edit session was ended more than once')
+  assert.equal(context.endEditSession(), null, 'the edit session outlived the insertion')
+  // And the block the host is left holding is the passage.
+  assert.equal(context.logseq.Editor.updates.at(-1).content, PASSAGE_BLOCK)
 })
 
 test('the passage properties join the drawer the block already has', async () => {
