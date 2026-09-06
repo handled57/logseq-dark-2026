@@ -193,6 +193,7 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
   /* A command is invoked from a block being edited, so the session is open
    * until something closes it. */
   let editing = true
+  const windowListeners = []
   const listeners = []
   const provided = []
   const observers = []
@@ -223,6 +224,15 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
     },
     parent: {
       ...(routes.apis ? { apis: routes.apis } : {}),
+      addEventListener(type, handler, capture) {
+        if (capture) windowListeners.push({ type, handler })
+      },
+      removeEventListener(type, handler) {
+        const index = windowListeners.findIndex(
+          (entry) => entry.type === type && entry.handler === handler
+        )
+        if (index !== -1) windowListeners.splice(index, 1)
+      },
       requestAnimationFrame(callback) {
         callback()
       },
@@ -310,8 +320,9 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
     }
   }
 
-  /* A key as the host delivers it: to the document's capturing listeners, in
-   * order, before anything nested has seen it. */
+  /* A key as the browser delivers it: window capture first, then document
+   * capture. Logseq's shortcut is already on the document before Passage opens
+   * its prompt, so only the window can stop the key ahead of the host. */
   context.press = (key) => {
     let stopped = false
     const event = {
@@ -325,7 +336,13 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
       }
     }
 
-    for (const { type, handler } of [...listeners]) if (type === 'keydown') handler(event)
+    for (const { type, handler } of [...windowListeners]) {
+      if (type === 'keydown') handler(event)
+      if (stopped) break
+    }
+    if (!stopped) {
+      for (const { type, handler } of [...listeners]) if (type === 'keydown') handler(event)
+    }
     return stopped
   }
 
@@ -335,7 +352,8 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
     for (const { type, handler } of [...listeners]) if (type === 'focusin') handler({ target })
   }
 
-  context.bound = (type) => listeners.filter((entry) => entry.type === type).length
+  context.bound = (type) =>
+    [...windowListeners, ...listeners].filter((entry) => entry.type === type).length
 
   /* The host's edit session ending on its own schedule, which is whenever the
    * user leaves the block. It writes the textarea it was editing back to the
@@ -1003,20 +1021,25 @@ test('without the text index the options add nothing to an empty body', async ()
 })
 
 test('Enter inserts and Escape cancels ahead of the host, wherever the key lands', async () => {
-  // Logseq binds its editor shortcuts on the document, so a key reaches those
-  // before it reaches the dialog: Enter would open a new block behind the
-  // prompt. The dialog claims Enter and Escape in the same capturing phase.
+  // Logseq binds its editor shortcuts on the document before Passage opens the
+  // prompt. Passage claims Enter and Escape on the window, whose capturing
+  // phase runs before the event reaches Logseq's document listener.
   const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
 
   const invocation = context.logseq.Editor.commands[0].action()
   await flush()
 
   const dialog = dialogOf(context)
+  let hostEnters = 0
+  context.parent.document.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') hostEnters += 1
+  }, true)
   // A key the dialog does not own is left to whatever has focus.
   assert.equal(context.press('a'), false)
 
   fill(dialog, 'Ex 2-Gen 50')
   assert.equal(context.press('Enter'), true, 'the host still saw Enter')
+  assert.equal(hostEnters, 0, 'Logseq handled Enter before Passage')
   await flush()
   assert.ok(dialogOf(context), 'a reference that does not resolve closed the dialog')
   assert.match(dialog.querySelector('p').textContent, /backwards/)
@@ -1029,11 +1052,12 @@ test('Enter inserts and Escape cancels ahead of the host, wherever the key lands
   assert.equal(dialogOf(context), null)
   // The claim lasts exactly as long as the dialog does.
   assert.equal(context.press('Enter'), false)
-  assert.equal(context.parent.document.listeners.length, 0)
+  assert.equal(hostEnters, 1, 'Logseq did not regain Enter after the dialog closed')
 
-  /* Every listener the dialog binds on the host document is released with it:
-   * the key claim and the focus hold both last exactly as long as the prompt. */
-  assert.equal(context.bound('keydown'), 0)
+  /* Every listener the dialog binds is released with it: the host's own
+   * document listener remains, while the focus hold lasts only as long as the
+   * prompt. */
+  assert.equal(context.bound('keydown'), 1)
   assert.equal(context.bound('focusin'), 0)
 })
 
@@ -1074,9 +1098,8 @@ test('the dialog keeps the focus the host editor tries to take back', async () =
   assert.match(context.logseq.Editor.updates[0].content, /\*\*John 3:16\*\*/)
 })
 
-test('the document listeners are released however the dialog closes', async () => {
+test('the modal listeners are released however the dialog closes', async () => {
   const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
-  const listeners = context.parent.document.listeners
 
   for (const dismiss of [
     () => context.press('Escape'),
@@ -1085,12 +1108,14 @@ test('the document listeners are released however the dialog closes', async () =
   ]) {
     const invocation = context.logseq.Editor.commands[0].action()
     await flush()
-    assert.equal(listeners.length, 2)
+    assert.equal(context.bound('keydown'), 1)
+    assert.equal(context.bound('focusin'), 1)
 
     await dismiss()
     await invocation
 
-    assert.equal(listeners.length, 0)
+    assert.equal(context.bound('keydown'), 0)
+    assert.equal(context.bound('focusin'), 0)
     assert.equal(dialogOf(context), null)
   }
 

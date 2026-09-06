@@ -26,6 +26,9 @@ All notable changes to this package are documented here.
   landed after the insertion and replaced the passage with the line that had
   been there: the passage appeared and then vanished, leaving an empty block
   out of edit mode.
+- Enter and Escape are claimed on the host window before Logseq's document-level
+  editor shortcuts. Pressing Enter now follows the same insertion path as
+  clicking **Insert**, without the host creating a block behind the prompt.
 - `npm run build` now copies a local `resources/bible.text.json` into
   `dist/logseq-passage/` after the archive is closed, so the folder you load as
   an unpacked plugin keeps its verse text across rebuilds. The verse text is

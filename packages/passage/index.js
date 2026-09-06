@@ -472,7 +472,7 @@ function askForReference() {
 
     function close(choice) {
       dismissDialog = null
-      doc.removeEventListener('keydown', keys, true)
+      parent.removeEventListener('keydown', keys, true)
       doc.removeEventListener('focusin', holdFocus, true)
       overlay.remove()
       resolve(choice)
@@ -515,8 +515,9 @@ function askForReference() {
      * as it is open. The host binds its own editor shortcuts on the document
      * and sees a key there before it ever reaches the dialog — Enter would open
      * a new block behind the prompt — so the dialog claims those two keys on
-     * the same document in the same capturing phase, ahead of the host, and
-     * lets everything else through to whatever has focus. */
+     * the parent window in the capturing phase. Window capture precedes the
+     * document where Logseq has already registered its shortcut, so Passage
+     * can stop Enter before the host creates a block behind the prompt. */
     function keys(event) {
       if (event.key !== 'Enter' && event.key !== 'Escape') return
 
@@ -543,7 +544,7 @@ function askForReference() {
       if (event.key === 'Escape') close(null)
       else if (event.key === 'Enter') submit(event)
     })
-    doc.addEventListener('keydown', keys, true)
+    parent.addEventListener('keydown', keys, true)
     doc.addEventListener('focusin', holdFocus, true)
 
     actions.appendChild(cancel)
