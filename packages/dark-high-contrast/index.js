@@ -15,11 +15,12 @@
  * content shape, `docs/contracts/passage-v1.md`, not a runtime — the theme
  * styles whatever passage blocks a graph holds, whoever wrote them.
  *
- * It also registers an `Open` block-menu action through Logseq's plugin API.
+ * It also takes over the block bullet's left click. Logseq routes that click to
+ * the block's own page; here it folds the block instead, the way the arrow
+ * beside the bullet does, and opening a block in the main editor moves to the
+ * `Open` block-menu action this script registers through Logseq's plugin API.
  * The API puts plugin actions at the end of the menu, so the host-DOM pass
- * moves that registered action immediately before `Open in sidebar`. Its
- * action follows the bullet's ordinary click behavior and opens that block in
- * the main editor.
+ * moves that registered action immediately before `Open in sidebar`.
  *
  * `parent.document` is reachable because package.json declares `effect: true`.
  * That flag keeps the plugin entry on the host's own `file://` origin;
@@ -35,6 +36,11 @@ const TYPE_ATTR = 'data-hc-block-type'
 const BULLET_ATTR = 'data-hc-hide-bullet'
 const VERSE_ATTR = 'data-hc-verse-lines'
 const OPEN_MENU_ATTR = 'data-hc-open-block'
+const BULLET_SELECTOR = '.bullet-link-wrap, .bullet-container'
+/* Whiteboard bullets carry gestures of their own — a portal shape, a shape
+ * link — so they are left to Logseq. */
+const WHITEBOARD_SELECTOR = '.whiteboard-page, .tl-container'
+const HAS_CHILD_ATTR = 'haschild'
 const sourceCache = new Map()
 
 const SPECIAL_CONTENT_SELECTOR = [
@@ -335,6 +341,38 @@ function openBlock({ uuid } = {}) {
   if (uuid) void logseq.App.pushState('page', { name: uuid })
 }
 
+/* Logseq's own handler on `a.bullet-link-wrap` routes a plain click to the
+ * block's page. React listens on its root container, so a capture-phase
+ * listener on the document sees the click first and stopping it there replaces
+ * that navigation without patching anything of Logseq's.
+ *
+ * Only a plain primary click is taken. Shift-click still opens the block in the
+ * sidebar, right-click still opens the block menu, and a drag never becomes a
+ * click, so moving a block is untouched. A block with nothing to fold keeps the
+ * click swallowed: the bullet stops navigating everywhere, rather than only
+ * where a fold is possible.
+ */
+function foldOnBulletClick(event) {
+  if (event.button > 0 || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return
+
+  const bullet = event.target?.closest?.(BULLET_SELECTOR)
+  if (!bullet || bullet.closest(WHITEBOARD_SELECTOR)) return
+
+  const block = bullet.closest('.ls-block')
+  const uuid = block ? blockUuid(block) : ''
+  if (!uuid) return
+
+  event.preventDefault()
+  event.stopPropagation()
+
+  /* Logseq marks a block that has children, collapsed or not, so the one state
+   * the DOM cannot show — the children of a collapsed block — is still known.
+   * The fold itself is Logseq's: `toggle` reads the stored collapsed state and
+   * calls the same collapse and expand handlers the arrow does. */
+  if (block.getAttribute?.(HAS_CHILD_ATTR) !== 'true') return
+  void logseq.Editor.setBlockCollapsed?.(uuid, { flag: 'toggle' })
+}
+
 /* The sandbox is an unrendered iframe, so its own rAF never fires; the host
  * window's does. Coalescing per frame keeps a burst of edit-mode mutations
  * down to one pass. */
@@ -354,6 +392,7 @@ let observer = null
 function teardown() {
   observer?.disconnect()
   observer = null
+  doc.removeEventListener('click', foldOnBulletClick, true)
 
   for (const item of doc.querySelectorAll(`[${OPEN_MENU_ATTR}]`)) item.removeAttribute(OPEN_MENU_ATTR)
   for (const table of doc.querySelectorAll(`[${HIDDEN_ATTR}]`)) table.removeAttribute(HIDDEN_ATTR)
@@ -374,6 +413,7 @@ function main() {
   })
   logseq.beforeunload?.(async () => teardown())
   logseq.Editor.registerBlockContextMenuItem('Open', openBlock)
+  doc.addEventListener('click', foldOnBulletClick, true)
 
   /* childList/subtree only: this observer must not see its own attribute
    * writes, or every pass would schedule another one. */

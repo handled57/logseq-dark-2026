@@ -69,6 +69,15 @@ editing and navigation. Settings changes repaint without reload. On
 attributes, clears its own style, and settles any open prompt without writing.
 Tests cover initial paint, mutations, settings, malformed settings, and cleanup.
 
+Dark High Contrast also replaces one host gesture rather than annotating it: a
+capture-phase `click` listener on the host document folds the block whose bullet
+was left-clicked, in place of the navigation Logseq's own handler performs.
+Capture on the document precedes React's root container, so stopping the event
+there needs no patch of Logseq's; the collapse itself is
+`logseq.Editor.setBlockCollapsed(uuid, { flag: 'toggle' })`, the same handlers
+the fold arrow calls. The listener is registered beside the observer and removed
+in the same teardown, so unloading returns the bullet to Logseq.
+
 ## Passage parser and local text
 
 `packages/passage/bible.js` is a classic browser script loaded before

@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+- Fold a block by left-clicking its bullet. The click that opened the block's
+  own page now expands or collapses it through Logseq's own collapse handling,
+  and a bullet never navigates: a block with no children keeps its click and
+  stays where it is. Opening a block in the main editor is the **Open** entry
+  on the bullet's context menu. Shift-click still opens the block in the
+  sidebar, right-click still opens the menu, dragging a bullet still moves the
+  block, and whiteboard bullets are left to Logseq.
+
 - Draw a block's rail bullet at the size of its own first line. Ordinary prose
   keeps the bullet it had, and a larger first line takes a proportionally larger
   bullet: halo, dot, rings and hover ring all scale by the multiple Logseq sets

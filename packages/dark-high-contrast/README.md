@@ -16,7 +16,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../passage) plugin's job, and the theme does not require it.
 - Sizes named-admonition and passage icons at 1.5 times the first line's font and aligns them with that line while their semantic divider continues through the full block height.
-- Adds **Open** immediately above **Open in sidebar** in a block bullet's context menu, opening that block in the main editor.
+- Left-clicking a block bullet expands or collapses that block rather than opening it. Shift-click still opens the block in the sidebar, and right-clicking offers **Open**, immediately above **Open in sidebar**, to open the block in the main editor.
 - No build runtime, tracking, remote imports, or network access.
 
 ## Color palette
@@ -216,9 +216,12 @@ Through version 1.10.1 the Passage command was part of this theme. Upgrading to 
 
 Version 2.0.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
 
-Right-click a block bullet and choose **Open** to open that block in the main
-editor. The entry sits immediately above Logseq's existing **Open in sidebar**
-action; the existing action and the rest of the menu keep their normal behavior.
+Left-clicking a block bullet expands or collapses that block, the way the fold
+arrow beside it does; a block with nothing to fold stays where it is. To open a
+block in the main editor, right-click its bullet and choose **Open**. The entry
+sits immediately above Logseq's existing **Open in sidebar** action; that
+action, shift-clicking a bullet, dragging a bullet, and the rest of the menu
+keep their normal behavior.
 
 - DB graphs are not supported in this release.
 - Mobile is not an advertised target; narrow desktop windows receive a layout smoke test.
@@ -261,6 +264,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 - Every rendered block in the main editor keeps a bullet, and every bullet stands in the same column: Logseq's own bullet is pulled left by the indentation its nesting level applied plus the margin the rail stands in, so the content column keeps the hierarchy Logseq renders. A cyan line runs behind the bullets, from the centre of the first bullet to the end of the last block.
 - A bullet sits on the middle of its block's first line of text, wherever that line begins. A heading's bullet drops by 1.75 times the size Logseq gives that heading level, both in view and while the heading is being typed; a quote, a passage, an admonition, a code block and a table drop their bullet into the box the block opens with. A block whose first line is a picture keeps its bullet at the top of the block.
 - A bullet is drawn at the size of the line it hangs beside. Ordinary prose is the baseline, and a first line set larger than that takes a proportionally larger bullet: a heading's bullet — halo, dot and rings alike — is drawn at the multiple Logseq sets that heading level in, so an `h1` bullet is twice an ordinary one and an `h6` bullet three quarters of it. The bullet grows around the rail rather than off it, so its centre stays on the line, and a block whose first line is ordinary text — including one opening with a quote, a passage, an admonition, a code block or a table — keeps exactly the bullet it had.
+- A bullet folds and unfolds its block on a left click, so the rail reads as a control column rather than a set of links; navigating into a block moves to **Open** on the bullet's context menu. Whiteboard bullets keep Logseq's own gestures.
 - Hovering a block lights its own bullet in the rail's cyan. An ancestor holding the hovered block keeps its bullet plain, the way the block highlight already behaves.
 - How far left the rail stands is one number, `--hc-rail-offset`. It defaults to 80px, drops to 48px on a window narrower than 1100px, and to 24px on the full-width route, where the only space left of the tree is the scroll container's own padding. A graph that wants the rail nearer its text can set it in `custom.css`.
 - The rail is the page's own tree in the main editor. Sidebars, whiteboards, dialogs and linked references keep Logseq's layout, as do embedded and queried trees rendered inside a block. Document mode and Logseq's right-hand fold button both re-measure indentation, so the rail steps aside for them and bullets render as Logseq draws them.

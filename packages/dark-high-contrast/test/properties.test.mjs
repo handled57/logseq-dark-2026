@@ -165,6 +165,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   const observers = []
   const unloads = []
   const blockMenuItems = []
+  const collapses = []
   let blockReads = 0
   const navigations = []
   const documentListeners = new Map()
@@ -225,6 +226,9 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
         },
         registerBlockContextMenuItem(label, action) {
           blockMenuItems.push({ label, action })
+        },
+        async setBlockCollapsed(uuid, options) {
+          collapses.push({ uuid, options })
         }
       },
       beforeunload(handler) {
@@ -260,6 +264,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   context.blockReads = () => blockReads
   context.navigations = navigations
   context.blockMenuItems = blockMenuItems
+  context.collapses = collapses
   context.dispatchDocument = (type, event) => {
     for (const handler of documentListeners.get(type) ?? []) handler(event)
   }
@@ -713,6 +718,165 @@ test('a non-block menu is left alone and unload clears the placement marker', as
   const [unload] = context.logseq.unloads
   await unload()
   assert.equal(fixture.menu.querySelector('[data-hc-open-block]'), null)
+})
+
+/* One block bullet as Logseq renders it: an anchor inside the control column,
+ * wrapping the halo the dot sits in. `haschild` is Logseq's own marker, and is
+ * the one signal that survives collapsing, which removes the children from the
+ * DOM. */
+function bulletHost({ uuid, hasChild = true, whiteboard = false } = {}) {
+  const host = node('body')
+  const page = node('div', { classes: whiteboard ? ['whiteboard-page'] : ['page-blocks-inner'] })
+  const block = node('div', {
+    classes: ['ls-block'],
+    attributes: { blockid: uuid, haschild: String(hasChild) }
+  })
+  const main = node('div', { classes: ['block-main-container'] })
+  const control = node('div', { classes: ['block-control-wrap'] })
+  const link = node('a', { classes: ['bullet-link-wrap'] })
+  const bullet = node('span', { classes: ['bullet-container'] })
+  const dot = node('span', { classes: ['bullet'] })
+
+  bullet.appendChild(dot)
+  link.appendChild(bullet)
+  control.appendChild(link)
+  main.appendChild(control)
+  block.appendChild(main)
+  page.appendChild(block)
+  host.appendChild(page)
+
+  return { host, block, bullet, dot }
+}
+
+function click(target, modifiers = {}) {
+  const event = {
+    target,
+    button: 0,
+    shiftKey: false,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    prevented: false,
+    stopped: false,
+    preventDefault() {
+      event.prevented = true
+    },
+    stopPropagation() {
+      event.stopped = true
+    },
+    ...modifiers
+  }
+
+  return event
+}
+
+test('a plain left click on a bullet folds its block instead of opening it', async () => {
+  const uuid = '65f00000-0000-0000-0000-000000000030'
+  const fixture = bulletHost({ uuid })
+  const context = load({}, [], {}, fixture.host)
+  await Promise.resolve()
+
+  const event = click(fixture.dot)
+  context.dispatchDocument('click', event)
+
+  assert.equal(context.collapses.length, 1)
+  assert.equal(context.collapses[0].uuid, uuid)
+  assert.equal(context.collapses[0].options.flag, 'toggle')
+  assert.equal(context.navigations.length, 0)
+  assert.equal(event.prevented, true)
+  assert.equal(event.stopped, true)
+})
+
+test('a click anywhere on the bullet, including its halo, folds the block', async () => {
+  const uuid = '65f00000-0000-0000-0000-000000000031'
+  const fixture = bulletHost({ uuid })
+  const context = load({}, [], {}, fixture.host)
+  await Promise.resolve()
+
+  context.dispatchDocument('click', click(fixture.bullet))
+  context.dispatchDocument('click', click(fixture.dot))
+
+  assert.deepEqual(
+    context.collapses.map((entry) => entry.uuid),
+    [uuid, uuid]
+  )
+})
+
+test('a nested block folds itself rather than the block holding it', async () => {
+  const outerUuid = '65f00000-0000-0000-0000-000000000032'
+  const innerUuid = '65f00000-0000-0000-0000-000000000033'
+  const fixture = bulletHost({ uuid: outerUuid })
+  const inner = bulletHost({ uuid: innerUuid })
+  fixture.block.appendChild(inner.block)
+
+  const context = load({}, [], {}, fixture.host)
+  await Promise.resolve()
+
+  context.dispatchDocument('click', click(inner.dot))
+
+  assert.equal(context.collapses.length, 1)
+  assert.equal(context.collapses[0].uuid, innerUuid)
+})
+
+test('a modified or secondary click is left to Logseq', async () => {
+  const fixture = bulletHost({ uuid: '65f00000-0000-0000-0000-000000000034' })
+  const context = load({}, [], {}, fixture.host)
+  await Promise.resolve()
+
+  for (const modifiers of [{ shiftKey: true }, { metaKey: true }, { ctrlKey: true }, { altKey: true }, { button: 1 }]) {
+    const event = click(fixture.dot, modifiers)
+    context.dispatchDocument('click', event)
+    assert.equal(event.prevented, false)
+    assert.equal(event.stopped, false)
+  }
+
+  assert.deepEqual(context.collapses, [])
+})
+
+test('a click outside a bullet, and a whiteboard bullet, are left alone', async () => {
+  const fixture = bulletHost({ uuid: '65f00000-0000-0000-0000-000000000035' })
+  const board = bulletHost({ uuid: '65f00000-0000-0000-0000-000000000036', whiteboard: true })
+  fixture.host.appendChild(board.host.children[0])
+
+  const context = load({}, [], {}, fixture.host)
+  await Promise.resolve()
+
+  for (const target of [fixture.block, board.dot]) {
+    const event = click(target)
+    context.dispatchDocument('click', event)
+    assert.equal(event.prevented, false)
+  }
+
+  assert.deepEqual(context.collapses, [])
+})
+
+test('a block with no children swallows the click without folding or opening', async () => {
+  const fixture = bulletHost({ uuid: '65f00000-0000-0000-0000-000000000037', hasChild: false })
+  const context = load({}, [], {}, fixture.host)
+  await Promise.resolve()
+
+  const event = click(fixture.dot)
+  context.dispatchDocument('click', event)
+
+  assert.deepEqual(context.collapses, [])
+  assert.equal(context.navigations.length, 0)
+  assert.equal(event.prevented, true)
+})
+
+test('unloading returns the bullet to Logseq', async () => {
+  const fixture = bulletHost({ uuid: '65f00000-0000-0000-0000-000000000038' })
+  const context = load({}, [], {}, fixture.host)
+  await Promise.resolve()
+
+  const [unload] = context.logseq.unloads
+  await unload()
+
+  assert.deepEqual(context.documentListeners.get('click'), [])
+
+  const event = click(fixture.dot)
+  context.dispatchDocument('click', event)
+  assert.deepEqual(context.collapses, [])
+  assert.equal(event.prevented, false)
 })
 
 test('unloading clears every attribute the theme wrote and stops observing', async () => {
