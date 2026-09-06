@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+- Draw a block's rail bullet at the size of its own first line. Ordinary prose
+  keeps the bullet it had, and a larger first line takes a proportionally larger
+  bullet: halo, dot, rings and hover ring all scale by the multiple Logseq sets
+  that line in, so an `h1` bullet is twice an ordinary one and an `h6` bullet
+  three quarters of it. A scaled bullet grows around the rail, keeping its
+  centre on the line and on its block's first line at every nesting level.
+
 - Add **Open** immediately above **Open in sidebar** in the context menu opened
   from every block bullet. It opens that block in the main editor, matching the
   bullet's ordinary click behavior, and uses Logseq's native block-menu hook so
