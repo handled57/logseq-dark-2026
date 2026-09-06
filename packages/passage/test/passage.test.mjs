@@ -90,6 +90,10 @@ function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
     focus() {
       self.focused = true
     },
+    setSelectionRange(start, end) {
+      self.selectionStart = start
+      self.selectionEnd = end
+    },
     matches: (selector) => matchesSelector(self, selector),
     querySelector: (selector) =>
       descendants(self).find((child) => matchesSelector(child, selector)) ?? null,
@@ -435,7 +439,7 @@ function commandContext({ value = '', cursor, menu = null, bible = null } = {}) 
 }
 
 test('the slash command writes the passage source and leaves the cursor on the writing line', async () => {
-  const { context } = commandContext()
+  const { context, host } = commandContext()
   await Promise.resolve()
 
   const [command] = context.logseq.Editor.commands
@@ -444,7 +448,8 @@ test('the slash command writes the passage source and leaves the cursor on the w
   await invoke(context, () => command.action())
 
   assert.deepEqual(context.logseq.Editor.updates, [{ uuid: PASSAGE_UUID, content: PASSAGE_BLOCK }])
-  assert.deepEqual(context.logseq.Editor.edits, [{ uuid: PASSAGE_UUID, pos: WRITING_LINE }])
+  assert.deepEqual(context.logseq.Editor.edits, [])
+  assert.equal(host.querySelector('textarea').selectionStart, WRITING_LINE)
   // The cursor sits at the start of the blank line, with the terminator below.
   assert.equal(PASSAGE_BLOCK.slice(WRITING_LINE), '\n#+END_PASSAGE')
 })
@@ -459,6 +464,7 @@ test('the passage becomes the value saved by the existing edit session', async (
   await invoke(context, () => context.logseq.Editor.commands[0].action())
 
   assert.deepEqual(context.logseq.Editor.exits, [], 'Passage ended the live editor session')
+  assert.deepEqual(context.logseq.Editor.edits, [], 'Passage reloaded the active block from storage')
   assert.equal(
     context.endEditSession(),
     PASSAGE_BLOCK,
@@ -481,9 +487,9 @@ test('the passage properties join the drawer the block already has', async () =>
     `type:: Note\ntags:: \n${PASSAGE_SOURCE}`
   )
   // The cursor still lands on the writing line, one 'tags:: ' line further down.
-  const [edit] = context.logseq.Editor.edits
+  const edit = context.parent.document.querySelector('textarea')
   assert.equal(
-    context.logseq.Editor.updates[0].content.slice(edit.pos),
+    context.logseq.Editor.updates[0].content.slice(edit.selectionStart),
     '\n#+END_PASSAGE'
   )
 })
@@ -620,7 +626,8 @@ test('the picker entry routes through the same insertion path as the slash comma
     context.logseq.Editor.updates[0].content,
     `${PASSAGE_PROPERTIES}\nnote \n${PASSAGE_SOURCE}`
   )
-  assert.deepEqual(context.logseq.Editor.edits, [{ uuid: PASSAGE_UUID, pos: 5 + 1 + WRITING_LINE }])
+  assert.deepEqual(context.logseq.Editor.edits, [])
+  assert.equal(context.parent.document.querySelector('textarea').selectionStart, 5 + 1 + WRITING_LINE)
 })
 
 test('a popup that is not the angle-bracket picker is left alone', async () => {
@@ -745,8 +752,8 @@ test('a resolved reference is written canonically, with its chapter tags and tex
       '#+END_PASSAGE'
   )
   // The cursor lands at the end of the text that was written, ready to continue.
-  const [edit] = context.logseq.Editor.edits
-  assert.equal(content.slice(edit.pos), '\n#+END_PASSAGE')
+  const editor = context.parent.document.querySelector('textarea')
+  assert.equal(content.slice(editor.selectionStart), '\n#+END_PASSAGE')
   assert.deepEqual(context.messages, [])
 })
 
@@ -1018,8 +1025,8 @@ test('the three display options are written together, and the cursor still lands
       '^^\u00b9\u2077^^Indeed, God did not send the Son.\n' +
       '#+END_PASSAGE'
   )
-  const [edit] = context.logseq.Editor.edits
-  assert.equal(content.slice(edit.pos), '\n#+END_PASSAGE')
+  const editor = context.parent.document.querySelector('textarea')
+  assert.equal(content.slice(editor.selectionStart), '\n#+END_PASSAGE')
 })
 
 test('without the text index the options add nothing to an empty body', async () => {

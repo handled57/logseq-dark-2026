@@ -24,7 +24,10 @@ All notable changes to this package are documented here.
 - Passage keeps the invoking block's edit session open while it writes. Logseq
   routes `updateBlock` for the currently edited block into the live editor
   state, so the host's eventual textarea save contains the passage instead of
-  overwriting it and making the inserted text appear and then vanish.
+  overwriting it and making the inserted text appear and then vanish. Passage
+  also restores the caret in that live editor instead of calling `editBlock`:
+  re-entering the already active block can reload its older database content
+  before the live state has been saved.
 - Enter and Escape are claimed on the host window before Logseq's document-level
   editor shortcuts. Pressing Enter now follows the same insertion path as
   clicking **Insert**, without the host creating a block behind the prompt.

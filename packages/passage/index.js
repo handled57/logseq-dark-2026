@@ -86,6 +86,25 @@ function cursorIn(editor, content) {
   return Number.isInteger(editor?.selectionStart) ? editor.selectionStart : content.length
 }
 
+function editorFor(uuid) {
+  const editor = editingArea()
+  return UUID_PATTERN.exec(editor?.id ?? '')?.[0] === uuid ? editor : null
+}
+
+/* updateBlock renders a new value into the textarea asynchronously. Restore
+ * the caret there after that render rather than calling editBlock on a block
+ * which is already being edited: editBlock reads the database copy and can
+ * replace the new live value before the current session has saved it. */
+async function restoreLiveCursor(uuid, position) {
+  await new Promise((resolve) => parent.requestAnimationFrame(resolve))
+  const editor = editorFor(uuid)
+  if (!editor) return false
+
+  editor.setSelectionRange?.(position, position)
+  editor.focus?.()
+  return true
+}
+
 /* The invocation has to be measured before the dialog takes focus, because
  * leaving the editor ends the edit session and discards the selection. */
 async function captureInvocation(trigger) {
@@ -283,10 +302,13 @@ async function writePassage({ uuid, content, cursor, trigger }, resolved, displa
   /* Keep the existing edit session alive. For the block currently being
    * edited, Logseq's updateBlock writes into its live editor state; the
    * textarea and the save performed when that session eventually ends then
-   * contain the passage too. Exiting first turns this into a database write
-   * which the unmounting editor can overwrite with its older textarea value. */
+   * contain the passage too. Do not re-enter that same block through editBlock:
+   * it reads the still-old database copy and can reset the live editor before
+   * its save. */
   await logseq.Editor.updateBlock(uuid, written.content)
-  await logseq.Editor.editBlock?.(uuid, { pos: written.cursor })
+  if (!(await restoreLiveCursor(uuid, written.cursor))) {
+    await logseq.Editor.editBlock?.(uuid, { pos: written.cursor })
+  }
 }
 
 /* The dialog is this plugin's own chrome, whichever theme is selected, so it
