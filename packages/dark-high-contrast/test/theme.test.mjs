@@ -461,7 +461,11 @@ test('named admonitions align their semantic icons with the first line', () => {
 
   assert.match(
     css,
-    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?--hc-admonition-first-line-height:\\s*1\\.75rem;[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?--hc-admonition-font-size:\\s*1\\.125rem;[\\s\\S]*?--hc-admonition-first-line-height:\\s*1\\.75rem;[\\s\\S]*?--hc-admonition-icon-size:\\s*1em;[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
+  )
+  assert.match(
+    css,
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) > :is\\(\\.admonition-icon, \\.text-lg\\)\\s*\\{[\\s\\S]*?font-size:\\s*var\\(--hc-admonition-font-size\\)`)
   )
   assert.match(
     css,
@@ -469,8 +473,9 @@ test('named admonitions align their semantic icons with the first line', () => {
   )
   assert.match(
     css,
-    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon svg\\s*\\{[\\s\\S]*?transform:\\s*translateY\\(calc\\(\\(var\\(--hc-admonition-first-line-height\\) - 2rem\\) \\/ 2\\)\\);[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?fill:\\s*var\\(--hc-admonition-accent\\)\\s*!important`)
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon svg\\s*\\{[\\s\\S]*?width:\\s*var\\(--hc-admonition-icon-size\\)\\s*!important;[\\s\\S]*?height:\\s*var\\(--hc-admonition-icon-size\\)\\s*!important;[\\s\\S]*?transform:\\s*translateY\\(calc\\(\\(var\\(--hc-admonition-first-line-height\\) - var\\(--hc-admonition-icon-size\\)\\) \\/ 2\\)\\);[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?fill:\\s*var\\(--hc-admonition-accent\\)\\s*!important`)
   )
+  assert.doesNotMatch(css, /\.admonition-icon svg\s*\{[^}]*?(?:width|height):\s*2rem/)
 
   assert.doesNotMatch(css, /\.admonitionblock:not\(/)
   assert.match(css, /blockquote\s*\{[\s\S]*?border-left:\s*4px solid var\(--vscode-hc-border\)/)
@@ -484,7 +489,7 @@ test('the passage block reproduces the admonition treatment on its own selectors
   assert.doesNotMatch(css, /\.admonitionblock:is\([^)]*passage/)
   assert.match(
     css,
-    /\.block-body > \.passage \{[\s\S]*?--hc-admonition-accent:\s*var\(--vscode-hc-cyan\);[\s\S]*?--hc-admonition-first-line-height:\s*1\.75rem/
+    /\.block-body > \.passage \{[\s\S]*?--hc-admonition-accent:\s*var\(--vscode-hc-cyan\);[\s\S]*?--hc-admonition-first-line-height:\s*1\.75rem;[\s\S]*?--hc-admonition-icon-size:\s*1em/
   )
   assert.match(
     css,
@@ -506,16 +511,17 @@ test('the passage block reproduces the admonition treatment on its own selectors
   )
   assert.doesNotMatch(css, /\.block-body > \.passage::before \{[^}]*mask/)
 
-  // The glyph is the same 2rem box as a named admonition icon, offset by half
+  // The glyph is the same one-em box as a named admonition icon, offset by half
   // the difference from the first 1.75rem text line. Its divider remains the
-  // separate full-height pseudo-element above.
+  // separate full-height pseudo-element above, and the column stays fixed.
   assert.match(
     css,
-    /\.block-body > \.passage::after \{[\s\S]*?top:\s*calc\(\(var\(--hc-admonition-first-line-height\) - 2rem\) \/ 2\);[\s\S]*?width:\s*2rem;[\s\S]*?height:\s*2rem;[\s\S]*?background-color:\s*var\(--hc-admonition-accent\)/
+    /\.block-body > \.passage::after \{[\s\S]*?top:\s*calc\(\(var\(--hc-admonition-first-line-height\) - var\(--hc-admonition-icon-size\)\) \/ 2\);[\s\S]*?width:\s*var\(--hc-admonition-icon-size\);[\s\S]*?height:\s*var\(--hc-admonition-icon-size\);[\s\S]*?background-color:\s*var\(--hc-admonition-accent\)/
   )
   assert.doesNotMatch(css, /\.block-body > \.passage::after \{[^}]*bottom:/)
   assert.match(css, /\.block-body > \.passage::after \{[^}]*?\n\s*mask-position:\s*50% 50%/)
-  assert.match(css, /\.block-body > \.passage::after \{[^}]*?\n\s*mask-size:\s*2rem 2rem/)
+  assert.match(css, /\.block-body > \.passage::after \{[^}]*?\n\s*mask-size:\s*var\(--hc-admonition-icon-size\) var\(--hc-admonition-icon-size\)/)
+  assert.doesNotMatch(css, /\.block-body > \.passage::after \{[^}]*?(?:width|height|mask-size):\s*2rem/)
   // `mask-image` over a colored `background-image`, so the icon's color stays a
   // palette token rather than being baked into the SVG.
   assert.match(css, /\.block-body > \.passage::after \{[\s\S]*?\n\s*mask-image:\s*url\("data:image\/svg\+xml,/)
