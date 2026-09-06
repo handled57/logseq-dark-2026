@@ -108,11 +108,16 @@ Changes follow the issue and linked-branch workflow:
 Theme and Passage versions are independent. A release changes only the selected
 package's `package.json`, `manifest.json` when applicable, and changelog, then
 builds and verifies that package's archive. The package-scoped tag names are
-`theme-vX.Y.Z` and `passage-vX.Y.Z`; the independent-release CI stage must be in
-place before using them.
+`theme-vX.Y.Z` and `passage-vX.Y.Z`. A tag must match both the selected
+workspace's package version and the newest version in its changelog. The release
+job runs the full repository gate, rebuilds and verifies the selected workspace,
+and attaches only that workspace's ZIP to its GitHub release. Historical `v*`
+tags remain in Git history but do not trigger the independent release workflow.
 
-The current pre-Stage-5 release workflow still responds to legacy `v*` tags and
-uploads every ZIP, so it must not be used for an independent package release.
-CI is responsible only for validation and the GitHub release artifacts its
-workflow configures. It does not perform Marketplace submission. Publishing or
-updating a Marketplace listing remains a separate, deliberate maintainer action.
+Shared release-tool changes do not require either package version to change.
+Increment a package only when releasing that package, put the same version in
+the newest changelog entry, merge the change, complete manual Logseq acceptance,
+and then create its package-scoped tag. CI is responsible only for validation
+and the GitHub release artifact. It does not perform Marketplace submission.
+Publishing or updating a Marketplace listing remains a separate, deliberate
+maintainer action.
