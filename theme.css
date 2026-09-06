@@ -877,6 +877,13 @@ a.tag:hover,
   border: 1px solid var(--vscode-hc-border);
 }
 
+/* The property table is a panel inside the block. When the pointer is on that
+ * block, drop its border so panel and block read as one hovered surface; an
+ * ancestor holding the hovered block leaves its own table alone. */
+.ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper .block-properties {
+  border-color: transparent;
+}
+
 .page-properties .page-property-key,
 .block-properties .page-property-key,
 .property-key {

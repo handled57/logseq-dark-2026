@@ -318,9 +318,21 @@ test('block hover outlines without painting a background', () => {
     'the raised fill must not be shared with a hover selector'
   )
 
-  /* The property table dropped its border on hover only because the gray fill
-   * made panel and block read as one surface. Without the fill it keeps it. */
-  assert.doesNotMatch(css, /\.ls-block:hover[^{]*\.block-properties\s*\{/)
+  /* The property table still drops its border on the hovered block, so the
+   * panel and the block read as one surface. Losing the fill did not change
+   * that, but the rule has to carry the innermost-hover guard: without it an
+   * ancestor's own table went borderless whenever a child was hovered. */
+  const propertyBorder = rules.find(
+    ([selector, body]) =>
+      selector.includes('.ls-block:hover') &&
+      selector.includes('.block-properties') &&
+      /border-color:\s*transparent/.test(body)
+  )
+  assert.ok(propertyBorder, 'the hovered block hides its property table border')
+  assert.ok(
+    propertyBorder[0].includes(':hover:not(:has(.ls-block:hover))'),
+    'only the innermost hovered block hides its property table border'
+  )
 })
 
 /* The bullet rail: every block in the page's own tree hangs its bullet on one
