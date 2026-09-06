@@ -264,7 +264,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 
 ## Development
 
-The committed `theme.css` and `index.js` are canonical; `lib/lsplugin.user.js` is a vendored copy of the Logseq plugin SDK and is not edited here.
+The committed `theme.css` and `index.js` are canonical. The repository keeps one vendored Logseq SDK at `vendor/logseq/lsplugin.user.js`; release tooling copies it into the staged package as `lib/lsplugin.user.js`.
 
 This theme is one workspace of the [logseq-dark-2026](https://github.com/handled57/logseq-dark-2026) monorepo, and lives in `packages/dark-high-contrast/`. Run its scripts from this directory, or from the repository root with `--workspace packages/dark-high-contrast`:
 
@@ -274,7 +274,7 @@ npm run build
 npm run verify:release
 ```
 
-`npm run build` creates a self-contained marketplace ZIP in `dist/`. The theme itself has no production dependencies; the SDK ships in-tree.
+`npm run build` creates a self-contained Marketplace ZIP and extracted package in the repository root's `dist/`. Load the extracted `dist/logseq-dark-high-contrast-theme/` folder for unpacked testing. The theme itself has no production dependencies; its archive includes the shared SDK and root license.
 
 `package.json` sets `"effect": true`. That flag is load-bearing rather than descriptive: Logseq rewrites a side-effect-free package's entry to `lsp://logseq.io/`, a different origin from the host window, which would put `parent.document` out of reach. With `effect: true` the entry stays on the app's own `file://` origin and the entry script can read and annotate the host DOM.
 

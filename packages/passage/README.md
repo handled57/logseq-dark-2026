@@ -114,7 +114,7 @@ setting names another path.
 
 Your edition's licence is yours to observe. Nothing in this repository
 redistributes verse text: it is not committed, it is not in the release archive,
-and the checks in `scripts/verify-release.mjs` fail the build if it ever appears
+and the checks in the root `scripts/verify-release.mjs` fail the build if it ever appears
 in one.
 
 ## Display options
@@ -198,12 +198,12 @@ npm run check --workspace packages/passage       # test, build and verify the ZI
 
 ### Testing against the built plugin
 
-`npm run build` stages the release into `dist/logseq-passage/` and zips it. That
+`npm run build` stages the release into the repository root's `dist/logseq-passage/` and zips it. That
 folder is also what you load as an unpacked plugin, so after the archive is
 closed the build copies your local `resources/bible.text.json` into it, if you
 have one. The unpacked folder is then a complete working plugin — verses
 included — across rebuilds, while the ZIP stays exactly the file list
-`scripts/verify-release.mjs` asserts. A clean checkout and CI have no local index
+the root `scripts/verify-release.mjs` asserts. A clean checkout and CI have no local index
 and nothing is copied.
 
 The copy happens strictly after archiving, and `verify-release.mjs` checks the
@@ -219,4 +219,4 @@ from and for the vendored Logseq SDK.
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+MIT. Release tooling copies the repository root [`LICENSE`](../../LICENSE) into every staged package and archive.

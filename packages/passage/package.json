@@ -19,8 +19,8 @@
   ],
   "scripts": {
     "test": "node --test test/package.test.mjs test/bible.test.mjs test/passage.test.mjs test/contract.test.mjs",
-    "build": "node scripts/build-release.mjs",
-    "verify:release": "node scripts/verify-release.mjs",
+    "build": "node ../../scripts/build-release.mjs",
+    "verify:release": "node ../../scripts/verify-release.mjs",
     "check": "npm test && npm run build && npm run verify:release"
   },
   "files": [
@@ -36,6 +36,23 @@
     "THIRD_PARTY_NOTICES.md",
     "manifest.json"
   ],
+  "release": {
+    "files": [
+      "package.json",
+      "manifest.json",
+      "index.html",
+      "index.js",
+      "bible.js",
+      "resources/bible.books.json",
+      "icon.svg",
+      "README.md",
+      "CHANGELOG.md",
+      "THIRD_PARTY_NOTICES.md"
+    ],
+    "unpackedLocalFiles": [
+      "resources/bible.text.json"
+    ]
+  },
   "repo": "handled57/logseq-dark-2026",
   "title": "Passage",
   "main": "index.html",

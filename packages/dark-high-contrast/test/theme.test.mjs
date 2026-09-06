@@ -144,7 +144,7 @@ test('README and palette chart document every fixed stylesheet color', async () 
 })
 
 test('the plugin entry loads the vendored SDK before the property script', async () => {
-  const sdk = await readFile(resolve(root, 'lib', 'lsplugin.user.js'), 'utf8')
+  const sdk = await readFile(resolve(root, '..', '..', 'vendor', 'logseq', 'lsplugin.user.js'), 'utf8')
   assert.ok(sdk.length > 10_000, 'the vendored SDK is unexpectedly small')
 
   assert.match(entry, /<script src="\.\/lib\/lsplugin\.user\.js"><\/script>/)
@@ -673,7 +673,7 @@ test('principal foreground/background pairs meet WCAG thresholds', () => {
   }
 })
 
-test('the theme is a self-contained workspace of the monorepo root', async () => {
+test('the theme is an independently staged workspace of the monorepo root', async () => {
   const repo = resolve(root, '..', '..')
   const workspace = JSON.parse(await readFile(resolve(repo, 'package.json'), 'utf8'))
 
@@ -681,20 +681,18 @@ test('the theme is a self-contained workspace of the monorepo root', async () =>
   assert.ok(workspace.workspaces.includes('packages/*'), 'the package is outside the workspaces glob')
   assert.equal(resolve(repo, 'packages', 'dark-high-contrast'), root)
 
-  // The coordinator aggregates; it owns no sources and no dependencies of its
-  // own, so a package stays installable without `npm install`.
-  for (const script of ['test', 'build', 'verify:release', 'check']) {
-    assert.match(workspace.scripts[script], /--workspaces/, `root ${script} does not aggregate`)
-    assert.ok(pkg.scripts[script], `the theme does not define ${script}`)
-  }
+  assert.match(workspace.scripts.test, /--workspaces/, 'root test does not aggregate')
+  assert.match(workspace.scripts.build, /build-release\.mjs --all/, 'root build is not a single aggregate build')
+  assert.match(workspace.scripts['verify:release'], /verify-release\.mjs --all/, 'root verification is not aggregate')
+  for (const script of ['test', 'build', 'verify:release', 'check']) assert.ok(pkg.scripts[script])
   for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
     assert.equal(workspace[field], undefined, `the root declares ${field}`)
     assert.equal(pkg[field], undefined, `the theme declares ${field}`)
   }
 
-  // Everything the archive ships is resolved inside this package: nothing is
-  // read from the repository root or from a sibling package.
-  for (const file of pkg.files) await access(resolve(root, file), constants.R_OK)
-  const build = await readFile(resolve(root, 'scripts', 'build-release.mjs'), 'utf8')
-  assert.ok(!/\.\.\/\.\.|packages\//.test(build), 'the build reaches outside the package')
+  for (const file of pkg.release.files) await access(resolve(root, file), constants.R_OK)
+  await access(resolve(repo, 'LICENSE'), constants.R_OK)
+  await access(resolve(repo, 'vendor', 'logseq', 'lsplugin.user.js'), constants.R_OK)
+  await assert.rejects(access(resolve(root, 'lib'), constants.F_OK))
+  await assert.rejects(access(resolve(root, 'LICENSE'), constants.F_OK))
 })

@@ -19,13 +19,19 @@ both sides against the same fixtures.
 
 ## Commands
 
-Root scripts aggregate every workspace that defines them:
+Root scripts test every workspace, then stage all releases into one root `dist/`:
 
 ```sh
 npm test            # run all workspace test suites
 npm run build       # build every workspace release archive
 npm run check       # test, build and verify every workspace
 ```
+
+Each ZIP is self-contained. For unpacked Logseq testing, load the corresponding
+extracted folder under `dist/` (for example `dist/logseq-passage/`), not the
+source workspace. The build copies the root license and canonical vendored SDK
+into every staged package. A targeted workspace build removes only that
+package's extracted folder and ZIP; an aggregate build cleans `dist/` once.
 
 Target a single package with npm's workspace flag:
 
