@@ -117,6 +117,12 @@ redistributes verse text: it is not committed, it is not in the release archive,
 and the checks in the root `scripts/verify-release.mjs` fail the build if it ever appears
 in one.
 
+For an already-built index stored elsewhere, enter its absolute
+`bible.text.json` path under **Plugins → Passage → Settings → Passage text
+index**. A Marketplace installation has no package-local text file, so this
+setting is the usual setup. Passage reads the file locally; it does not fetch or
+upload verse text.
+
 ## Display options
 
 Three checkboxes under the reference field decide how that text is written. Each
@@ -184,8 +190,9 @@ After the plugin is accepted into the marketplace:
 
 1. Clone or download this repository.
 2. In Logseq, enable **Settings → Advanced → Developer mode**.
-3. Open **Plugins**, choose **Load unpacked plugin**, and select
-   `packages/passage`.
+3. Run `npm run build` from the repository root.
+4. Open **Plugins**, choose **Load unpacked plugin**, and select
+   `dist/logseq-passage/`.
 
 No dependency installation or compilation is needed to use the plugin.
 

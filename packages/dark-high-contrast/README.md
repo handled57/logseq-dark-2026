@@ -231,8 +231,10 @@ After the theme is accepted into the marketplace:
 
 1. Clone or download this repository.
 2. In Logseq, enable **Settings → Advanced → Developer mode**.
-3. Open **Plugins**, choose **Load unpacked plugin**, and select the repository folder.
-4. Open the theme selector and choose **Dark High Contrast**.
+3. Run `npm run build` from the repository root.
+4. Open **Plugins**, choose **Load unpacked plugin**, and select
+   `dist/logseq-dark-high-contrast-theme/`.
+5. Open the theme selector and choose **Dark High Contrast**.
 
 No dependency installation or compilation is needed to use the theme.
 
