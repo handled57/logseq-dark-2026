@@ -35,3 +35,20 @@ test('shared host fixture models host descendants and event delivery', () => {
   child.dispatch('click')
   assert.equal(clicked, true)
 })
+
+test('repository documentation covers package ownership and independent migration', async () => {
+  const required = [
+    ['README.md', ['Dark High Contrast', 'Passage', 'CONTRIBUTING.md']],
+    ['CONTRIBUTING.md', ['Node.js 22', 'LOGSEQ_CSS', 'Marketplace submission']],
+    ['docs/architecture.md', ['effect: true', 'MutationObserver', 'release.files']],
+    ['docs/adding-a-package.md', ['SDK', 'allowlist', 'Manual acceptance']],
+    ['docs/migrating-theme-2.md', ['hiddenProperties', 'biblePassageText', 'separately']]
+  ]
+
+  for (const [file, phrases] of required) {
+    const source = await readFile(resolve(repositoryRoot, file), 'utf8')
+    for (const phrase of phrases) {
+      assert.ok(source.includes(phrase), `${file} does not document ${phrase}`)
+    }
+  }
+})

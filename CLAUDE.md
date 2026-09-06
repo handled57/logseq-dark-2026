@@ -23,6 +23,15 @@ Paths below are relative to `packages/dark-high-contrast/` unless noted.
 - Root `scripts/verify-release.mjs` verifies exact archive contents, metadata agreement, and byte parity with canonical sources.
 - Root `test/support/` owns reusable host-document, classic-script, ZIP, and pinned-CSS test helpers; package-specific assertions remain in their workspaces.
 - The repository root holds shared release inputs (`LICENSE` and `vendor/logseq/lsplugin.user.js`) as well as coordinator tooling and documentation.
+- Root `README.md` is the repository and independent-installation overview;
+  `CONTRIBUTING.md` owns prerequisites, commands, manual acceptance, and release
+  workflow.
+- `docs/architecture.md` records runtime and release invariants;
+  `docs/adding-a-package.md` is the package-integration checklist; and
+  `docs/migrating-theme-2.md` owns the 1.x-to-2.0.0 user migration.
+- `docs/contracts/passage-v1.md` is the normative cross-package content
+  contract. Package READMEs explain their own setup and behavior; do not make a
+  root document the only source for package-specific use.
 
 Read the package's `README.md` and `CHANGELOG.md` before changing public behavior. Keep both synchronized with user-visible changes.
 
@@ -62,6 +71,12 @@ Completed work waits for the user's testing. Do not merge a topic branch into `m
 A short confirmation such as `continue`, `close`, `done`, `ship it`, `looks good`, or any similar approval means the change passed their testing. On that signal, finish delivery: merge the topic branch into `main`, tag a release when appropriate, push commits and tags to `origin`, and close the issue with the validating commit or release.
 
 Do not create a release tag for documentation-only or unreleased maintenance unless the user explicitly requests a release. Never rewrite shared history or use destructive Git commands to resolve conflicts.
+
+Theme and Passage versions and release tags are independent. Their intended tag
+namespaces are `theme-vX.Y.Z` and `passage-vX.Y.Z`; do not use them until CI
+selects and publishes only the named package. GitHub release automation does not
+submit a package to the Logseq Marketplace, which remains a separate maintainer
+action.
 
 ## Validation
 
