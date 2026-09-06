@@ -1447,7 +1447,13 @@ textarea.block-editor:focus {
 
 /* Rendered admonitions keep Logseq's semantic icon colors, but use the same
  * color for their heavier internal divider. A transparent outer border keeps
- * the existing box dimensions while removing the visible container edge. */
+ * the existing box dimensions while removing the visible container edge.
+ *
+ * Logseq's icon column carries `justify-center`, which centers the icon over
+ * the full height of a long admonition. Keep the column (and therefore its
+ * divider) stretched to the full height, but pin its contents to the top. The
+ * icon is 2rem square while the `text-lg` content's first line box is 1.75rem,
+ * so half their difference centers the icon on that first rendered line. */
 .admonitionblock.tip {
   --hc-admonition-accent: var(--vscode-hc-focus);
 }
@@ -1470,15 +1476,19 @@ textarea.block-editor:focus {
 }
 
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) {
+  --hc-admonition-first-line-height: 1.75rem;
+
   border-color: transparent !important;
 }
 
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon {
+  justify-content: flex-start !important;
   color: var(--hc-admonition-accent) !important;
   border-right: 4px solid var(--hc-admonition-accent) !important;
 }
 
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon svg {
+  transform: translateY(calc((var(--hc-admonition-first-line-height) - 2rem) / 2));
   color: var(--hc-admonition-accent) !important;
   fill: var(--hc-admonition-accent) !important;
 }
@@ -1503,6 +1513,7 @@ textarea.block-editor:focus {
  * admonition whose content is shorter than its icon. */
 .block-body > .passage {
   --hc-admonition-accent: var(--vscode-hc-cyan);
+  --hc-admonition-first-line-height: 1.75rem;
   --hc-verse-gutter: 0px;
 
   position: relative;
@@ -1533,16 +1544,15 @@ textarea.block-editor:focus {
 
 /* The glyph. `mask-image` rather than a colored `background-image` keeps the
  * color a palette token. The SVG is inlined as a `data:` URI, so nothing is
- * fetched. The box is stretched over the full block height and the mask is
- * centered within it, which is what `flex-col justify-center` does to a real
- * admonition icon. */
+ * fetched. Its 2rem box uses the same first-line offset as a named admonition;
+ * the separate `::before` divider remains stretched over the full block. */
 .block-body > .passage::after {
   content: "";
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: calc((var(--hc-admonition-first-line-height) - 2rem) / 2);
   left: 0;
   width: 2rem;
+  height: 2rem;
   background-color: var(--hc-admonition-accent);
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11.2 6.6C8.9 5 5.9 4.3 2.8 4.5a.9.9 0 0 0-.8.9v12.7c0 .5.4.9 1 .9 2.7-.2 5.3.4 7.2 1.8.4.3.9 0 .9-.5V7.3a.9.9 0 0 0-.4-.7z'/%3E%3Cpath d='M12.8 6.6C15.1 5 18.1 4.3 21.2 4.5c.4 0 .8.4.8.9v12.7c0 .5-.4.9-1 .9-2.7-.2-5.3.4-7.2 1.8-.4.3-.9 0-.9-.5V7.3c0-.3.1-.5.4-.7z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11.2 6.6C8.9 5 5.9 4.3 2.8 4.5a.9.9 0 0 0-.8.9v12.7c0 .5.4.9 1 .9 2.7-.2 5.3.4 7.2 1.8.4.3.9 0 .9-.5V7.3a.9.9 0 0 0-.4-.7z'/%3E%3Cpath d='M12.8 6.6C15.1 5 18.1 4.3 21.2 4.5c.4 0 .8.4.8.9v12.7c0 .5-.4.9-1 .9-2.7-.2-5.3.4-7.2 1.8-.4.3-.9 0-.9-.5V7.3c0-.3.1-.5.4-.7z'/%3E%3C/svg%3E");

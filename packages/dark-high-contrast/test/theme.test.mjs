@@ -439,7 +439,7 @@ test('fenced code has a single outer border', () => {
   assert.match(css, /pre\s*>\s*code[\s\S]*?background:\s*transparent[\s\S]*?border:\s*0/)
 })
 
-test('named admonitions share their icon color with a four-pixel divider', () => {
+test('named admonitions align their semantic icons with the first line', () => {
   const types = ['tip', 'note', 'important', 'caution', 'pinned', 'warning']
   const scopedTypes = types.map((type) => `.${type}`).join(', ')
   const semanticAccents = {
@@ -461,15 +461,15 @@ test('named admonitions share their icon color with a four-pixel divider', () =>
 
   assert.match(
     css,
-    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?--hc-admonition-first-line-height:\\s*1\\.75rem;[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
   )
   assert.match(
     css,
-    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon\\s*\\{[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?border-right:\\s*4px solid var\\(--hc-admonition-accent\\)\\s*!important`)
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon\\s*\\{[\\s\\S]*?justify-content:\\s*flex-start\\s*!important[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?border-right:\\s*4px solid var\\(--hc-admonition-accent\\)\\s*!important`)
   )
   assert.match(
     css,
-    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon svg\\s*\\{[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?fill:\\s*var\\(--hc-admonition-accent\\)\\s*!important`)
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\) \\.admonition-icon svg\\s*\\{[\\s\\S]*?transform:\\s*translateY\\(calc\\(\\(var\\(--hc-admonition-first-line-height\\) - 2rem\\) \\/ 2\\)\\);[\\s\\S]*?color:\\s*var\\(--hc-admonition-accent\\)\\s*!important[\\s\\S]*?fill:\\s*var\\(--hc-admonition-accent\\)\\s*!important`)
   )
 
   assert.doesNotMatch(css, /\.admonitionblock:not\(/)
@@ -482,7 +482,10 @@ test('the passage block reproduces the admonition treatment on its own selectors
   // must not join the admonition type list; it carries the shared accent
   // vocabulary instead.
   assert.doesNotMatch(css, /\.admonitionblock:is\([^)]*passage/)
-  assert.match(css, /\.block-body > \.passage \{[\s\S]*?--hc-admonition-accent:\s*var\(--vscode-hc-cyan\)/)
+  assert.match(
+    css,
+    /\.block-body > \.passage \{[\s\S]*?--hc-admonition-accent:\s*var\(--vscode-hc-cyan\);[\s\S]*?--hc-admonition-first-line-height:\s*1\.75rem/
+  )
   assert.match(
     css,
     /\.block-body > \.passage \{[\s\S]*?background:\s*var\(--vscode-hc-black\)\s*!important[\s\S]*?border:\s*1px solid transparent\s*!important/
@@ -503,12 +506,14 @@ test('the passage block reproduces the admonition treatment on its own selectors
   )
   assert.doesNotMatch(css, /\.block-body > \.passage::before \{[^}]*mask/)
 
-  // The glyph: a full-height box with the icon centered in it, matching the
-  // `flex-col justify-center` column and `h-8 w-8` icon of an admonition.
+  // The glyph is the same 2rem box as a named admonition icon, offset by half
+  // the difference from the first 1.75rem text line. Its divider remains the
+  // separate full-height pseudo-element above.
   assert.match(
     css,
-    /\.block-body > \.passage::after \{[\s\S]*?width:\s*2rem;[\s\S]*?background-color:\s*var\(--hc-admonition-accent\)/
+    /\.block-body > \.passage::after \{[\s\S]*?top:\s*calc\(\(var\(--hc-admonition-first-line-height\) - 2rem\) \/ 2\);[\s\S]*?width:\s*2rem;[\s\S]*?height:\s*2rem;[\s\S]*?background-color:\s*var\(--hc-admonition-accent\)/
   )
+  assert.doesNotMatch(css, /\.block-body > \.passage::after \{[^}]*bottom:/)
   assert.match(css, /\.block-body > \.passage::after \{[^}]*?\n\s*mask-position:\s*50% 50%/)
   assert.match(css, /\.block-body > \.passage::after \{[^}]*?\n\s*mask-size:\s*2rem 2rem/)
   // `mask-image` over a colored `background-image`, so the icon's color stays a
