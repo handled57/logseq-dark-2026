@@ -313,9 +313,17 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
       }
     }
 
-    for (const { handler } of [...listeners]) handler(event)
+    for (const { type, handler } of [...listeners]) if (type === 'keydown') handler(event)
     return stopped
   }
+
+  /* The host moving the focus, as the document sees it: `focusin` bubbles, so
+   * a capturing listener on the document is told wherever it lands. */
+  context.focusOn = (target) => {
+    for (const { type, handler } of [...listeners]) if (type === 'focusin') handler({ target })
+  }
+
+  context.bound = (type) => listeners.filter((entry) => entry.type === type).length
 
   vm.createContext(context)
   parser.runInContext(context)
@@ -978,9 +986,51 @@ test('Enter inserts and Escape cancels ahead of the host, wherever the key lands
   // The claim lasts exactly as long as the dialog does.
   assert.equal(context.press('Enter'), false)
   assert.equal(context.parent.document.listeners.length, 0)
+
+  /* Every listener the dialog binds on the host document is released with it:
+   * the key claim and the focus hold both last exactly as long as the prompt. */
+  assert.equal(context.bound('keydown'), 0)
+  assert.equal(context.bound('focusin'), 0)
 })
 
-test('the document listener is released however the dialog closes', async () => {
+test('the dialog keeps the focus the host editor tries to take back', async () => {
+  /* The block behind the prompt is still in edit mode, and Logseq puts the
+   * caret back in its own textarea once the command menu closes. Focus taken
+   * back that way would send the reference into the block instead of the field,
+   * leaving the field blank: Insert disabled, and Enter with nothing to read. */
+  const { context, host } = await bibleContext({
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } }
+  })
+
+  const invocation = context.logseq.Editor.commands[0].action()
+  await flush()
+
+  const dialog = dialogOf(context)
+  const input = dialog.querySelector('input')
+  assert.equal(input.focused, true, 'the dialog opened without the focus')
+
+  input.focused = false
+  context.focusOn(host.querySelector('textarea'))
+  assert.equal(input.focused, true, 'the host took the focus out of the dialog')
+
+  // A checkbox is the dialog's own, so it keeps what it was given — and it is
+  // where the focus returns to next.
+  const box = dialog.querySelector('#passage-numbers')
+  context.focusOn(box)
+  box.focused = false
+  input.focused = false
+  context.focusOn(host.querySelector('textarea'))
+  assert.equal(box.focused, true, 'the focus did not return to where it was last')
+  assert.equal(input.focused, false)
+
+  fill(dialog, 'John 3:16')
+  context.press('Enter')
+  await invocation
+
+  assert.match(context.logseq.Editor.updates[0].content, /\*\*John 3:16\*\*/)
+})
+
+test('the document listeners are released however the dialog closes', async () => {
   const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
   const listeners = context.parent.document.listeners
 
@@ -991,7 +1041,7 @@ test('the document listener is released however the dialog closes', async () => 
   ]) {
     const invocation = context.logseq.Editor.commands[0].action()
     await flush()
-    assert.equal(listeners.length, 1)
+    assert.equal(listeners.length, 2)
 
     await dismiss()
     await invocation

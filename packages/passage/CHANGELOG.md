@@ -16,7 +16,11 @@ All notable changes to this package are documented here.
   beginning `passage-` — so it never reads, replaces or clears what a theme
   wrote, and unloading either package leaves the other's work intact.
 - The reference dialog paints itself, with a fallback for every colour it names,
-  so the prompt is legible with any theme selected or none.
+  so the prompt is legible with any theme selected or none. It also holds the
+  focus while it is open: the block behind it is still in edit mode, and the
+  host puts the caret back in its own textarea once the command menu closes,
+  which sent the reference into the block and left Insert disabled and Enter
+  with a blank field to read.
 - `npm run build` now copies a local `resources/bible.text.json` into
   `dist/logseq-passage/` after the archive is closed, so the folder you load as
   an unpacked plugin keeps its verse text across rebuilds. The verse text is

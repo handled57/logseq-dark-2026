@@ -466,8 +466,27 @@ function askForReference() {
     function close(choice) {
       dismissDialog = null
       doc.removeEventListener('keydown', keys, true)
+      doc.removeEventListener('focusin', holdFocus, true)
       overlay.remove()
       resolve(choice)
+    }
+
+    /* The dialog is modal, so it holds the focus for as long as it is open.
+     * The host's editor does not know the prompt exists: the block behind it is
+     * still in edit mode, and Logseq puts the caret back in its textarea on its
+     * own schedule once the command menu closes. Focus taken back that way is
+     * silent and total — the reference is typed into the block instead of the
+     * field, so the field stays empty, Insert stays disabled, and Enter reads a
+     * blank reference and does nothing. Anything focused outside the dialog is
+     * handed straight back to whatever inside it had the focus last. */
+    let held = input
+    function inside(target) {
+      for (let node = target; node; node = node.parentElement) if (node === overlay) return true
+      return false
+    }
+    function holdFocus(event) {
+      if (inside(event.target)) held = event.target
+      else held.focus?.()
     }
 
     /* Unloading mid-prompt has to settle the promise as well as remove the
@@ -518,6 +537,7 @@ function askForReference() {
       else if (event.key === 'Enter') submit(event)
     })
     doc.addEventListener('keydown', keys, true)
+    doc.addEventListener('focusin', holdFocus, true)
 
     actions.appendChild(cancel)
     actions.appendChild(insert)
