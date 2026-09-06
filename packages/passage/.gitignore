@@ -1,4 +1,3 @@
-dist/
 # The verse text is a licensed edition: it is built locally by
 # scripts/build-bible-index.mjs and never committed. The manifest that script
 # also writes carries no verse text, and is committed.
