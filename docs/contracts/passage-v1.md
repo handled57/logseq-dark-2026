@@ -115,9 +115,8 @@ content, not decoration: it survives either package being uninstalled.
 ## Fixtures
 
 Normative. Both packages' tests read the block below: Passage asserts these are
-the sources its command writes, and the theme asserts these are the sources its
-classification reads. The verse text is invented for the fixtures — no licensed
-edition is reproduced in this repository.
+the block sources its command writes, and the theme asserts these are the block
+sources its classification reads. The verse text is fixture data.
 
 <!-- passage-v1-fixtures:start -->
 ```json

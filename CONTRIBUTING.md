@@ -85,8 +85,7 @@ that Logseq rendered correctly.
 
 The built `dist/logseq-passage/` may contain a developer's ignored local
 `resources/bible.text.json` for manual testing. The ZIP is created before that
-local file is copied and archive verification rejects any licensed verse-text
-file or unexpected archive member.
+local file is copied, and archive verification rejects unexpected members.
 
 ## Repository delivery
 

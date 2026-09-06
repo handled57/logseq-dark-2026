@@ -1,18 +1,16 @@
-/* Turns a source Bible index into the two artifacts the Passage command reads.
+/* Turns a Bible index into the two artifacts the Passage command reads.
  *
- *   node scripts/build-bible-index.mjs [--source <file>] [--out <directory>]
+ *   node scripts/build-bible-index.mjs [--input <file>] [--out <directory>]
  *
- * The source index is a per-verse export of a licensed edition, so it never
- * enters this repository. Two files come out of it:
+ * Two files come out of it:
  *
  *   resources/bible.books.json  the manifest: book names, chapter counts, verse
  *                               counts and verse-id offsets, and no verse text.
  *                               Committed, shipped in the package, and what the
  *                               reference parser resolves against.
- *   resources/bible.text.json   the text index: the verse text itself, kept out
- *                               of the repository and out of the release ZIP.
+ *   resources/bible.text.json   the text index: the verse text itself.
  *
- * The source carries four defects this script repairs; see REPAIRS below.
+ * The input carries four defects this script repairs; see REPAIRS below.
  */
 
 import { readFile, writeFile } from 'node:fs/promises'
@@ -26,14 +24,14 @@ function option(name, fallback) {
   return index === -1 ? fallback : process.argv[index + 1]
 }
 
-const sourcePath = resolve(root, option('source', 'resources/bible.index.json'))
+const inputPath = resolve(root, option('input', 'resources/bible.index.json'))
 const outDirectory = resolve(root, option('out', 'resources'))
 
-/* Book names the source states wrongly. `Bah` is a typo; `Psalm` is the
+/* Book names the input states wrongly. `Bah` is a typo; `Psalm` is the
  * singular of a plural title; and bookIds 72–84 hold the right content under
  * names shifted by one deuterocanonical book, so every one of them is renamed
  * rather than reordered. Each entry states the chapter count the real book has,
- * which is asserted against the source before anything is written. */
+ * which is asserted against the input before anything is written. */
 const REPAIRS = {
   19: { longName: 'Psalms', chapters: 150 },
   35: { shortName: 'Hab', chapters: 3 },
@@ -56,7 +54,7 @@ const REPAIRS = {
 }
 
 /* Section headings and psalm superscriptions belong to the passage that follows
- * them, and the source leaves both at the tail of the verse they interrupt. A
+ * them, and the input leaves both at the tail of the verse they interrupt. A
  * heading is title-cased and carries no terminal punctuation; a superscription
  * is a sentence, so it is only peeled from the last verse of a psalm, and only
  * when it opens the way the psalter's own superscriptions do. */
@@ -90,7 +88,7 @@ function headingLine(line) {
   })
 }
 
-/* The double brackets around passages the source marks as textually doubtful
+/* The double brackets around passages the input marks as textually doubtful
  * are page-reference syntax in Logseq, so they are dropped rather than left to
  * turn a passage into a set of broken links. */
 function withoutEditorialBrackets(text) {
@@ -124,7 +122,7 @@ function versesOf(chapter) {
   return chapter.verses ?? chapter.paragraphs.flatMap((paragraph) => paragraph.verses)
 }
 
-const source = JSON.parse(await readFile(sourcePath, 'utf8'))
+const input = JSON.parse(await readFile(inputPath, 'utf8'))
 const problems = []
 
 const books = []
@@ -133,7 +131,7 @@ let expectedVerseId = 1
 let chapterTotal = 0
 let verseTotal = 0
 
-for (const book of source.books) {
+for (const book of input.books) {
   const repair = REPAIRS[book.bookId] ?? {}
   const shortName = repair.shortName ?? book.shortName
   const longName = repair.longName ?? book.longName
@@ -166,10 +164,10 @@ for (const book of source.books) {
     const headings = {}
 
     /* Verse numbers ascend, but they neither always start at 1 nor run
-     * gaplessly: this edition omits the verses its text-critical notes reject,
+     * gaplessly: the input may omit verses,
      * so Matthew 17 runs 1–20, 22–27, and the Greek additions to Esther open at
      * 5:3. Both shapes are recorded rather than closed up, because a reference
-     * to a verse the edition does not carry has to be refused, not silently
+     * to an absent verse has to be refused, not silently
      * shifted onto its neighbour. */
     if (numbers.some((value, index) => index > 0 && value <= numbers[index - 1])) {
       problems.push(`${shortName} ${number} has verse numbers that do not ascend`)
@@ -230,19 +228,13 @@ if (duplicates.length) problems.push(`duplicate short names: ${duplicates.join('
 
 if (problems.length) {
   console.error(problems.map((problem) => `  ${problem}`).join('\n'))
-  throw new Error(`the source index failed ${problems.length} consistency check(s)`)
-}
-
-const edition = {
-  title: source.source?.title ?? '',
-  edition: source.source?.edition ?? ''
+  throw new Error(`the input index failed ${problems.length} consistency check(s)`)
 }
 
 /* No timestamp: the manifest is committed, so regenerating it from the same
- * source has to produce the same bytes. */
+ * input has to produce the same bytes. */
 const manifest = {
   schemaVersion: 1,
-  source: edition,
   stats: { books: books.length, chapters: chapterTotal, verses: verseTotal },
   books
 }
@@ -250,7 +242,7 @@ const manifest = {
 await writeFile(resolve(outDirectory, 'bible.books.json'), `${JSON.stringify(manifest, null, 2)}\n`)
 await writeFile(
   resolve(outDirectory, 'bible.text.json'),
-  JSON.stringify({ schemaVersion: 1, source: edition, books: text })
+  JSON.stringify({ schemaVersion: 1, books: text })
 )
 
 console.log(

@@ -9,16 +9,16 @@ dependencies, compilation, remote imports, or runtime network access.
 | Marketplace package | npm workspace | Version | Install it when you want |
 | --- | --- | --- | --- |
 | **Dark High Contrast** | [`packages/dark-high-contrast`](packages/dark-high-contrast) | `2.0.0` | A pure-black, accessible theme for Logseq classic/file graphs. |
-| **Passage** | [`packages/passage`](packages/passage) | `0.1.0` | `/Passage` and `< Passage` commands that write canonical Bible passage blocks from a local text index. |
+| **Passage** | [`packages/passage`](packages/passage) | `0.2.0` | `/Passage` and `< Passage` commands that write canonical Bible passage blocks from a local text index. |
 
 Install either package by itself or install both. The theme does not call
 Passage, and Passage does not call the theme. Dark High Contrast styles any
 block that follows the [Passage v1 content contract](docs/contracts/passage-v1.md);
 Passage writes that ordinary Logseq markup readably with any theme, or none.
 
-Passage never ships licensed verse text. Its release contains only the book,
-chapter, and verse-count manifest needed to validate and canonicalize a
-reference. To insert text, build or supply your own local `bible.text.json` as
+Passage uses a local `bible.text.json` when one is available. Its release
+contains the book, chapter, and verse-count manifest needed to validate and
+canonicalize a reference. To insert text, build or supply a local index as
 described in the [Passage setup guide](packages/passage/README.md#passage-text).
 
 ## Install

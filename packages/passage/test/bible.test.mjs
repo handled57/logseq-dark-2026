@@ -38,7 +38,7 @@ function rejected(reference) {
   return outcome.error
 }
 
-test('the shipped manifest describes the whole edition', () => {
+test('the shipped manifest describes the complete index', () => {
   assert.deepEqual(manifest.stats, { books: 84, chapters: 1398, verses: 37758 })
   assert.equal(manifest.books.length, manifest.stats.books)
 
@@ -56,7 +56,7 @@ test('the shipped manifest describes the whole edition', () => {
 })
 
 test('the corrected book names are the ones the parser answers to', () => {
-  // The source index names these books one deuterocanonical book out of step,
+  // The input index names these books one deuterocanonical book out of step,
   // and calls Habakkuk `Bah` and the Psalms `Psalm`.
   const corrected = {
     35: ['Hab', 'Habakkuk'],
@@ -185,14 +185,14 @@ test('a backwards range is refused', () => {
   assert.equal(resolved('Gen 1:1-1:1').canonical, 'Genesis 1:1')
 })
 
-test('a chapter or verse the edition does not carry is refused', () => {
+test('a chapter or verse absent from the index is refused', () => {
   assert.match(rejected('Gen 51'), /50 chapters/)
   assert.match(rejected('Gen 0'), /no chapter 0/)
   assert.match(rejected('Obad 2'), /one chapter/)
   assert.match(rejected('John 3:37'), /no verse 37/)
   assert.match(rejected('Ps 23:7'), /no verse 7/)
   assert.match(rejected('Gen 1:1-Gen 1:32'), /no verse 32/)
-  // Verses this edition omits as textually doubtful are gaps, not shifts:
+  // Missing verses are gaps, not shifts:
   // Matthew 17 runs 1–20 and 22–27, and 17:21 is not 17:22 under another name.
   assert.match(rejected('Matt 17:21'), /without 21/)
   assert.equal(resolved('Matt 17:27').end.verse, 27)
@@ -257,7 +257,7 @@ const compose = (reference, options) => composePassageText(resolved(reference), 
 
 /* References that between them cover what a verse number has to survive: a whole
  * chapter of several paragraphs, a single verse, a chapter boundary, poetry
- * lineation inside a verse, a three-digit number, an edition's numbering gap,
+ * lineation inside a verse, a three-digit number, an index numbering gap,
  * and a book boundary. */
 const NUMBERED = ['Gen 1', 'Gen 1:2', 'Gen 1:3-2:1', 'Ps 23:1-2', 'Ps 119:150',
   'Matt 17:20-22', 'Obad 1:1-Jonah 1:2']
@@ -358,7 +358,7 @@ test('verse numbers are superscripts against the verse they open', () => {
   )
   // A partial chapter is numbered from where it starts, not from one.
   assert.equal(compose('Gen 1:2', numbers), '^^\u00b2^^And the earth.')
-  // A chapter this edition numbers with a gap keeps each number against its own
+  // A chapter numbered with a gap keeps each number against its own
   // verse: Matthew 17:21 is not in the text, and 22 is not renumbered to 21.
   assert.equal(
     compose('Matt 17:20-22', numbers),
@@ -401,7 +401,7 @@ test('a verse number carries the markup that gives it an element of its own', ()
 
           // One verse to a line is what lets a reader of the contract hang the
           // numbers in a gutter: every number there opens its own line, and the
-          // lines without one are an edition's poetry inside a verse.
+          // lines without one are poetry inside a verse.
           const numbers = line.match(highlights)
           if (!perLine || !numbers) continue
           assert.equal(numbers.length, 1, `${reference}: ${line}`)
@@ -441,7 +441,7 @@ test('one verse per line breaks between verses without flattening poetry', () =>
     compose('Gen 1', perLine),
     'In the beginning.\nAnd the earth.\n\nThen God said.'
   )
-  // The line breaks inside a verse are the edition's own lineation and survive
+  // The line breaks inside a verse are preserved and survive
   // untouched; the option adds breaks, it never removes them.
   assert.equal(
     compose('Ps 23:1-2', perLine),
@@ -489,7 +489,7 @@ test('the resolved chapters carry the long book name a heading is written with',
   )
 })
 
-test('the whole edition resolves and composes without throwing', () => {
+test('the complete index resolves and composes without throwing', () => {
   for (const book of manifest.books) {
     for (const chapter of book.chapters) {
       const outcome = resolved(`${book.shortName} ${chapter.chapter}`)
@@ -498,7 +498,7 @@ test('the whole edition resolves and composes without throwing', () => {
     }
   }
 
-  // The whole edition as one span names every chapter exactly once.
+  // The complete index as one span names every chapter exactly once.
   const whole = resolved('Gen 1 - 4Macc 18')
   assert.equal(whole.tags.length, manifest.stats.chapters)
   assert.equal(new Set(whole.tags).size, whole.tags.length)

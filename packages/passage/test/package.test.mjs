@@ -89,15 +89,14 @@ test('the package ships no stylesheet and no icon a theme owns', async () => {
   assert.equal(pkg.logseq.icon, './icon.svg')
 })
 
-test('the package ships the reference manifest and no verse text', async () => {
+test('the package ships the reference manifest', async () => {
   const parser = await readFile(resolve(root, 'bible.js'), 'utf8')
   const books = JSON.parse(await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8'))
   const ignored = await readFile(resolve(root, '.gitignore'), 'utf8')
 
   assert.ok(pkg.files.includes('bible.js'))
   assert.ok(pkg.files.includes('resources/bible.books.json'))
-  // The verse text is a licensed edition. It is built locally, never committed,
-  // and the manifest that ships in its place carries counts, not words.
+  // The manifest carries structural data; the optional text index is local.
   assert.deepEqual(
     pkg.files.filter((file) => file.startsWith('resources')),
     ['resources/bible.books.json']
@@ -106,8 +105,7 @@ test('the package ships the reference manifest and no verse text', async () => {
   assert.match(ignored, /^!resources\/bible\.books\.json$/m)
 
   assert.deepEqual(books.stats, { books: 84, chapters: 1398, verses: 37758 })
-  // Names, counts and offsets, and nothing else: a stray text field would be
-  // verse text republished under another name.
+  // Names, counts and offsets, and nothing else.
   for (const book of books.books) {
     assert.deepEqual(
       Object.keys(book).sort(),
@@ -129,10 +127,10 @@ test('the package ships the reference manifest and no verse text', async () => {
   assert.doesNotMatch(code, /parent\.|document|fetch\(|logseq\./)
 })
 
-test('the tracked source carries no verse text', async () => {
+test('generated text indexes remain local', async () => {
   const shipped = await readdir(resolve(root, 'resources'))
-  // Whatever a local build has left in the working tree, only the manifest is
-  // committed and only the manifest ships.
+  // Whatever a local build has left in the working tree, the manifest remains
+  // the tracked resource.
   assert.ok(shipped.includes('bible.books.json'))
   const ignored = await readFile(resolve(root, '.gitignore'), 'utf8')
   assert.match(ignored, /bible\.text\.json|resources\/\*/)
@@ -143,10 +141,9 @@ test('the build stages a local verse index only after the archive is closed', as
   const build = await readFile(resolve(repo, 'scripts', 'build-release.mjs'), 'utf8')
   const verify = await readFile(resolve(repo, 'scripts', 'verify-release.mjs'), 'utf8')
 
-  /* The verse text is never one of the packaged files. It is copied into the
-   * unpacked folder afterwards so a developer's own install keeps working
-   * across rebuilds, and the ordering is what keeps it out of the ZIP. */
-  assert.doesNotMatch(JSON.stringify(pkg.release.files), /bible\.text\.json/, 'the verse text is in the release file list')
+  /* The text index is copied into the unpacked folder after archiving so a
+   * developer's install keeps working across rebuilds. */
+  assert.doesNotMatch(JSON.stringify(pkg.release.files), /bible\.text\.json/, 'the local text index is in the fixed release file list')
   assert.deepEqual(pkg.release.unpackedLocalFiles, ['resources/bible.text.json'])
 
   const archived = build.indexOf('zipped?.status')

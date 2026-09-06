@@ -11,9 +11,9 @@ test('package tags select one version-matched release archive', async () => {
     release_name: 'Dark High Contrast 2.1.0',
     workspace: 'packages/dark-high-contrast'
   })
-  assert.deepEqual(await selectRelease('passage-v0.1.0'), {
-    archive: 'dist/logseq-passage-0.1.0.zip',
-    release_name: 'Passage 0.1.0',
+  assert.deepEqual(await selectRelease('passage-v0.2.0'), {
+    archive: 'dist/logseq-passage-0.2.0.zip',
+    release_name: 'Passage 0.2.0',
     workspace: 'packages/passage'
   })
 })

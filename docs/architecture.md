@@ -85,12 +85,10 @@ in the same teardown, so unloading returns the bullet to Logseq.
 the parser/formatter surface the entry consumes. The shipped
 `resources/bible.books.json` contains structural book and verse metadata only.
 
-Licensed text lives, if present, in ignored `resources/bible.text.json` or at
-the absolute path in the `biblePassageText` setting. The build may copy the
+Text lives, if present, in ignored `resources/bible.text.json` or at the
+absolute path in the `biblePassageText` setting. The build may copy the
 package-local file into the already archived extracted folder for manual
-testing; it is never in the release allowlist. Verification rejects missing or
-unexpected ZIP members, which prevents that local text from entering an
-archive.
+testing. Verification rejects missing or unexpected ZIP members.
 
 ## Shared release infrastructure
 

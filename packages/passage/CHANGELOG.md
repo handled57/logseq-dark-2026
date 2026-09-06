@@ -2,6 +2,14 @@
 
 All notable changes to this package are documented here.
 
+## 0.2.0 - 2026-09-06
+
+- Remove Bible provenance metadata from the generated `bible.books.json` and
+  `bible.text.json` schemas, and treat supplied Bible JSON as ready for use.
+- Standardize the generator's Bible input option as `--input` and describe the
+  input solely by its structure throughout documentation, runtime comments and
+  tests.
+
 ## 0.1.0 - 2026-09-05
 
 - First release as a package of its own. The Passage command, its reference
@@ -33,10 +41,9 @@ All notable changes to this package are documented here.
   clicking **Insert**, without the host creating a block behind the prompt.
 - `npm run build` now copies a local `resources/bible.text.json` into
   `dist/logseq-passage/` after the archive is closed, so the folder you load as
-  an unpacked plugin keeps its verse text across rebuilds. The verse text is
-  still never committed and never packaged: the copy happens after zipping, and
-  `scripts/verify-release.mjs` fails the release if verse text is ever found in
-  the archive.
+  an unpacked plugin keeps its verse text across rebuilds. The copy happens
+  after zipping, while `scripts/verify-release.mjs` continues to enforce the
+  archive's declared file list.
 - The **Passage text index** setting (`biblePassageText`) is now a Passage
   setting. A path configured under the theme is not carried across: re-enter it
   once under **Plugins → Passage → Settings**. Passages already written need no

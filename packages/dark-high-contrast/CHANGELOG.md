@@ -124,7 +124,7 @@ All notable changes to this project are documented here.
   prose keeps its numbers inline: `index.js` reads the fact from the block's own
   source, because the render cannot be asked — inside `#+BEGIN_PASSAGE` the
   whole body is one paragraph of line breaks, where a number opening a line and
-  a number following an edition's poetry break look alike.
+  a number following a poetry break look alike.
 - Write a passage reference back under the book's full name, in one of six
   forms: `Genesis`, `Genesis 1`, `Genesis 1-2`, `Genesis 1:1 - 2:1`,
   `Genesis 50:20 - Exodus 1:10`, `Genesis 1:1-10`. The dash is tight where what
@@ -162,8 +162,8 @@ All notable changes to this project are documented here.
   about the passage in front of you rather than a setting, and with none of them
   checked the passage is written exactly as it was before.
 - Keep paragraph breaks, poetry lineation and chapter separation as they were
-  wherever an option does not override them, and keep the edition's own section
-  headings out of the block. Without a local text index the command still writes
+  wherever an option does not override them, and keep section headings out of
+  the block. Without a local text index the command still writes
   the reference and its chapter tags and leaves the body empty — an option adds
   nothing to a passage that has no text.
 - Keep a prompt button black with white text in every state, so a focused button
@@ -181,17 +181,16 @@ All notable changes to this project are documented here.
   one namespaced tag per chapter the passage spans: `Gen 50 - Ex 2` becomes
   **Gen 50–Ex 2** under `tags:: Gen/50, Ex/1, Ex/2`.
 - Keep the prompt open, with the reason under the field, for a reference that
-  does not resolve: an unknown book, a chapter or verse the edition does not
+  does not resolve: an unknown book, a chapter or verse absent from the index,
   carry, or a range that runs backwards such as `Ex 2-Gen 50`.
 - Write the passage text under the reference as plain prose — no verse numbers,
   no section headings, a blank line between paragraphs, and poetry keeps its
   lineation — when a local text index is present. The index is built by `scripts/build-bible-index.mjs` from an
-  edition of your own; no verse text is committed here or shipped in the
-  release. Without it the command still writes the reference and its tags, so
+  input file. Without it the command still writes the reference and its tags, so
   the theme is fully usable installed from the Marketplace.
 - Ship `resources/bible.books.json`, a manifest of 84 books, 1398 chapters and
   37758 verses carrying names, counts and verse-id offsets and no verse text.
-  The generator repairs four defects in the source it is built from: `Bah` for
+  The generator repairs four defects in its input: `Bah` for
   Habakkuk, `Psalm` for the Psalms, the thirteen tail books named one
   deuterocanonical book out of step, and section headings and psalm
   superscriptions left at the end of the preceding verse.

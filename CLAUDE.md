@@ -37,6 +37,7 @@ Read the package's `README.md` and `CHANGELOG.md` before changing public behavio
 
 ## Design and compatibility constraints
 
+- Unless otherwise specified, references to admonitions also include `bible_passage` blocks.
 - Preserve the exact High Contrast palette constants unless the task explicitly changes the palette.
 - Logseq resolves many colors through `--lx-*`, then `--ls-*`, then `--rx-*`. Theme selectors must retain enough specificity to beat Logseq's per-accent declarations.
 - Keep `package.json` `effect: true`. Logseq otherwise moves the entry to the `lsp://logseq.io/` origin, preventing `index.js` from reading `parent.document`.

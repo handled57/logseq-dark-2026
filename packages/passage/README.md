@@ -81,10 +81,10 @@ A bare number after the dash is a verse when the left side named one
 it and it is always that book's chapter.
 
 A reference that does not resolve leaves the prompt open with the reason under
-the field, so you can correct it: an unknown book, a chapter or verse the
-edition does not carry, or a range that runs backwards, such as `Ex 2-Gen 50`.
-Verses this edition omits as textually doubtful — Matthew 17:21 among them — are
-refused rather than quietly read as their neighbour.
+the field, so you can correct it: an unknown book, a chapter or verse absent
+from the index, or a range that runs backwards, such as `Ex 2-Gen 50`. Gaps in
+verse numbering — Matthew 17:21 among them — are refused rather than quietly
+read as their neighbour.
 
 ## Passage text
 
@@ -93,12 +93,10 @@ numbers, no section headings, a blank line between paragraphs, and poetry keeps
 its own lineation. A chapter boundary is a paragraph boundary, so it is
 separated the same way.
 
-This needs a local text index, which the plugin does not ship — the edition it is
-built from is licensed and cannot be redistributed here. Without one the command
-still writes the canonical reference and its chapter tags and leaves the text to
-you, which is what a Marketplace install does out of the box.
+This needs a local text index. Without one the command still writes the
+canonical reference and its chapter tags and leaves the text to you.
 
-To build the index, put a per-verse export of your edition at
+To build the index, put per-verse Bible data at
 `resources/bible.index.json` and run:
 
 ```sh
@@ -108,14 +106,9 @@ node scripts/build-bible-index.mjs
 That writes two files. `resources/bible.books.json` is the manifest — book names,
 chapter counts, verse counts and verse-id offsets, no verse text — and it is
 committed and shipped, which is what makes references resolve with no further
-setup. `resources/bible.text.json` is the verse text; it is git-ignored, never
-packaged, and read from the plugin's own folder unless the **Passage text index**
-setting names another path.
-
-Your edition's licence is yours to observe. Nothing in this repository
-redistributes verse text: it is not committed, it is not in the release archive,
-and the checks in the root `scripts/verify-release.mjs` fail the build if it ever appears
-in one.
+setup. `resources/bible.text.json` is the verse text; it is read from the
+plugin's own folder unless the **Passage text index** setting names another
+path.
 
 For an already-built index stored elsewhere, enter its absolute
 `bible.text.json` path under **Plugins → Passage → Settings → Passage text
@@ -133,7 +126,7 @@ range spanning chapters and books:
 | --- | --- |
 | **View chapter headings** | `**Genesis 1**` above the verses of every chapter the passage includes, under the book's long name — a single chapter and a partial chapter are headed too |
 | **View verse numbers** | each verse number as a superscript against the front of its own verse: `¹⁶For God so loved…` |
-| **One verse per line** | every verse on a new line, with the line breaks inside a verse left exactly where the edition put them |
+| **One verse per line** | every verse on a new line, preserving line breaks inside a verse |
 
 All three open unchecked every time the prompt does: they describe the passage in
 front of you rather than the next one. With none of them checked the passage is
@@ -150,9 +143,9 @@ the number is still a number.
 
 The options add to the text and never replace it. Paragraph breaks, poetry
 lineation and chapter separation stay as they are wherever an option does not
-override them, verse numbers stay attached to their own verses where an edition
-omits one — Matthew 17:21 among them — and the edition's own section headings are
-still left out. Without a local text index the body stays empty and the
+override them, verse numbers stay attached to their own verses when the index
+omits one — Matthew 17:21 among them — and section headings are still left out.
+Without a local text index the body stays empty and the
 missing-index notice still appears: a heading or a verse number over a passage
 that has no text would be metadata standing in for the passage.
 
@@ -214,15 +207,13 @@ the root `scripts/verify-release.mjs` asserts. A clean checkout and CI have no l
 and nothing is copied.
 
 The copy happens strictly after archiving, and `verify-release.mjs` checks the
-archive for verse text by name as well as by its exact file list, so a licensed
-edition cannot reach a release this way.
+archive against its exact file list.
 
 ## Attribution
 
 `resources/bible.books.json` carries book names, chapter counts, verse counts and
 verse-id offsets, and no verse text. See
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the edition it is derived
-from and for the vendored Logseq SDK.
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the vendored Logseq SDK.
 
 ## License
 

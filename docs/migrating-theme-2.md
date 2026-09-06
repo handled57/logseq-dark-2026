@@ -23,10 +23,10 @@ picker entry. Install the **Passage** plugin (`logseq-passage`) separately if
 you want to create new passage blocks. The theme works without it; Passage also
 works with another theme or with no theme selected.
 
-Passage does not ship licensed Bible text. It can validate references and write
-the reference and chapter tags immediately, but a local text index is required
-to insert verse text. Follow the [Passage text setup](../packages/passage/README.md#passage-text)
-for building or supplying your own edition.
+Passage can validate references and write the reference and chapter tags
+immediately, but a local text index is required to insert verse text. Follow
+the [Passage text setup](../packages/passage/README.md#passage-text) for building
+or supplying an index.
 
 ## Copy the text-index path manually
 

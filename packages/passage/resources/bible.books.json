@@ -1,9 +1,5 @@
 {
   "schemaVersion": 1,
-  "source": {
-    "title": "The SBL Study Bible",
-    "edition": "New Revised Standard Version, Updated Edition"
-  },
   "stats": {
     "books": 84,
     "chapters": 1398,

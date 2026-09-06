@@ -34,9 +34,8 @@ const COMMAND_ITEM_SELECTOR = '.menu-link, a, li'
 const EDITOR_SELECTOR = 'textarea.block-editor, textarea'
 const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 
-/* The manifest ships with the plugin; the verse text does not, and cannot — it
- * is a licensed edition. This setting is where a reader who has built the text
- * index points the command at it. */
+/* The manifest ships with the plugin. This setting is where a reader points
+ * the command at a text index. */
 const TEXT_SETTING = 'biblePassageText'
 const BIBLE_MANIFEST_PATH = 'resources/bible.books.json'
 const BIBLE_TEXT_PATH = 'resources/bible.text.json'
@@ -126,9 +125,8 @@ async function captureInvocation(trigger) {
  * Two files, and neither one is required. `resources/bible.books.json` is the
  * manifest — book names, chapter counts and verse-id offsets, no verse text —
  * and it ships with the plugin, so references resolve out of the box. The verse
- * text is a licensed edition that cannot be redistributed here: it is built
- * locally by `scripts/build-bible-index.mjs` and read from the plugin's own
- * resources folder or from wherever the setting points.
+ * text index is read from the plugin's own resources folder or from wherever
+ * the setting points.
  *
  * Every read route below is optional and guarded. A route that is missing or
  * refuses is simply the next one's turn, and when all of them fail the command
