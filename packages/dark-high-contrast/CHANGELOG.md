@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## Unreleased
+## 2.1.0 - 2026-09-06
 
 - Fold a block by left-clicking its bullet. The click that opened the block's
   own page now expands or collapses it through Logseq's own collapse handling,
