@@ -98,9 +98,17 @@ function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
     addEventListener(type, handler) {
       self.listeners.set(type, [...(self.listeners.get(type) ?? []), handler])
     },
+    removeEventListener(type, handler) {
+      self.listeners.set(type, (self.listeners.get(type) ?? []).filter((entry) => entry !== handler))
+    },
     appendChild(child) {
       child.parentElement = self
       self.children.push(child)
+      return child
+    },
+    insertBefore(child, before) {
+      child.parentElement = self
+      self.children.splice(self.children.indexOf(before), 0, child)
       return child
     },
     remove() {
@@ -108,17 +116,26 @@ function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
       if (siblings) siblings.splice(siblings.indexOf(self), 1)
       self.parentElement = null
     },
-    cloneNode() {
-      return node(tag, {
+    cloneNode(deep = false) {
+      const copy = node(tag, {
         id: self.id,
         classes: [...self.classList],
         attributes: Object.fromEntries(self.attributes)
       })
+      copy.textContent = self.textContent
+      if (deep) for (const child of self.children) copy.appendChild(child.cloneNode(true))
+      return copy
     },
     focus() {
       self.focused = true
     },
     matches: (selector) => matchesSelector(self, selector),
+    closest(selector) {
+      for (let current = self; current; current = current.parentElement) {
+        if (matchesSelector(current, selector)) return current
+      }
+      return null
+    },
     querySelector: (selector) =>
       descendants(self).find((child) => matchesSelector(child, selector)) ?? null,
     querySelectorAll: (selector) =>
@@ -146,6 +163,8 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   const observers = []
   const unloads = []
   let blockReads = 0
+  const navigations = []
+  const documentListeners = new Map()
   const context = {
     console,
     setImmediate,
@@ -171,6 +190,15 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
         body: host,
         getElementById: () => element(),
         createElement: (tag) => node(tag),
+        addEventListener(type, handler) {
+          documentListeners.set(type, [...(documentListeners.get(type) ?? []), handler])
+        },
+        removeEventListener(type, handler) {
+          documentListeners.set(
+            type,
+            (documentListeners.get(type) ?? []).filter((entry) => entry !== handler)
+          )
+        },
         /* The two block collections keep their purpose-built stubs; anything
          * else is served by the host stand-in. */
         querySelector: (selector) => host.querySelector(selector),
@@ -194,6 +222,12 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
       beforeunload(handler) {
         unloads.push(handler)
       },
+      App: {
+        onRouteChanged() {},
+        pushState(route, parameters) {
+          navigations.push({ route, parameters })
+        }
+      },
       useSettingsSchema(schema) {
         for (const entry of schema) {
           if (!(entry.key in this.settings)) this.settings[entry.key] = entry.default
@@ -207,7 +241,6 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
         provided.push(style)
       },
       onSettingsChanged() {},
-      App: { onRouteChanged() {} },
       ready(main) {
         return Promise.resolve(main())
       }
@@ -217,6 +250,11 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   vm.createContext(context)
   source.runInContext(context)
   context.blockReads = () => blockReads
+  context.navigations = navigations
+  context.dispatchDocument = (type, event) => {
+    for (const handler of documentListeners.get(type) ?? []) handler(event)
+  }
+  context.documentListeners = documentListeners
 
   return context
 }
@@ -569,6 +607,99 @@ test('a passage that runs its verses together keeps its numbers where they are',
     await context.refreshFromStoredSource(passage)
     assert.equal(passage.attributes.has('data-hc-verse-lines'), false, name)
   }
+})
+
+function menuLink(label) {
+  const link = node('a', { classes: ['flex', 'justify-between', 'menu-link'] })
+  const text = node('span', { classes: ['flex-1'] })
+  text.textContent = label
+  link.appendChild(text)
+  return link
+}
+
+function menuLabel(item) {
+  return item.querySelector('.flex-1')?.textContent ?? ''
+}
+
+function bulletMenuHost(uuid) {
+  const host = node('body')
+  const block = node('div', { classes: ['ls-block'], attributes: { blockid: uuid } })
+  const main = node('div', { classes: ['block-main-container'] })
+  const wrapper = node('div', { classes: ['block-content-wrapper'] })
+  const control = node('div', { classes: ['block-control-wrap'] })
+  const bullet = node('span', { classes: ['bullet-container'] })
+  const menu = node('div', { classes: ['menu-links-wrapper'] })
+
+  main.appendChild(wrapper)
+  control.appendChild(bullet)
+  main.appendChild(control)
+  block.appendChild(main)
+  host.appendChild(block)
+  for (const label of ['Heading', 'Open in sidebar', 'Copy block ref']) menu.appendChild(menuLink(label))
+  host.appendChild(menu)
+
+  return { host, block, bullet, menu }
+}
+
+test('the bullet menu puts one Open action immediately above Open in sidebar', async () => {
+  const uuid = '65f00000-0000-0000-0000-000000000020'
+  const fixture = bulletMenuHost(uuid)
+  const context = load({}, [], {}, fixture.host)
+  await Promise.resolve()
+
+  context.dispatchDocument('contextmenu', { target: fixture.bullet })
+  context.paint()
+  context.paint()
+
+  const labels = fixture.menu.children.filter((child) => child.matches('.menu-link')).map(menuLabel)
+  assert.deepEqual(labels, ['Heading', 'Open', 'Open in sidebar', 'Copy block ref'])
+  assert.equal(fixture.menu.querySelectorAll('[data-hc-open-block]').length, 1)
+
+  fixture.menu.querySelector('[data-hc-open-block]').dispatch('click')
+  assert.equal(context.navigations.length, 1)
+  assert.equal(context.navigations[0].route, 'page')
+  assert.equal(context.navigations[0].parameters.name, uuid)
+})
+
+test('Open targets the nested block whose bullet opened the menu', async () => {
+  const outerUuid = '65f00000-0000-0000-0000-000000000021'
+  const innerUuid = '65f00000-0000-0000-0000-000000000022'
+  const fixture = bulletMenuHost(outerUuid)
+  const inner = node('div', { classes: ['ls-block'], attributes: { blockid: innerUuid } })
+  const control = node('div', { classes: ['block-control-wrap'] })
+  const bullet = node('span', { classes: ['bullet-container'] })
+  control.appendChild(bullet)
+  inner.appendChild(control)
+  fixture.block.appendChild(inner)
+
+  const context = load({}, [], {}, fixture.host)
+  await Promise.resolve()
+  context.dispatchDocument('contextmenu', { target: bullet })
+  context.paint()
+  fixture.menu.querySelector('[data-hc-open-block]').dispatch('click')
+
+  assert.equal(context.navigations.length, 1)
+  assert.equal(context.navigations[0].route, 'page')
+  assert.equal(context.navigations[0].parameters.name, innerUuid)
+})
+
+test('non-bullet context menus get no Open action and unload removes the bridge', async () => {
+  const fixture = bulletMenuHost('65f00000-0000-0000-0000-000000000023')
+  const context = load({}, [], {}, fixture.host)
+  await Promise.resolve()
+
+  context.dispatchDocument('contextmenu', { target: fixture.block })
+  context.paint()
+  assert.equal(fixture.menu.querySelector('[data-hc-open-block]'), null)
+
+  context.dispatchDocument('contextmenu', { target: fixture.bullet })
+  context.paint()
+  assert.ok(fixture.menu.querySelector('[data-hc-open-block]'))
+
+  const [unload] = context.logseq.unloads
+  await unload()
+  assert.equal(fixture.menu.querySelector('[data-hc-open-block]'), null)
+  assert.equal(context.documentListeners.get('contextmenu').length, 0)
 })
 
 test('unloading clears every attribute the theme wrote and stops observing', async () => {

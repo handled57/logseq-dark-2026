@@ -15,6 +15,11 @@
  * content shape, `docs/contracts/passage-v1.md`, not a runtime — the theme
  * styles whatever passage blocks a graph holds, whoever wrote them.
  *
+ * It also adds one host-DOM affordance that Logseq 0.10.15 does not expose
+ * through its plugin API: an `Open` action immediately before `Open in
+ * sidebar` in the menu opened from a block bullet. The action follows the
+ * bullet's ordinary click behavior and opens that block in the main editor.
+ *
  * `parent.document` is reachable because package.json declares `effect: true`.
  * That flag keeps the plugin entry on the host's own `file://` origin;
  * side-effect-free packages are rewritten to `lsp://logseq.io/`, which is a
@@ -28,7 +33,9 @@ const HIDDEN_ATTR = 'data-hc-hidden'
 const TYPE_ATTR = 'data-hc-block-type'
 const BULLET_ATTR = 'data-hc-hide-bullet'
 const VERSE_ATTR = 'data-hc-verse-lines'
+const OPEN_MENU_ATTR = 'data-hc-open-block'
 const sourceCache = new Map()
+let pendingOpenUuid = ''
 
 const SPECIAL_CONTENT_SELECTOR = [
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -298,6 +305,52 @@ function paint() {
     if (type) block.setAttribute(TYPE_ATTR, type)
     else block.removeAttribute(TYPE_ATTR)
   }
+
+  addOpenMenuItem()
+}
+
+function menuLabel(item) {
+  return item.querySelector('.flex-1')?.textContent?.trim() ?? ''
+}
+
+/* Plugin block-menu commands render at the end of Logseq's menu, while this
+ * action belongs beside the native navigation action. Clone only the native
+ * link's presentation (DOM cloning does not copy its click handler), mark the
+ * clone as ours, and give it the captured bullet's UUID. The child-list
+ * observer may see this insertion, so the marker is also the idempotence
+ * guard. */
+function addOpenMenuItem() {
+  if (!pendingOpenUuid) return
+
+  for (const menu of doc.querySelectorAll('.menu-links-wrapper')) {
+    const links = [...menu.children].filter((child) => child.matches?.('.menu-link'))
+    const sidebar = links.find((item) => menuLabel(item) === 'Open in sidebar')
+    if (!sidebar || menu.querySelector(`[${OPEN_MENU_ATTR}]`)) continue
+
+    const item = sidebar.cloneNode(false)
+    item.removeAttribute('href')
+    item.setAttribute(OPEN_MENU_ATTR, '')
+
+    const label = doc.createElement('span')
+    label.classList.add('flex-1')
+    label.textContent = 'Open'
+    item.appendChild(label)
+    item.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const uuid = pendingOpenUuid
+      pendingOpenUuid = ''
+      if (uuid) void logseq.App.pushState('page', { name: uuid })
+    })
+
+    menu.insertBefore(item, sidebar)
+  }
+}
+
+function rememberBulletBlock(event) {
+  const bullet = event.target?.closest?.('.bullet-container')
+  const block = bullet?.closest('.ls-block')
+  pendingOpenUuid = block ? blockUuid(block) : ''
 }
 
 /* The sandbox is an unrendered iframe, so its own rAF never fires; the host
@@ -319,7 +372,10 @@ let observer = null
 function teardown() {
   observer?.disconnect()
   observer = null
+  doc.removeEventListener('contextmenu', rememberBulletBlock, true)
+  pendingOpenUuid = ''
 
+  for (const item of doc.querySelectorAll(`[${OPEN_MENU_ATTR}]`)) item.remove()
   for (const table of doc.querySelectorAll(`[${HIDDEN_ATTR}]`)) table.removeAttribute(HIDDEN_ATTR)
   for (const block of doc.querySelectorAll(`[${BULLET_ATTR}]`)) block.removeAttribute(BULLET_ATTR)
   for (const block of doc.querySelectorAll(`[${VERSE_ATTR}]`)) block.removeAttribute(VERSE_ATTR)
@@ -337,6 +393,7 @@ function main() {
     repaint()
   })
   logseq.beforeunload?.(async () => teardown())
+  doc.addEventListener('contextmenu', rememberBulletBlock, true)
 
   /* childList/subtree only: this observer must not see its own attribute
    * writes, or every pass would schedule another one. */

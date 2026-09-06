@@ -16,6 +16,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../passage) plugin's job, and the theme does not require it.
 - Aligns named-admonition and passage icons with the first rendered line while their semantic divider continues through the full block height.
+- Adds **Open** immediately above **Open in sidebar** in a block bullet's context menu, opening that block in the main editor.
 - No build runtime, tracking, remote imports, or network access.
 
 ## Color palette
@@ -214,6 +215,10 @@ Through version 1.10.1 the Passage command was part of this theme. Upgrading to 
 ## Compatibility
 
 Version 2.0.0 targets **Logseq 0.10.15 classic/file graphs on desktop**.
+
+Right-click a block bullet and choose **Open** to open that block in the main
+editor. The entry sits immediately above Logseq's existing **Open in sidebar**
+action; the existing action and the rest of the menu keep their normal behavior.
 
 - DB graphs are not supported in this release.
 - Mobile is not an advertised target; narrow desktop windows receive a layout smoke test.
