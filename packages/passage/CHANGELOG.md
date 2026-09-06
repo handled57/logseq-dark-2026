@@ -22,10 +22,10 @@ All notable changes to this package are documented here.
   which sent the reference into the block and left Insert disabled and Enter
   with a blank field to read.
 - The block leaves edit mode before the passage is written. The host saves the
-  textarea it was editing back to the block whenever that session ends, which
-  landed after the insertion and replaced the passage with the line that had
-  been there: the passage appeared and then vanished, leaving an empty block
-  out of edit mode.
+  textarea it was editing back to the block whenever that session ends. Passage
+  now also waits for that queued host save to commit before it writes; the API's
+  promise resolves when exit is requested, while the save itself can otherwise
+  land after the insertion and make the passage appear and then vanish.
 - Enter and Escape are claimed on the host window before Logseq's document-level
   editor shortcuts. Pressing Enter now follows the same insertion path as
   clicking **Insert**, without the host creating a block behind the prompt.

@@ -203,9 +203,19 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
   const exits = []
   const unloads = []
   const messages = []
+  let pendingEditorSave = null
+  const writes = []
   const context = {
     console,
     setImmediate,
+    /* Logseq finishes the textarea save in a later host task even though
+     * exitEditingMode's promise has already resolved. Run that queued save
+     * before the plugin's own zero-delay continuation. */
+    setTimeout(callback) {
+      pendingEditorSave?.()
+      pendingEditorSave = null
+      callback()
+    },
     messages,
     ...(routes.fetch ? { fetch: routes.fetch } : {}),
     MutationObserver: class {
@@ -278,9 +288,13 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
         },
         async updateBlock(uuid, content) {
           updates.push({ uuid, content })
+          writes.push({ source: 'passage', content })
         },
         async editBlock(uuid, options) {
           edits.push({ uuid, ...options })
+          const content = updates.findLast((update) => update.uuid === uuid)?.content ?? ''
+          host.appendChild(editingArea({ value: content, cursor: options?.pos ?? content.length, uuid }))
+          editing = true
         },
         /* Ending the edit session is a write of its own: the host saves the
          * editing textarea back to the block on the way out. What matters is
@@ -288,6 +302,11 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
         async exitEditingMode() {
           exits.push({ after: updates.length })
           editing = false
+          const stale = host.querySelector('textarea')?.value ?? ''
+          pendingEditorSave = () => {
+            writes.push({ source: 'host', content: stale })
+            host.querySelector('textarea')?.remove()
+          }
         }
       },
       beforeunload(handler) {
@@ -365,6 +384,7 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
     editing = false
     return host.querySelector('textarea')?.value ?? ''
   }
+  context.writes = writes
 
   vm.createContext(context)
   parser.runInContext(context)
@@ -442,9 +462,17 @@ test('the block leaves edit mode before the passage is written', async () => {
   assert.ok(exit, 'the block was left in edit mode')
   assert.equal(exit.after, 0, 'the edit session ended after the passage was written')
   assert.deepEqual(rest, [], 'the edit session was ended more than once')
-  assert.equal(context.endEditSession(), null, 'the edit session outlived the insertion')
-  // And the block the host is left holding is the passage.
-  assert.equal(context.logseq.Editor.updates.at(-1).content, PASSAGE_BLOCK)
+  assert.equal(
+    context.endEditSession(),
+    PASSAGE_BLOCK,
+    'the new edit session did not contain the passage'
+  )
+  // The API resolves before Logseq's queued textarea save. That save must land
+  // before Passage, leaving Passage as the final write.
+  assert.deepEqual(context.writes, [
+    { source: 'host', content: '' },
+    { source: 'passage', content: PASSAGE_BLOCK }
+  ])
 })
 
 test('the passage properties join the drawer the block already has', async () => {
@@ -807,6 +835,7 @@ test('without the text index the reference and tags are still written, with a no
   assert.match(context.messages[0].text, /build-bible-index/)
 
   // The notice is a standing condition, not something to repeat per passage.
+  context.parent.document.querySelector('textarea').value = ''
   await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Ps 24')
   assert.equal(context.messages.length, 1)
 })
@@ -824,6 +853,7 @@ test('a settings change re-reads the text index and says again when there is non
   context.logseq.settings.biblePassageText = '/graph/bible.text.json'
   for (const handler of context.logseq.settingsListeners) handler(context.logseq.settings)
 
+  context.parent.document.querySelector('textarea').value = ''
   await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Ps 24')
   assert.equal(context.messages.length, 2)
   assert.equal(context.logseq.Editor.updates.length, 2)

@@ -86,6 +86,19 @@ function cursorIn(editor, content) {
   return Number.isInteger(editor?.selectionStart) ? editor.selectionStart : content.length
 }
 
+/* `exitEditingMode` acknowledges the request before Logseq has necessarily
+ * committed and removed its textarea. Give that queued save a task, then (when
+ * needed) a few paint cycles to finish before an API write can race it. */
+async function waitForEditorExit(uuid) {
+  await new Promise((resolve) => setTimeout(resolve, 0))
+
+  for (let frame = 0; frame < 8; frame += 1) {
+    const editing = UUID_PATTERN.exec(editingArea()?.id ?? '')?.[0] ?? ''
+    if (editing !== uuid) return
+    await new Promise((resolve) => parent.requestAnimationFrame(resolve))
+  }
+}
+
 /* The invocation has to be measured before the dialog takes focus, because
  * leaving the editor ends the edit session and discards the selection. */
 async function captureInvocation(trigger) {
@@ -282,11 +295,13 @@ async function writePassage({ uuid, content, cursor, trigger }, resolved, displa
 
   /* The block behind the dialog is still being edited: the slash command puts
    * the caret back in its own textarea before this handler runs, and the host
-   * writes that textarea back to the block when the session ends. Ending the
-   * session first makes that save happen before the passage is written rather
-   * than after it, where it replaced the passage with the line that had been
-   * there — an empty block, and no edit session left to undo it in. */
+   * writes that textarea back to the block when the session ends. The API
+   * promise resolves when that exit is requested, not when the host's queued
+   * textarea save has committed, so yield one host task before writing. That
+   * makes the stale editor save finish first and the passage remain the final
+   * write. */
   await logseq.Editor.exitEditingMode?.()
+  await waitForEditorExit(uuid)
   await logseq.Editor.updateBlock(uuid, written.content)
   await logseq.Editor.editBlock?.(uuid, { pos: written.cursor })
 }
