@@ -71,6 +71,10 @@ test('marketplace metadata is classic-only and agrees with the package', () => {
   assert.equal(marketplace.id, pkg.name)
   assert.equal(marketplace.repo, pkg.repo)
   assert.equal(marketplace.author, pkg.author)
+  assert.equal(
+    marketplace.description,
+    'A VS Code-inspired Dark High Contrast theme for Logseq classic graphs, with configurable property hiding and Bible passage insertion.'
+  )
   assert.equal(marketplace.theme, true)
   assert.equal(marketplace.effect, pkg.effect)
   assert.equal(marketplace.web, false)
