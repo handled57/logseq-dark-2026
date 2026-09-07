@@ -90,9 +90,9 @@ Those popups' section headings are a second upstream assumption the theme
 cannot inherit: Logseq draws `.ui__ac-group-name` at a fifth of
 `--popover-foreground`, a fade that reads on its own near-black background but
 disappears on this one. The theme replaces the colour rather than the alpha, so
-a per-accent foreground cannot thin it again, and leaves Logseq's own size,
-weight and padding alone — those, not the colour, are what separate a heading
-from the commands under it.
+a per-accent foreground cannot thin it again, and pays back in weight what the
+shared colour costs: at Logseq's heading size, bold is what still separates a
+heading from the commands under it. Size and padding remain Logseq's.
 
 ## Anno's import and the highlight page
 

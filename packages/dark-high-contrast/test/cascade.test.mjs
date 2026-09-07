@@ -805,7 +805,7 @@ test('the slash-command menu is opaque and paints over the blocks below it', () 
   )
 })
 
-test("the popup's section headings are as bright as the rows beneath them", () => {
+test("the popup's section headings are white, bold, and still Logseq's size", () => {
   // Logseq draws them at a fifth of the popover foreground. The theme sets that
   // token to white, so the headings resolve to a fifth of white over the popup's
   // black — about a 1.6:1 contrast, well under any legibility floor. The theme
@@ -813,9 +813,14 @@ test("the popup's section headings are as bright as the rows beneath them", () =
   const heading = rule('.ui__ac-group-name')
   assert.equal(value(heading, 'color'), 'var(--vscode-hc-white) !important')
 
-  // The heading is told from the commands by size and weight, both Logseq's
-  // own, so brightening it must not also restyle it.
-  assert.doesNotMatch(heading, /font-size:|font-weight:|padding:|background:/)
+  // Sharing the rows' colour costs the heading the one thing that set it apart,
+  // so it takes weight instead: bolder than Logseq's own 500 and bolder than
+  // the commands under it.
+  assert.equal(value(heading, 'font-weight'), '700 !important')
+
+  // Size and padding are still Logseq's, and the heading is not given a
+  // background that would box it off from the rows.
+  assert.doesNotMatch(heading, /font-size:|padding:|background:/)
 })
 
 /* Optional: confirm the pinned literals still describe the installed app. */
