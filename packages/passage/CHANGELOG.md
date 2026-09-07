@@ -2,6 +2,12 @@
 
 All notable changes to this package are documented here.
 
+## 0.3.0 - 2026-09-07
+
+- Add **Passage: Insert a passage** to Logseq's global command palette, available
+  through **Cmd+Shift+P** on macOS and **Ctrl+Shift+P** on Windows and Linux.
+  The `/` slash-command and `<` command-picker entries remain unchanged.
+
 ## 0.2.1 - 2026-09-07
 
 - Rename the command shown in the `/` slash-command menu and the `<` command

@@ -9,7 +9,7 @@ dependencies, compilation, remote imports, or runtime network access.
 | Marketplace package | npm workspace | Version | Install it when you want |
 | --- | --- | --- | --- |
 | **Dark High Contrast** | [`packages/dark-high-contrast`](packages/dark-high-contrast) | `2.1.0` | A pure-black, accessible theme for Logseq classic/file graphs. |
-| **Passage** | [`packages/passage`](packages/passage) | `0.2.1` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
+| **Passage** | [`packages/passage`](packages/passage) | `0.3.0` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
 | **Anno** | [`packages/anno`](packages/anno) | `0.1.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
 
 Install any one package by itself or install them together. None of them calls

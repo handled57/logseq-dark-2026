@@ -7,9 +7,9 @@
  * `docs/contracts/passage-v1.md`. Nothing here needs a theme installed: the
  * block it writes is ordinary Logseq markup that renders readably on its own.
  *
- * Two entry points, one insertion path: the `/` slash command, which has a
- * plugin API, and the `<` command picker, which has none and is reached through
- * a host-DOM bridge.
+ * Three entry points, one insertion path: the `/` slash command and global
+ * command palette, which have plugin APIs, and the `<` command picker, which
+ * has none and is reached through a host-DOM bridge.
  *
  * `parent.document` is reachable because package.json declares `effect: true`.
  * That flag keeps the plugin entry on the host's own `file://` origin;
@@ -20,6 +20,7 @@
 const doc = parent.document
 
 const COMMAND_LABEL = 'Passage: Insert a passage'
+const COMMAND_PALETTE_KEY = 'passage.insert-passage'
 /* Every attribute, style key and element id this plugin writes is namespaced to
  * Passage, so a theme that annotates the same host document — Dark High
  * Contrast writes `data-hc-*` — never reads or clears one of these by mistake,
@@ -284,7 +285,10 @@ function withPassageProperties(content, cursor, tags) {
 async function writePassage({ uuid, content, cursor, trigger }, resolved, display) {
   const reference = resolved.canonical
   const body = await passageBody(resolved, display)
-  const head = content.slice(0, cursor).replace(INVOCATIONS[trigger], '')
+  const invocation = INVOCATIONS[trigger]
+  const head = invocation
+    ? content.slice(0, cursor).replace(invocation, '')
+    : content.slice(0, cursor)
   const tail = content.slice(cursor)
   /* `#+BEGIN_PASSAGE` only parses on a line of its own, so surrounding text is
    * pushed onto its own line rather than dropped. */
@@ -685,6 +689,10 @@ function main() {
   void loadBibleManifest().catch(() => null)
   logseq.provideStyle({ key: DIALOG_STYLE_KEY, style: DIALOG_STYLE })
   logseq.Editor?.registerSlashCommand?.(COMMAND_LABEL, () => insertPassage('slash'))
+  logseq.App?.registerCommandPalette?.(
+    { key: COMMAND_PALETTE_KEY, label: COMMAND_LABEL },
+    () => insertPassage('palette')
+  )
   /* A new text-index path is a new read, and a reason to say again that there
    * is nothing at the end of it. */
   logseq.onSettingsChanged(() => {
