@@ -75,6 +75,17 @@ seven hues, `--hc-red` and `--hc-indigo`, are the theme's own additions to the
 VS Code palette; `test/theme.test.mjs` holds them to contrast against the canvas
 and separation from the levels beside them.
 
+Because the rail paints its line behind the bullets, each row is its own
+stacking context. That matters to the editor's popups: Logseq opens the `/`
+command menu and its siblings inside the block being edited without a stacking
+level, so the following blocks — every `.ls-block` is positioned — paint their
+text over an otherwise opaque menu. The theme gives `.absolute-modal
+[data-modal-name]` Logseq's `--ls-z-index-level-1`, and lifts the containing
+`.ls-block` to the same level so the popup escapes its row's isolation. The lift
+is on the block, which Logseq already positions, rather than on the row, which
+would otherwise become the containing block the popup is measured from. Both
+levels stay below the sticky header at `z-index: 10`.
+
 ## Anno's import and the highlight page
 
 Logseq derives a PDF's whole annotation identity from one filename. Opening
