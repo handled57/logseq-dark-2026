@@ -86,6 +86,14 @@ is on the block, which Logseq already positions, rather than on the row, which
 would otherwise become the containing block the popup is measured from. Both
 levels stay below the sticky header at `z-index: 10`.
 
+Those popups' section headings are a second upstream assumption the theme
+cannot inherit: Logseq draws `.ui__ac-group-name` at a fifth of
+`--popover-foreground`, a fade that reads on its own near-black background but
+disappears on this one. The theme replaces the colour rather than the alpha, so
+a per-accent foreground cannot thin it again, and leaves Logseq's own size,
+weight and padding alone — those, not the colour, are what separate a heading
+from the commands under it.
+
 ## Anno's import and the highlight page
 
 Logseq derives a PDF's whole annotation identity from one filename. Opening

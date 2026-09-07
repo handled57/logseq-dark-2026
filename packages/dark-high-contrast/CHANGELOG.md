@@ -13,6 +13,10 @@ All notable changes to this project are documented here.
   and every dialog. The `[[`, `((`, template, property, date-picker and code
   block mode popups are fixed with it, and the menu's layout, keyboard
   navigation, scrolling, filtering and row states are unchanged.
+- Brighten the section headings inside those popups — BASIC and TIME & DATE in
+  the `/` menu — to full white. Logseq draws them at a fifth of the popover
+  foreground, which over the theme's black left them barely visible. They keep
+  the smaller, heavier type that tells a heading from a command.
 
 ## 2.2.0 - 2026-09-07
 

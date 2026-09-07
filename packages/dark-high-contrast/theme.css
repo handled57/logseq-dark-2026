@@ -1130,6 +1130,16 @@ button:disabled,
   outline-offset: -2px;
 }
 
+/* Logseq draws an autocomplete popup's section headings — BASIC and TIME & DATE
+ * in the `/` menu — at a fifth of the popover foreground. The theme's own
+ * foreground is white, so a fifth of it lands near the popup's black
+ * background and the headings all but disappear. High contrast wants them read,
+ * not sensed: they take the full white the rows beside them take, and keep the
+ * smaller, heavier type that tells a heading from a command. */
+.ui__ac-group-name {
+  color: var(--vscode-hc-white) !important;
+}
+
 .ui__modal-overlay,
 .ui__dialog-overlay {
   background: rgb(0 0 0 / 78%);

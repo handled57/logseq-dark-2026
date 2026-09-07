@@ -343,7 +343,8 @@ const popupMetrics = [
   '.absolute-modal{background:var(--ls-primary-background-color);overflow:auto}',
   '.absolute-modal[data-modal-name]{background-color:hsl(var(--popover));border-radius:var(--radius);border-width:1px;overflow-x:hidden;overflow-y:auto;padding-bottom:.25rem;padding-top:.25rem}',
   '.ls-block{border-bottom:1px solid transparent;min-height:24px;padding:2px 0;position:relative;transition:background-color .3s cubic-bezier(.16,1,.3,1)}',
-  '--ls-z-index-level-1:9'
+  '--ls-z-index-level-1:9',
+  '.ui__ac-group-name{color:hsl(var(--popover-foreground)/.2);font-size:.75rem;font-weight:500;line-height:1rem;padding:.5rem}'
 ]
 
 /* Read back off the declarations above. */
@@ -802,6 +803,19 @@ test('the slash-command menu is opaque and paints over the blocks below it', () 
     [...rules].some(([selector, body]) => selector.endsWith('> .block-main-container') && /isolation:\s*isolate/.test(body)),
     'the row no longer isolates the rail, so the popup no longer needs lifting with the block'
   )
+})
+
+test("the popup's section headings are as bright as the rows beneath them", () => {
+  // Logseq draws them at a fifth of the popover foreground. The theme sets that
+  // token to white, so the headings resolve to a fifth of white over the popup's
+  // black — about a 1.6:1 contrast, well under any legibility floor. The theme
+  // replaces the colour rather than the alpha, so no accent can thin it again.
+  const heading = rule('.ui__ac-group-name')
+  assert.equal(value(heading, 'color'), 'var(--vscode-hc-white) !important')
+
+  // The heading is told from the commands by size and weight, both Logseq's
+  // own, so brightening it must not also restyle it.
+  assert.doesNotMatch(heading, /font-size:|font-weight:|padding:|background:/)
 })
 
 /* Optional: confirm the pinned literals still describe the installed app. */
