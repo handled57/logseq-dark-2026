@@ -18,7 +18,7 @@ Paths below are relative to `packages/dark-high-contrast/` unless noted.
 - `test/theme.test.mjs` checks package structure, workspace layout, required selectors, palette values, accessibility, and release metadata.
 - `test/cascade.test.mjs` checks selector specificity against pinned Logseq CSS behavior.
 - `test/properties.test.mjs` behaviorally tests `index.js` against a stub host document.
-- `../anno/index.js` is Anno's canonical runtime: the **Upload PDF for annotation** command, its prompt, and the asset-naming rule that decides which page Logseq collects a PDF's highlights on. `../anno/test/package.test.mjs` checks its structure and metadata; `../anno/test/anno.test.mjs` drives that runtime against a stub host document and file bridge.
+- `../anno/index.js` is Anno's canonical runtime: the **Anno: Import PDF** command, its prompt, and the asset-naming rule that decides which page Logseq collects a PDF's highlights on. `../anno/test/package.test.mjs` checks its structure and metadata; `../anno/test/anno.test.mjs` drives that runtime against a stub host document and file bridge.
 - Each package's `package.json#release.files` is its exact package-owned archive allowlist.
 - Root `scripts/build-release.mjs` creates extracted packages and Marketplace ZIPs in root `dist/`; aggregate builds clean once and targeted workspace builds remove only their own outputs.
 - Root `scripts/verify-release.mjs` verifies exact archive contents, metadata agreement, and byte parity with canonical sources.

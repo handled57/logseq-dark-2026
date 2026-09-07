@@ -8,9 +8,9 @@ and styles nothing; the annotating itself is Logseq's own PDF viewer, unchanged.
 
 ## Importing a PDF
 
-- Type `/` and choose **Upload PDF for annotation**.
+- Type `/` and choose **Anno: Import PDF**.
 - Or press `Cmd+Shift+P` (`Ctrl+Shift+P` on Windows and Linux) and choose
-  **Upload PDF for annotation** from the command palette.
+  **Anno: Import PDF** from the command palette.
 
 Either one opens the same prompt, and the system file chooser opens with it,
 because choosing the PDF is the first thing the command is for. **Choose PDF…**

@@ -249,9 +249,9 @@ test('both entry points invoke the same import under one label', async () => {
   const context = load()
   await flush()
 
-  assert.equal(context.slash().label, 'Upload PDF for annotation')
-  assert.equal(context.command().label, 'Upload PDF for annotation')
-  assert.equal(context.command().key, 'anno-upload-pdf')
+  assert.equal(context.slash().label, 'Anno: Import PDF')
+  assert.equal(context.command().label, 'Anno: Import PDF')
+  assert.equal(context.command().key, 'anno-import-pdf')
   assert.deepEqual(context.logseq.provided.map((style) => style.key), ['anno-dialog'])
 })
 

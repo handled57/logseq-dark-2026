@@ -4,9 +4,9 @@ All notable changes to this package are documented here.
 
 ## 0.1.0 - 2026-09-06
 
-- First release. **Upload PDF for annotation** imports a PDF into the graph and
-  opens the page it is annotated from. The command is on both the `/` menu and
-  the command palette (`Cmd+Shift+P`), and both reach the same prompt.
+- First release. **Anno: Import PDF** imports a PDF into the graph and opens
+  the page it is annotated from. The command is on both the `/` menu and the
+  command palette (`Cmd+Shift+P`), and both reach the same prompt.
 - The prompt opens the system file chooser with it, and **Choose PDF…** reopens
   it. The page title fills itself in from the PDF's filename without its `.pdf`
   extension, re-fills while it has not been written by hand, and stays editable

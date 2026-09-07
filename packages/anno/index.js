@@ -21,8 +21,8 @@
 
 const doc = parent.document
 
-const COMMAND_LABEL = 'Upload PDF for annotation'
-const PALETTE_KEY = 'anno-upload-pdf'
+const COMMAND_LABEL = 'Anno: Import PDF'
+const PALETTE_KEY = 'anno-import-pdf'
 
 /* Every attribute, element id and style key this plugin writes is namespaced
  * to Anno, so a theme or a sibling plugin annotating the same host document —

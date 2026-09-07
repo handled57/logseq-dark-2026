@@ -10,7 +10,7 @@ dependencies, compilation, remote imports, or runtime network access.
 | --- | --- | --- | --- |
 | **Dark High Contrast** | [`packages/dark-high-contrast`](packages/dark-high-contrast) | `2.1.0` | A pure-black, accessible theme for Logseq classic/file graphs. |
 | **Passage** | [`packages/passage`](packages/passage) | `0.2.0` | `/Passage` and `< Passage` commands that write canonical Bible passage blocks from a local text index. |
-| **Anno** | [`packages/anno`](packages/anno) | `0.1.0` | An **Upload PDF for annotation** command that imports a PDF and opens the page its highlights are collected on. |
+| **Anno** | [`packages/anno`](packages/anno) | `0.1.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
 
 Install any one package by itself or install them together. None of them calls
 another. Dark High Contrast styles any
