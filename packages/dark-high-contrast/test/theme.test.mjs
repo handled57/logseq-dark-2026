@@ -4,6 +4,7 @@ import { constants } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { splitSelectors as selectors } from '../../../test/support/pinned-css.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
@@ -132,7 +133,7 @@ test('README and palette chart document every fixed stylesheet color', async () 
 
   assert.deepEqual(
     { hex: expected.hex.length, rgb: expected.rgb.length, hsl: expected.hsl.length },
-    { hex: 50, rgb: 27, hsl: 9 },
+    { hex: 52, rgb: 26, hsl: 9 },
     'stylesheet color inventory changed unexpectedly'
   )
   assert.deepEqual(readmeColors, expected, 'README fixed-color tables have drifted from theme.css')
@@ -212,6 +213,76 @@ test('official High Contrast palette values remain exact', () => {
   }
 
   for (const [name, value] of Object.entries(expected)) assert.equal(cssValue(name), value)
+})
+
+/* A color's hue angle, for checking that one is the color it is named after
+ * and that it reads apart from the one beside it. */
+function hue(hex) {
+  const [red, green, blue] = hex.match(/[a-f\d]{2}/gi).map((value) => Number.parseInt(value, 16) / 255)
+  const high = Math.max(red, green, blue)
+  const range = high - Math.min(red, green, blue)
+  if (range === 0) return 0
+  const angle = high === red ? (green - blue) / range
+    : high === green ? 2 + (blue - red) / range
+    : 4 + (red - green) / range
+  return (angle * 60 + 360) % 360
+}
+
+/* A palette token, followed through the `var()` chain to the literal it ends
+ * at. */
+function literal(name) {
+  let value = cssValue(name)
+  for (let hops = 0; hops < 8 && value.startsWith('var('); hops += 1) {
+    value = cssValue(value.slice(4, value.indexOf(')')))
+  }
+  assert.match(value, /^#[\da-f]{6}$/, `${name} does not end at a color literal`)
+  return value
+}
+
+test('the rail hierarchy runs ROYGBIV and stays legible on black', () => {
+  // The bands each color of the spectrum has to fall inside to be the color it
+  // is named after, in the order the rail steps through them.
+  const spectrum = [
+    ['red', 340, 20],
+    ['orange', 20, 45],
+    ['yellow', 45, 70],
+    ['green', 70, 160],
+    ['blue', 160, 240],
+    ['indigo', 240, 280],
+    ['violet', 280, 340]
+  ]
+
+  const colors = spectrum.map(([name, start, end], index) => {
+    const color = literal(`--hc-rail-depth-${index + 1}`)
+    const angle = hue(color)
+    const inside = start < end ? angle >= start && angle < end : angle >= start || angle < end
+    assert.ok(inside, `depth ${index + 1} is ${color} at ${Math.round(angle)}°, which is not ${name}`)
+    // Every hierarchy color is a bullet and a hairline on the black canvas, so
+    // each one carries text-weight contrast against it.
+    assert.ok(
+      contrast(color, '#000000') >= 4.5,
+      `${name} (${color}) is ${contrast(color, '#000000').toFixed(2)}:1 on the canvas`
+    )
+    return { name, color, angle }
+  })
+
+  // Adjacent levels are the pairs a reader compares, and the seventh is
+  // followed by the first again where the spectrum repeats. No two of them may
+  // read as the same color.
+  for (let index = 0; index < colors.length; index += 1) {
+    const here = colors[index]
+    const next = colors[(index + 1) % colors.length]
+    const apart = Math.min(Math.abs(here.angle - next.angle), 360 - Math.abs(here.angle - next.angle))
+    assert.ok(apart >= 20, `${here.name} and ${next.name} are ${Math.round(apart)}° apart`)
+  }
+
+  // Five of the seven are the VS Code palette's own; the two the palette does
+  // not carry are the theme's own tokens rather than literals in the rail.
+  assert.equal(cssValue('--hc-rail-depth-1'), 'var(--hc-red)')
+  assert.equal(cssValue('--hc-rail-depth-6'), 'var(--hc-indigo)')
+  for (const [index, token] of [[2, 'orange'], [3, 'yellow'], [4, 'green'], [5, 'blue'], [7, 'purple']]) {
+    assert.equal(cssValue(`--hc-rail-depth-${index}`), `var(--vscode-hc-${token})`)
+  }
 })
 
 test('classic and ShUI theme contracts cover every planned surface', () => {
@@ -327,24 +398,6 @@ const railScope =
 const railRules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)]
   .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
   .filter(([selector]) => selector.includes('#main-content-container .page-blocks-inner'))
-
-/* A selector list, split at the commas that separate selectors rather than the
- * ones inside `:is()` and `:has()`. */
-function selectors(list) {
-  const found = []
-  let depth = 0
-  let start = 0
-  for (let index = 0; index < list.length; index += 1) {
-    if (list[index] === '(') depth += 1
-    else if (list[index] === ')') depth -= 1
-    else if (list[index] === ',' && depth === 0) {
-      found.push(list.slice(start, index).trim())
-      start = index + 1
-    }
-  }
-  found.push(list.slice(start).trim())
-  return found
-}
 
 /* What a selector actually paints: its last compound, with the guards a rule
  * qualifies itself by — `:has()`, `:not()` — taken back off. */

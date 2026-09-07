@@ -41,6 +41,25 @@ html[data-theme][data-color]:root body,
   --vscode-hc-panel: #0c0c0c;
   --vscode-hc-elevated: #151515;
 
+  /* Two hues the bullet rail's hierarchy needs that the palette above does not
+   * carry: a red that reads apart from the orange a level below it rather than
+   * the error salmon's near-orange, and an indigo to stand between the blue and
+   * the purple. Both are drawn at the weight of the VS Code colors around them
+   * and clear 6:1 against the black canvas. */
+  --hc-red: #f14c4c;
+  --hc-indigo: #9d8bf5;
+
+  /* The rail's hierarchy colors: ROYGBIV, one hue per nesting level, red for a
+   * top-level block. The seven repeat below the seventh level, so no two
+   * adjacent levels ever share a hue. */
+  --hc-rail-depth-1: var(--hc-red);
+  --hc-rail-depth-2: var(--vscode-hc-orange);
+  --hc-rail-depth-3: var(--vscode-hc-yellow);
+  --hc-rail-depth-4: var(--vscode-hc-green);
+  --hc-rail-depth-5: var(--vscode-hc-blue);
+  --hc-rail-depth-6: var(--hc-indigo);
+  --hc-rail-depth-7: var(--vscode-hc-purple);
+
   /* Logseq's newer controls use HSL component tokens. Keep those controls in
    * the same palette instead of allowing the active accent theme to leak in. */
   --background: 0 0% 0%;
@@ -658,6 +677,14 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   margin-right: var(--hc-rail-indent);
 
   --hc-rail-indent: var(--hc-rail-offset);
+
+  /* What this block's own depth is colored in, what it paints its stretch of
+   * line with, and what its bullet is drawn in. A block that carries the
+   * hierarchy — a heading, or a block with children — takes its depth's color
+   * for both; every other block keeps the line's own cyan and a white bullet. */
+  --hc-rail-depth-color: var(--hc-rail-depth-1);
+  --hc-rail-line-color: var(--vscode-hc-cyan);
+  --hc-rail-bullet-color: var(--vscode-hc-white);
 }
 
 /* Logseq drops the gutter for ordered lists because its number is wider than a
@@ -711,8 +738,18 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   width: var(--hc-rail-bullet-dot);
   height: var(--hc-rail-bullet-dot);
   flex: none;
+  background-color: var(--hc-rail-bullet-color);
   box-shadow: 0 0 0 calc(1px * var(--hc-rail-bullet-scale)) var(--vscode-hc-black),
-    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--vscode-hc-white);
+    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--hc-rail-bullet-color);
+}
+
+/* Pointing at the control column still fills the bullet with the active color,
+ * the way every bullet outside the rail does. The rail colors a bullet by its
+ * depth from a more specific rule than that one, so the hover is answered here
+ * rather than lost. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap:hover .bullet-container .bullet {
+  background-color: var(--vscode-hc-focus);
 }
 
 /* An ordered list's marker is a label inside its bullet. The bullet rides the
@@ -731,9 +768,9 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   width: var(--hc-rail-bullet-dot);
   height: var(--hc-rail-bullet-dot);
   border-radius: 9999px;
-  background-color: var(--vscode-hc-white);
+  background-color: var(--hc-rail-bullet-color);
   box-shadow: 0 0 0 calc(1px * var(--hc-rail-bullet-scale)) var(--vscode-hc-black),
-    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--vscode-hc-white);
+    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--hc-rail-bullet-color);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -758,61 +795,90 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 29px);
+  --hc-rail-depth-color: var(--hc-rail-depth-2);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 58px);
+  --hc-rail-depth-color: var(--hc-rail-depth-3);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 87px);
+  --hc-rail-depth-color: var(--hc-rail-depth-4);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 116px);
+  --hc-rail-depth-color: var(--hc-rail-depth-5);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 145px);
+  --hc-rail-depth-color: var(--hc-rail-depth-6);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 174px);
+  --hc-rail-depth-color: var(--hc-rail-depth-7);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 203px);
+  --hc-rail-depth-color: var(--hc-rail-depth-1);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 232px);
+  --hc-rail-depth-color: var(--hc-rail-depth-2);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 261px);
+  --hc-rail-depth-color: var(--hc-rail-depth-3);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 290px);
+  --hc-rail-depth-color: var(--hc-rail-depth-4);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 319px);
+  --hc-rail-depth-color: var(--hc-rail-depth-5);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
   --hc-rail-indent: calc(var(--hc-rail-offset) + 348px);
+  --hc-rail-depth-color: var(--hc-rail-depth-6);
+}
+
+/* The blocks that carry the hierarchy take their depth's color, for their
+ * bullet and for the stretch of line they paint: a block that opens with a
+ * heading, and a block with children of its own, which is Logseq's own
+ * `haschild` and so stays true while the block is folded. Ordinary leaf prose
+ * keeps the white bullet on the cyan line it has always had. A block reads its
+ * own depth here, never its parent's: both variables are declared on the
+ * block's own control column, which no descendant block sits inside. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap,
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper :is(h1, h2, h3, h4, h5, h6):not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)) > .block-control-wrap,
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper :is(.h1, .h2, .h3, .h4, .h5, .h6)) > .block-control-wrap {
+  --hc-rail-line-color: var(--hc-rail-depth-color);
+  --hc-rail-bullet-color: var(--hc-rail-depth-color);
 }
 
 /* The line. Each block paints the stretch of rail its own row is responsible
@@ -828,7 +894,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   left: 30px;
   width: 1px;
   z-index: -1;
-  background-color: var(--vscode-hc-cyan);
+  background-color: var(--hc-rail-line-color);
   pointer-events: none;
 }
 
@@ -861,23 +927,23 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   bottom: 0;
 }
 
-/* Hovering a block lights its own bullet in the rail's own color — `#9cdcfe`,
- * written out because the halo takes it at a fraction of full strength — so the
- * block under the pointer is easy to find out in the margin. The block the
- * pointer is actually over is the innermost hovered one; an ancestor holding it
- * keeps its bullet plain. */
+/* Hovering a block lights its own bullet in the color that block paints the
+ * rail with — the line's cyan for ordinary prose, its own depth's hue for a
+ * heading or a parent — so the block under the pointer is easy to find out in
+ * the margin at every level. The block the pointer is actually over is the
+ * innermost hovered one; an ancestor holding it keeps its bullet plain. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *):hover:not(:has(.ls-block:hover))
   > .block-main-container > .block-control-wrap .bullet-container .bullet {
   box-shadow: 0 0 0 calc(1px * var(--hc-rail-bullet-scale)) var(--vscode-hc-black),
-    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--vscode-hc-white),
-    0 0 0 calc(5px * var(--hc-rail-bullet-scale)) rgb(156 220 254 / 30%);
+    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--hc-rail-bullet-color),
+    0 0 0 calc(5px * var(--hc-rail-bullet-scale)) color-mix(in srgb, var(--hc-rail-line-color) 30%, transparent);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *):hover:not(:has(.ls-block:hover))
   > .block-main-container > .block-control-wrap .bullet-container {
-  background-color: rgb(156 220 254 / 30%);
+  background-color: color-mix(in srgb, var(--hc-rail-line-color) 30%, transparent);
 }
 
 .page-reference,

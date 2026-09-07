@@ -20,3 +20,21 @@ export function specificity(selector) {
   total[2] += (types.match(/(?:^|[\s>+~,])[a-zA-Z][\w-]*/g) ?? []).length
   return total
 }
+
+/* A selector list, split at the commas that separate selectors rather than the
+ * ones inside `:is()`, `:not()` and `:has()`. */
+export function splitSelectors(list) {
+  const found = []
+  let depth = 0
+  let start = 0
+  for (let index = 0; index < list.length; index += 1) {
+    if (list[index] === '(') depth += 1
+    else if (list[index] === ')') depth -= 1
+    else if (list[index] === ',' && depth === 0) {
+      found.push(list.slice(start, index).trim())
+      start = index + 1
+    }
+  }
+  found.push(list.slice(start).trim())
+  return found
+}

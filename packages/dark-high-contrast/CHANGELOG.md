@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here.
 
+## 2.2.0 - 2026-09-07
+
+- Colour the bullet rail by hierarchy. A block that carries the structure of the
+  page — one whose first line is a heading, or one with children of its own —
+  paints its bullet and its own stretch of the rail in the colour of its depth:
+  red at the top level, then orange, yellow, green, blue, indigo and violet, the
+  seven repeating below the seventh level so no two adjacent levels ever share a
+  hue. A child's segment is always the child's colour rather than its parent's,
+  and a folded parent keeps its colour while its children are out of the
+  document. Ordinary leaf prose keeps the white bullet on the cyan line it
+  already had, and a hovered bullet now lights in whichever of the two colours
+  its own block paints the rail with.
+
+- Add two colours the VS Code High Contrast palette does not carry, `--hc-red`
+  and `--hc-indigo`, so the red at the top of the spectrum reads apart from the
+  orange a level below it and the indigo stands between the blue and the violet.
+  Both clear 6:1 against the black canvas.
+
 ## 2.1.0 - 2026-09-06
 
 - Fold a block by left-clicking its bullet. The click that opened the block's

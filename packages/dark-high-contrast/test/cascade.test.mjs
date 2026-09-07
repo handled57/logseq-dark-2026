@@ -19,7 +19,7 @@ import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { compareSpecificity as compare, specificity } from '../../../test/support/pinned-css.mjs'
+import { compareSpecificity as compare, specificity, splitSelectors } from '../../../test/support/pinned-css.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const css = await readFile(resolve(root, 'theme.css'), 'utf8')
@@ -321,6 +321,11 @@ const railMetrics = [
   '.editor-inner .h4.uniline-block,.ls-block h4{font-size:1em;min-height:1em}',
   '.editor-inner .h5.uniline-block,.ls-block h5{font-size:.83em;min-height:.83em}',
   '.editor-inner .h6.uniline-block,.ls-block h6{font-size:.75em;min-height:.75em}',
+  // Logseq's own marker for a block with children, which is what the rail reads
+  // to decide a block carries the hierarchy. It is written from the block's
+  // stored children rather than the rendered ones, so it holds while a block is
+  // folded and its subtree is not in the DOM.
+  'main.ls-fold-button-on-right .ls-block[haschild=true] .control-hide{display:block!important}',
   // Both layouts re-measure that indentation, which is why the rail opts out of
   // them rather than drawing a line through the wrong column.
   'main.ls-fold-button-on-right .block-children-container{margin-left:7px}',
@@ -435,6 +440,108 @@ test('the rail takes back exactly the indentation each nesting level applied', (
   }
 })
 
+/* The rail's hierarchy colors, in the ROYGBIV order it steps through, and the
+ * guard the heading rules already qualify themselves by. */
+const spectrum = 7
+const headingGuard = ':not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)'
+
+/* The three rows that carry the hierarchy: a block Logseq marks as having
+ * children, a block whose first line renders as a heading, and that same
+ * heading while it is being typed. */
+const qualifying = [
+  `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap`,
+  `${scope} .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper :is(h1, h2, h3, h4, h5, h6)${headingGuard}) > .block-control-wrap`,
+  `${scope} .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper :is(.h1, .h2, .h3, .h4, .h5, .h6)) > .block-control-wrap`
+]
+
+test('every nesting level takes the next color of the spectrum', () => {
+  // A top-level block opens the spectrum at red, and is the level every deeper
+  // rule is measured from.
+  const defaults = rule(wrap)
+  assert.equal(value(defaults, '--hc-rail-depth-color'), 'var(--hc-rail-depth-1)')
+
+  const levels = new Map()
+  for (const [selector, body] of rules) {
+    if (!selector.startsWith(scope) || !selector.endsWith('.block-control-wrap')) continue
+    const depth = selector.split('.block-children ').length - 1
+    if (depth === 0) continue
+    levels.set(depth, body)
+  }
+
+  assert.ok(levels.size >= 12, `only ${levels.size} nesting levels are colored`)
+  for (const [depth, body] of levels) {
+    // Seven colors for however many levels ride the rail: past the seventh the
+    // spectrum starts again, so no two adjacent levels ever share a hue.
+    assert.equal(
+      value(body, '--hc-rail-depth-color'),
+      `var(--hc-rail-depth-${(depth % spectrum) + 1})`,
+      `nesting level ${depth + 1} is not the ${(depth % spectrum) + 1}${'st nd rd th th th th'.split(' ')[depth % spectrum]} color of the spectrum`
+    )
+  }
+
+  // The spectrum itself is seven colors deep, and each one is a palette token
+  // rather than a literal written into the rail.
+  for (let step = 1; step <= spectrum; step += 1) {
+    assert.match(
+      css,
+      new RegExp(`\\n  --hc-rail-depth-${step}: var\\(--(?:vscode-)?hc-[\\w-]+\\);`),
+      `the spectrum has no ${step}${step === 1 ? 'st' : 'th'} color`
+    )
+  }
+  assert.ok(!/--hc-rail-depth-8:/.test(css), 'the spectrum is longer than the seven colors the levels cycle through')
+})
+
+test('a heading and a block with children take their depth color; ordinary prose does not', () => {
+  // Ordinary prose is unchanged: a white bullet on the rail's own cyan line.
+  const defaults = rule(wrap)
+  assert.equal(value(defaults, '--hc-rail-line-color'), 'var(--vscode-hc-cyan)')
+  assert.equal(value(defaults, '--hc-rail-bullet-color'), 'var(--vscode-hc-white)')
+
+  // A block that carries the hierarchy hands its depth's color to both, so its
+  // bullet and the stretch of line it paints always agree.
+  const carried = rule(qualifying.join(', '))
+  assert.equal(value(carried, '--hc-rail-line-color'), 'var(--hc-rail-depth-color)')
+  assert.equal(value(carried, '--hc-rail-bullet-color'), 'var(--hc-rail-depth-color)')
+  for (const selector of qualifying) {
+    assert.ok(
+      compare(specificity(selector), specificity(wrap)) > 0,
+      `"${selector.slice(-72)}" does not out-rank the defaults it replaces`
+    )
+  }
+
+  // The line and the bullet read those two variables and nothing else, so a
+  // block's segment is painted in the same color as its own bullet.
+  assert.equal(value(rule(`${wrap}::before, ${wrap}::after`), 'background-color'), 'var(--hc-rail-line-color)')
+  const dot = rule(`${wrap} .bullet-container .bullet`)
+  assert.equal(value(dot, 'background-color'), 'var(--hc-rail-bullet-color)')
+  assert.match(dot, /0 0 0 calc\(2px \* var\(--hc-rail-bullet-scale\)\) var\(--hc-rail-bullet-color\)/)
+
+  // Every one of those colors is declared on a block's own control column,
+  // which no descendant block sits inside: a child's segment takes the child's
+  // depth, never the color of the parent holding it.
+  for (const [selector, body] of rules) {
+    if (!/(?:^|;|\n)\s*--hc-rail-(?:depth|line|bullet)-color:/.test(body)) continue
+    for (const part of splitSelectors(selector)) {
+      assert.ok(
+        part.endsWith('.block-control-wrap'),
+        `a hierarchy color is declared where a descendant block inherits it: "${part.slice(0, 60)}…"`
+      )
+    }
+  }
+
+  // Pointing at the control column still fills the bullet the way it does
+  // everywhere outside the rail, which the colored bullet would otherwise
+  // out-rank.
+  assert.equal(
+    value(rule(`${wrap}:hover .bullet-container .bullet`), 'background-color'),
+    'var(--vscode-hc-focus)'
+  )
+  assert.ok(
+    compare(specificity(`${wrap}:hover .bullet-container .bullet`), specificity(`${wrap} .bullet-container .bullet`)) > 0,
+    'the bullet under the pointer does not out-rank its own depth color'
+  )
+})
+
 test("a bullet sits on the middle of its block's first line", () => {
   // Half of the 24px line an ordinary block renders, which is what Logseq's own
   // 24px control box was centering the bullet by.
@@ -533,7 +640,7 @@ test('the rail line runs from the first bullet to the end of the last block', ()
   // The fold arrow, then half a bullet: the center of the bullet Logseq draws.
   assert.equal(px(line, 'left'), rail.arrow + rail.bullet / 2)
   assert.equal(px(line, 'width'), 1)
-  assert.match(line, /background-color:\s*var\(--vscode-hc-cyan\)/)
+  assert.match(line, /background-color:\s*var\(--hc-rail-line-color\)/)
   // Decorative: the line is never what a click lands on.
   assert.match(line, /pointer-events:\s*none/)
   // Behind the bullets, inside the stacking context the row is given for it.
@@ -580,7 +687,7 @@ test('an ordered list keeps its number beside the content and a bullet on the ra
   // sized like every other bullet by the line it hangs beside.
   assert.equal(value(marker, 'width'), 'var(--hc-rail-bullet-size)')
   assert.equal(px(marker, 'padding-left'), 0)
-  assert.match(rule(`${wrap} .bullet-container.typed-list .bullet`), /background-color:\s*var\(--vscode-hc-white\)/)
+  assert.match(rule(`${wrap} .bullet-container.typed-list .bullet`), /background-color:\s*var\(--hc-rail-bullet-color\)/)
 
   // Logseq drops the gutter for an ordered list because its number is wider
   // than a bullet. The number is no longer there, so the gutter comes back and
@@ -625,22 +732,23 @@ test('hovering a block lights its own bullet and no other', () => {
   const halo = rule(`${hovered} .bullet-container`)
   const dot = rule(`${hovered} .bullet-container .bullet`)
 
-  // The rail's own color, at a fraction of full strength.
-  const channels = css.match(/--vscode-hc-cyan:\s*#(\w{2})(\w{2})(\w{2});/)
-  assert.ok(channels, 'the rail color is no longer a hex literal')
-  const rgb = channels.slice(1).map((pair) => Number.parseInt(pair, 16)).join(' ')
-  assert.match(halo, new RegExp(`background-color:\\s*rgb\\(${rgb} / \\d+%\\)`), 'a hovered bullet is not lit in the rail color')
+  // The color that block paints the rail with, at a fraction of full strength:
+  // the line's cyan for ordinary prose, its own depth's hue for a heading or a
+  // parent, so the halo stays visible against every bullet the rail draws.
+  const glow = /color-mix\(in srgb, var\(--hc-rail-line-color\) \d+%, transparent\)/
+  assert.match(halo, new RegExp(`background-color:\\s*${glow.source}`), 'a hovered bullet is not lit in its own rail color')
   assert.match(
     dot,
-    new RegExp(`0 0 0 calc\\(\\d+px \\* var\\(--hc-rail-bullet-scale\\)\\) rgb\\(${rgb} / \\d+%\\)`),
-    'a hovered bullet has no ring in the rail color'
+    new RegExp(`0 0 0 calc\\(\\d+px \\* var\\(--hc-rail-bullet-scale\\)\\) ${glow.source}`),
+    'a hovered bullet has no ring in its own rail color'
   )
 
   // The dot keeps the ring the theme draws it with, so hover adds to a bullet
-  // rather than replacing it.
+  // rather than replacing it — and that ring is still the bullet's own color,
+  // not the white every bullet carried before the rail was colored.
   assert.match(
     dot,
-    /0 0 0 calc\(1px \* var\(--hc-rail-bullet-scale\)\) var\(--vscode-hc-black\),\s*\n?\s*0 0 0 calc\(2px \* var\(--hc-rail-bullet-scale\)\) var\(--vscode-hc-white\)/
+    /0 0 0 calc\(1px \* var\(--hc-rail-bullet-scale\)\) var\(--vscode-hc-black\),\s*\n?\s*0 0 0 calc\(2px \* var\(--hc-rail-bullet-scale\)\) var\(--hc-rail-bullet-color\)/
   )
 
   // Only the block the pointer is over: an ancestor holding a hovered block
