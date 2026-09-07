@@ -5,6 +5,7 @@ on:
     tags:
       - "theme-v*"
       - "passage-v*"
+      - "anno-v*"
 
 permissions:
   contents: write

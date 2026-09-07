@@ -1,0 +1,13 @@
+{
+  "title": "Anno",
+  "description": "Import a PDF into your graph from a slash command or the command palette: choose the file, name the page, and Anno stores the asset, opens the page linked to it, and lines up Logseq's own highlight page behind that name.",
+  "author": "Peter Cole",
+  "repo": "handled57/logseq-dark-2026",
+  "icon": "icon.svg",
+  "theme": false,
+  "effect": true,
+  "web": false,
+  "supportsDB": false,
+  "supportsDBOnly": false,
+  "id": "logseq-anno"
+}

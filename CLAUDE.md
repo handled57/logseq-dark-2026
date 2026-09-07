@@ -2,7 +2,7 @@
 
 ## Project
 
-This repository is an npm-workspace monorepo of Logseq packages. `packages/dark-high-contrast/` holds **Dark High Contrast**, a Logseq theme for classic/file graphs on desktop. It targets Logseq 0.10.15 and adapts Visual Studio Code's Dark High Contrast palette.
+This repository is an npm-workspace monorepo of Logseq packages. `packages/dark-high-contrast/` holds **Dark High Contrast**, a Logseq theme for classic/file graphs on desktop. It targets Logseq 0.10.15 and adapts Visual Studio Code's Dark High Contrast palette. `packages/passage/` holds **Passage** and `packages/anno/` holds **Anno**, plugins for the same target.
 
 The root `package.json` is a private coordinator: it declares `workspaces: ["packages/*"]`, aggregates each package's scripts, and owns no sources and no dependencies. Every package is intentionally installable without dependency installation or compilation. Keep release artifacts self-contained and package-specific, and do not add runtime network access, tracking, or remote CSS imports.
 
@@ -18,6 +18,7 @@ Paths below are relative to `packages/dark-high-contrast/` unless noted.
 - `test/theme.test.mjs` checks package structure, workspace layout, required selectors, palette values, accessibility, and release metadata.
 - `test/cascade.test.mjs` checks selector specificity against pinned Logseq CSS behavior.
 - `test/properties.test.mjs` behaviorally tests `index.js` against a stub host document.
+- `../anno/index.js` is Anno's canonical runtime: the **Anno: Import PDF** command, its prompt, and the asset-naming rule that decides which page Logseq collects a PDF's highlights on. `../anno/test/package.test.mjs` checks its structure and metadata; `../anno/test/anno.test.mjs` drives that runtime against a stub host document and file bridge.
 - Each package's `package.json#release.files` is its exact package-owned archive allowlist.
 - Root `scripts/build-release.mjs` creates extracted packages and Marketplace ZIPs in root `dist/`; aggregate builds clean once and targeted workspace builds remove only their own outputs.
 - Root `scripts/verify-release.mjs` verifies exact archive contents, metadata agreement, and byte parity with canonical sources.
@@ -79,8 +80,9 @@ tag goes on the merge commit once the user approves. Semantic versioning
 decides the number — a bug fix is a patch, a feature is a minor, a breaking
 change is a major.
 
-Theme and Passage versions and release tags are independent, and each package
-is tagged in its own namespace: `theme-vX.Y.Z` and `passage-vX.Y.Z`. Pushing
+Theme, Passage and Anno versions and release tags are independent, and each
+package is tagged in its own namespace: `theme-vX.Y.Z`, `passage-vX.Y.Z` and
+`anno-vX.Y.Z`. Pushing
 such a tag runs `.github/workflows/publish.yml`, which calls
 `scripts/select-release.mjs` to select exactly one workspace, then builds and
 attaches only that package's archive. Selection asserts that the tag version,
