@@ -443,7 +443,7 @@ test('the slash command writes the passage source and leaves the cursor on the w
   await Promise.resolve()
 
   const [command] = context.logseq.Editor.commands
-  assert.equal(command.name, 'Passage')
+  assert.equal(command.name, 'Passage: Insert a passage')
 
   await invoke(context, () => command.action())
 
@@ -580,7 +580,7 @@ test('the angle-bracket picker gains exactly one Passage entry, however often it
 
   const entries = () => menu.querySelectorAll('[data-passage-command]')
   assert.equal(entries().length, 1)
-  assert.equal(entries()[0].textContent, 'Passage')
+  assert.equal(entries()[0].textContent, 'Passage: Insert a passage')
   // Cloned from the host's own entry, so it inherits the popup's markup.
   assert.equal(entries()[0].classList.has('menu-link'), true)
 

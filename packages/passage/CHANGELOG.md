@@ -2,6 +2,12 @@
 
 All notable changes to this package are documented here.
 
+## 0.2.1 - 2026-09-07
+
+- Rename the command shown in the `/` slash-command menu and the `<` command
+  picker to **Passage: Insert a passage**. Passage insertion and its dialog,
+  reference resolution, content and options are unchanged.
+
 ## 0.2.0 - 2026-09-06
 
 - Remove Bible provenance metadata from the generated `bible.books.json` and

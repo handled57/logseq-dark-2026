@@ -40,8 +40,8 @@ missing one is added.
 
 ## Inserting a passage
 
-- Type `/passage` and choose **Passage**.
-- Type `<` and choose **Passage**. Logseq has no plugin API for the `<` picker,
+- Type `/passage` and choose **Passage: Insert a passage**.
+- Type `<` and choose **Passage: Insert a passage**. Logseq has no plugin API for the `<` picker,
   so this entry is added to the picker's own menu while it is open; it withdraws
   itself as soon as what you have typed can no longer match.
 

@@ -19,7 +19,7 @@
 
 const doc = parent.document
 
-const COMMAND_LABEL = 'Passage'
+const COMMAND_LABEL = 'Passage: Insert a passage'
 /* Every attribute, style key and element id this plugin writes is namespaced to
  * Passage, so a theme that annotates the same host document — Dark High
  * Contrast writes `data-hc-*` — never reads or clears one of these by mistake,
