@@ -61,6 +61,20 @@ defaults to `1`, so every surface the rail does not reach is untouched. These nu
 upstream declarations; change arithmetic, selectors, and cascade tests
 together.
 
+The rail also carries the hierarchy. `--hc-rail-depth-color` is declared once
+per nesting level beside that level's `--hc-rail-indent`, cycling the seven
+ROYGBIV tokens `--hc-rail-depth-1`…`--hc-rail-depth-7` so adjacent levels never
+share a hue and the spectrum starts again below the seventh. A row that carries
+the hierarchy — Logseq's own `haschild="true"`, which holds while a block is
+folded, or a first line that renders or is being typed as a heading — copies
+that color into `--hc-rail-line-color` and `--hc-rail-bullet-color`; every other
+row keeps the line's cyan and a white bullet. Both variables are declared on a
+block's own control column, which no descendant block sits inside, so a child's
+segment always takes the child's depth rather than its parent's. Two of the
+seven hues, `--hc-red` and `--hc-indigo`, are the theme's own additions to the
+VS Code palette; `test/theme.test.mjs` holds them to contrast against the canvas
+and separation from the levels beside them.
+
 ## Anno's import and the highlight page
 
 Logseq derives a PDF's whole annotation identity from one filename. Opening
