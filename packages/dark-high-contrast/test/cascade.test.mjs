@@ -332,6 +332,21 @@ const railMetrics = [
   '.content.doc-mode .block-children-container{margin-left:18px}'
 ]
 
+/* The `/` command menu and every other popup the editor opens live inside the
+ * block being edited, and Logseq gives them no stacking level. Because a block
+ * is a positioned element, the blocks after the edited one paint over the popup
+ * and their text reads through its opaque background. The theme lifts the popup
+ * instead, so these are the declarations that lift is measured against: the
+ * popup's own rule, which still carries no z-index; the block's positioning,
+ * which is what the popup loses to; and the scale the lift is taken from. */
+const popupMetrics = [
+  '.absolute-modal{background:var(--ls-primary-background-color);overflow:auto}',
+  '.absolute-modal[data-modal-name]{background-color:hsl(var(--popover));border-radius:var(--radius);border-width:1px;overflow-x:hidden;overflow-y:auto;padding-bottom:.25rem;padding-top:.25rem}',
+  '.ls-block{border-bottom:1px solid transparent;min-height:24px;padding:2px 0;position:relative;transition:background-color .3s cubic-bezier(.16,1,.3,1)}',
+  '--ls-z-index-level-1:9',
+  '.ui__ac-group-name{color:hsl(var(--popover-foreground)/.2);font-size:.75rem;font-weight:500;line-height:1rem;padding:.5rem}'
+]
+
 /* Read back off the declarations above. */
 const rail = { indent: 29, arrow: 22, bullet: 16, dot: 6, box: 24, gutter: 6, orderList: 22, pagePad: 32 }
 
@@ -759,6 +774,55 @@ test('hovering a block lights its own bullet and no other', () => {
   )
 })
 
+test('the slash-command menu is opaque and paints over the blocks below it', () => {
+  // The surface itself. Logseq paints it from `hsl(var(--popover))`, which the
+  // theme replaces outright rather than by re-pointing the token, so nothing an
+  // accent redefines can thin it.
+  const surface = [...rules].find(
+    ([selector, body]) => selector.split(',').at(-1).trim() === '.absolute-modal[data-modal-name]' && /background:/.test(body)
+  )
+  assert.ok(surface, 'no rule paints the editor popups')
+  assert.match(surface[1], /background:\s*var\(--vscode-hc-black\)\s*!important/)
+  assert.match(surface[1], /opacity:\s*1\s*!important/)
+
+  // The popup and the block holding it are both lifted, and both onto Logseq's
+  // own scale. The popup's own z-index answers the missing stacking level; the
+  // block's carries the popup out of the stacking context the rail makes of
+  // every row, which the popup would otherwise be ordered inside.
+  const level = 'var(--ls-z-index-level-1)'
+  assert.equal(value(rule('.absolute-modal[data-modal-name]'), 'z-index'), level)
+
+  const lift = '.ls-block:has(> .block-main-container .absolute-modal[data-modal-name])'
+  assert.equal(value(rule(lift), 'z-index'), level)
+
+  // The lift is on the block rather than the row because the block is already
+  // positioned: a row given `position: relative` would become the containing
+  // block the popup is measured from and move it.
+  assert.doesNotMatch(rule(lift), /position:/)
+  assert.ok(
+    [...rules].some(([selector, body]) => selector.endsWith('> .block-main-container') && /isolation:\s*isolate/.test(body)),
+    'the row no longer isolates the rail, so the popup no longer needs lifting with the block'
+  )
+})
+
+test("the popup's section headings are white, bold, and still Logseq's size", () => {
+  // Logseq draws them at a fifth of the popover foreground. The theme sets that
+  // token to white, so the headings resolve to a fifth of white over the popup's
+  // black — about a 1.6:1 contrast, well under any legibility floor. The theme
+  // replaces the colour rather than the alpha, so no accent can thin it again.
+  const heading = rule('.ui__ac-group-name')
+  assert.equal(value(heading, 'color'), 'var(--vscode-hc-white) !important')
+
+  // Sharing the rows' colour costs the heading the one thing that set it apart,
+  // so it takes weight instead: bolder than Logseq's own 500 and bolder than
+  // the commands under it.
+  assert.equal(value(heading, 'font-weight'), '700 !important')
+
+  // Size and padding are still Logseq's, and the heading is not given a
+  // background that would box it off from the rows.
+  assert.doesNotMatch(heading, /font-size:|padding:|background:/)
+})
+
 /* Optional: confirm the pinned literals still describe the installed app. */
 const upstreamPath = process.env.LOGSEQ_CSS
 test(
@@ -773,7 +837,7 @@ test(
         `${surface}: upstream no longer ships "${selector}"`
       )
     }
-    for (const declaration of [...admonitionMetrics, ...spacingMetrics, ...railMetrics]) {
+    for (const declaration of [...admonitionMetrics, ...spacingMetrics, ...railMetrics, ...popupMetrics]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }
     assert.ok(upstream.includes(markDeclaration), 'Logseq no longer ships the page-mark rule')

@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## 2.2.1 - 2026-09-07
+
+- Keep the `/` command menu, and every other popup the editor opens over a
+  block, above the text of the blocks below it. The menu was already painted
+  opaque black; what read through it was the text of the following blocks, drawn
+  on top of it because Logseq gives the popup no stacking level of its own and
+  every block is a positioned element. The popup and the block it opens in now
+  sit on Logseq's own first z-index level, above the page and below the header
+  and every dialog. The `[[`, `((`, template, property, date-picker and code
+  block mode popups are fixed with it, and the menu's layout, keyboard
+  navigation, scrolling, filtering and row states are unchanged.
+- Brighten the section headings inside those popups — BASIC and TIME & DATE in
+  the `/` menu — to full white and set them bold. Logseq draws them at a fifth
+  of the popover foreground, which over the theme's black left them barely
+  visible. They keep Logseq's smaller size, so weight is now what tells a
+  heading from a command.
+
 ## 2.2.0 - 2026-09-07
 
 - Colour the bullet rail by hierarchy. A block that carries the structure of the

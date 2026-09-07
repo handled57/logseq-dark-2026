@@ -1130,6 +1130,18 @@ button:disabled,
   outline-offset: -2px;
 }
 
+/* Logseq draws an autocomplete popup's section headings — BASIC and TIME & DATE
+ * in the `/` menu — at a fifth of the popover foreground. The theme's own
+ * foreground is white, so a fifth of it lands near the popup's black
+ * background and the headings all but disappear. High contrast wants them read,
+ * not sensed: they take the full white the rows beside them take, and go bold,
+ * which at this size is what still tells a heading from a command once both are
+ * the same colour. Logseq's own size and padding stay. */
+.ui__ac-group-name {
+  color: var(--vscode-hc-white) !important;
+  font-weight: 700 !important;
+}
+
 .ui__modal-overlay,
 .ui__dialog-overlay {
   background: rgb(0 0 0 / 78%);
@@ -1429,6 +1441,30 @@ tr:nth-child(even) td,
   border-radius: 2px !important;
   box-shadow: none !important;
   opacity: 1 !important;
+}
+
+/* The editor's own popups — the `/` command menu above all — are absolutely
+ * positioned inside the block being edited, and Logseq gives them no stacking
+ * level of their own. Every `.ls-block` is `position: relative`, so each block
+ * after the edited one is a positioned sibling that comes later in the tree and
+ * paints over the popup. The popup's background is opaque either way; what
+ * shows through it is the text of the blocks below, drawn on top. A positive
+ * z-index takes the popup out of that tree order and over the page, and stays
+ * under the header Logseq pins at `z-index: 10` and under every dialog above
+ * it. */
+.absolute-modal[data-modal-name] {
+  z-index: var(--ls-z-index-level-1);
+}
+
+/* The rail makes each row its own stacking context, which it paints the line
+ * behind the bullets in. A popup opened inside that row is trapped in it: its
+ * own z-index then only orders it against the rest of the row, and the row goes
+ * on painting where the block sits in the tree. Lifting the block instead
+ * carries the whole row, popup included, over the blocks below it. The block is
+ * already `position: relative`, so this adds no containing block the popup or
+ * the rail could be measured from, and the row keeps its isolation. */
+.ls-block:has(> .block-main-container .absolute-modal[data-modal-name]) {
+  z-index: var(--ls-z-index-level-1);
 }
 
 .cp__cmdk .form-input,
