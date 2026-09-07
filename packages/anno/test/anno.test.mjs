@@ -6,10 +6,12 @@
  * command that starts it to the asset and the page that come out of it.
  *
  * The stub host is deliberately literal about the two things Logseq really
- * does here: `parent.apis.doAction` is the host's IPC bridge, where `stat`
- * throws for a path that is not there and `writeFile` takes the repo, the
- * absolute path and the bytes; and the plugin API creates or returns a page and
- * appends blocks to it.
+ * does here: `parent.apis.doAction` is the host's IPC bridge, which answers a
+ * failed action by resolving with the exception rather than rejecting it — its
+ * `ipcMain.handle('main', ...)` catches whatever a handler throws and returns
+ * it — so a missing path and a refused write both come back as ordinary
+ * values, and `writeFile` takes the repo, the absolute path and the bytes; and
+ * the plugin API creates or returns a page and appends blocks to it.
  */
 
 import assert from 'node:assert/strict'
@@ -32,7 +34,7 @@ function pdf(name, bytes = PDF_BYTES) {
   return { name, type: 'application/pdf', async arrayBuffer() { return bytes } }
 }
 
-function load({ graph = GRAPH, onDisk = [], pages = {} } = {}) {
+function load({ graph = GRAPH, onDisk = [], pages = {}, writable = true } = {}) {
   const host = node('body')
   const windowListeners = []
   const listeners = []
@@ -44,7 +46,7 @@ function load({ graph = GRAPH, onDisk = [], pages = {} } = {}) {
   const actions = []
   const created = []
   const appended = []
-  const files = new Set(onDisk)
+  const files = new Map(onDisk.map((path) => [path, PDF_BYTES.byteLength]))
   const blocks = { ...pages }
 
   const context = {
@@ -54,17 +56,21 @@ function load({ graph = GRAPH, onDisk = [], pages = {} } = {}) {
     parent: {
       apis: {
         /* One array per call, its head naming the action — the shape the host
-         * bridge really takes. */
+         * bridge really takes. A failure resolves rather than rejects, exactly
+         * as the host's own handler does: `stat` of a path that is not there
+         * hands back the error it caught, and so does a write it would not
+         * make. */
         async doAction(call) {
           const [action, ...rest] = call
           actions.push({ action, args: rest })
           if (action === 'stat') {
-            if (!files.has(rest[0])) throw new Error(`ENOENT: ${rest[0]}`)
-            return { size: 4 }
+            const size = files.get(rest[0])
+            return size === undefined ? new Error(`ENOENT: ${rest[0]}`) : { size }
           }
           if (action === 'writeFile') {
-            files.add(rest[1])
-            return { size: 4 }
+            if (!writable) return new Error(`EACCES: ${rest[1]}`)
+            files.set(rest[1], rest[2].byteLength)
+            return null
           }
           return null
         }
@@ -306,8 +312,8 @@ test('importing writes the asset, then opens the page linked to it', async () =>
 
   assert.deepEqual(
     context.actions.map((entry) => entry.action),
-    ['stat', 'mkdir-recur', 'writeFile'],
-    'the import did not check, create and write in that order'
+    ['stat', 'mkdir-recur', 'writeFile', 'stat'],
+    'the import did not check, create, write and read back in that order'
   )
   const [write] = context.writes()
   assert.deepEqual(write.args.slice(0, 2), [GRAPH.url, '/graphs/notes/assets/Moby Dick.pdf'])
@@ -388,6 +394,39 @@ test('a PDF already in the graph is never overwritten', async () => {
 
   assert.equal(dialogOf(context), null)
   assert.equal(context.writes()[0].args[1], '/graphs/notes/assets/Moby Dick (annotated).pdf')
+})
+
+test('a PDF the graph does not have is not read as one it has', async () => {
+  /* The host answers a stat of a missing path with the error it caught rather
+   * than by rejecting, so a bridge read only for whether it settled reports
+   * every first import as one already in the graph. What settles the question
+   * is what came back. */
+  const context = load()
+  await flush()
+
+  const { dialog } = await open(context)
+  choose(dialog, 'Moby Dick.pdf')
+  dialog.querySelector('form').dispatch('submit')
+  await flush()
+
+  assert.equal(messageOf(dialog).textContent, '', 'a first import was refused as a duplicate')
+  assert.equal(dialogOf(context), null, 'the prompt stayed open on a PDF the graph does not have')
+  assert.equal(context.writes().length, 1)
+})
+
+test('a write the host will not make leaves no page pointing at nothing', async () => {
+  /* A refused write resolves like one that worked, for the same reason, so the
+   * asset is read back before anything links it. */
+  const context = load({ writable: false })
+  await flush()
+
+  await importPdf(context)
+
+  assert.deepEqual(context.created, [], 'a page was created for an asset that was never written')
+  assert.deepEqual(context.appended, [])
+  const [notice] = context.messages
+  assert.equal(notice.status, 'error')
+  assert.match(notice.text, /could not write/i)
 })
 
 test('an existing page is used rather than replaced, and its link not doubled', async () => {

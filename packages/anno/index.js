@@ -82,15 +82,23 @@ function hostAction(...call) {
   return apis.doAction(call)
 }
 
-/* `stat` throws for a path that is not there, which is the question being
- * asked; nothing else about the file matters. */
-async function alreadyInGraph(path) {
+/* The host does not reject a failed action: `ipcMain.handle('main', ...)`
+ * catches everything its handlers throw and *returns* the exception, naming
+ * `stat` as one whose failure is ordinary enough not to log. So a path that is
+ * not there answers with a resolved value that carries no stat in it, and the
+ * size is what tells the two apart. Rejection is still handled, for the host
+ * that has no bridge at all. */
+async function statOf(path) {
   try {
-    await hostAction('stat', path)
-    return true
+    const stat = await hostAction('stat', path)
+    return typeof stat?.size === 'number' ? stat : null
   } catch (error) {
-    return false
+    return null
   }
+}
+
+async function alreadyInGraph(path) {
+  return (await statOf(path)) !== null
 }
 
 /* Where the asset goes, and the relative href a page links it by. Pages live in
@@ -116,6 +124,12 @@ async function writeAsset(target, file) {
   const data = await file.arrayBuffer()
   await hostAction('mkdir-recur', target.assets)
   await hostAction('writeFile', target.repo, target.path, data)
+
+  /* A write that failed resolves exactly like one that worked, for the reason
+   * statOf describes, so the asset is read back at its full length before a
+   * page is allowed to link it. */
+  const written = await statOf(target.path)
+  if (written?.size !== data.byteLength) throw new Error(NOT_WRITTEN)
 }
 
 /* A `]` in the title would close the link's label early, and the label is only
@@ -247,6 +261,8 @@ const CHOOSE_A_PDF = 'Choose a PDF to import.'
 const UNUSABLE_TITLE =
   'A file cannot be named after that title. Give it at least one character a filename can hold.'
 const NO_GRAPH = 'Anno imports into an open file graph, and there is none open.'
+const NOT_WRITTEN =
+  'Anno could not write the PDF into the graph\u2019s assets folder, so no page was created.'
 const taken = (asset) =>
   `assets/${asset}.pdf is already in this graph. Give the page a different title, or annotate the ` +
   'PDF that is already there.'

@@ -17,6 +17,9 @@ All notable changes to this package are documented here.
   and store them in `assets/<page title>.edn`: Logseq derives both from the
   asset's own filename. Characters a filename cannot hold become spaces in the
   asset name; the page keeps the title exactly as it was typed.
+- The asset is read back at its full length before the page is created, so a
+  write the host will not make leaves no page pointing at a PDF that is not
+  there.
 - An asset already in the graph is never overwritten — highlights are recorded
   against that file — so the prompt stays open and asks for another title. A
   page that already exists is used as it stands, and a PDF already linked from

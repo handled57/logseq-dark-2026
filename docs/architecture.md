@@ -82,6 +82,16 @@ repeated. `mkdir-recur`, `stat` and `writeFile` are the three host actions
 involved, and `writeFile` takes the graph's repo URL, an absolute path, and the
 PDF's bytes as an `ArrayBuffer`.
 
+The host bridge reports a failure by resolving with it, not by rejecting:
+`ipcMain.handle('main', ...)` catches whatever its handler throws and returns
+the exception, and it names `stat` among the actions whose failure is ordinary
+enough not to log. A caller that reads only whether the promise settled
+therefore reads every failure as a success — a missing asset as one already in
+the graph, a refused write as a completed one. Anno reads the resolved value
+instead: a stat counts only when it carries a numeric `size`, and the asset is
+stat-ed again after the write and must come back at the length that was sent
+before a page is allowed to link it.
+
 ## Host-DOM annotation and cleanup
 
 Each runtime owns a namespace. Passage writes `data-passage-*`, element ids
