@@ -18,6 +18,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../passage) plugin's job, and the theme does not require it.
 - Sizes named-admonition and passage icons at 1.5 times the first line's font and aligns them with that line while their semantic divider continues through the full block height.
 - Folds a long rendered box — an admonition, a passage, a table, a quote, a code block, a math block, a piece of media, a block or page embed — on a control of its own, without folding the block that holds it or touching a line of its source.
+- Sets the emoji a block opens with in a gutter of its own, left of the block's text, so it reads as that block's icon and the lines under it stay in one column. The emoji is left exactly where it is written.
 - Left-clicking a block bullet expands or collapses that block rather than opening it. Shift-click still opens the block in the sidebar, and right-clicking offers **Open**, immediately above **Open in sidebar**, to open the block in the main editor.
 - No build runtime, tracking, remote imports, or network access.
 
@@ -212,6 +213,27 @@ What a folded box keeps:
 
 The control is a button: it takes Tab, answers Enter and Space, and shows the theme's orange focus ring. Pressing it never opens the block for editing and never folds the block the way its bullet does. Boxes rendered outside the main editor — in the sidebars, in a whiteboard, in a dialog — are left exactly as Logseq draws them, and where one box holds another, only the outer one takes a control.
 
+## A leading emoji as a block icon
+
+A block that opens with an emoji sets that emoji in a gutter of its own, to the left of the block's text, the way a passage sets a verse number:
+
+```text
+📌 Important note
+```
+
+renders the pin in the gutter and `Important note` in the block's ordinary text column, with a line long enough to wrap coming back to that same column rather than under the pin.
+
+The emoji is not moved, copied or replaced. It is still the first character of the block's source and of the text the block renders — the theme only marks the block so `theme.css` can hang the first line back out of the text column. Clicking into the block shows the line exactly as it was typed, and nothing is written to the graph.
+
+- What counts as the icon is one emoji grapheme, however many code points it takes: a variation selector, a skin tone, a flag, a keycap and a ZWJ sequence like 👩‍💻 are each one icon.
+- A character that only becomes an emoji when it is asked to — `©`, `™`, a bare `❤` — stays text.
+- Whitespace between the emoji and the text is part of neither: the text begins in the same column whether it is separated by one space or three.
+- An emoji anywhere else in the line stays inline, and a block that opens with anything else is untouched.
+- A block that renders as something with an icon or a layout of its own — an admonition, a passage, a code block, a query, an embed, a piece of media — keeps that structure; a leading emoji never overrides it.
+- The bullet on the rail is Logseq's own and is left alone. Folding, hovering, clicking, dragging and the hierarchy colors all behave as they did.
+
+Turn it off in **Plugins → Dark High Contrast → Settings** under **Leading emoji as a block icon**, and every emoji goes back into its line. The gutter is `--hc-block-icon-gutter`, `1.5em` by default, so a graph that sets its notes in a face with a wider or narrower emoji can retune it from `custom.css`.
+
 ## Hiding properties by property value
 
 Blocks whose rendered properties match any one of the configured `key: value` pairs render as bare content: the whole property table is hidden. Clicking into such a block still shows its content *and* its properties as source, because Logseq replaces the entire rendered block with a textarea over the raw block content, and custom properties are part of that content — nothing needs to be un-hidden.
@@ -336,6 +358,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 - A block nested deeper than twelve levels hangs from the twelfth level's position rather than its own.
 - An admonition centres a short text against its icon, so its bullet marks the head of its box rather than that first line.
 - A folded rendered box hides what it holds outright rather than scrolling it, so nothing of it overflows the box and no space is left standing for it. A code block's editor is hidden rather than removed from the layout, because one measured while it was out of the layout comes back blank.
+- A block icon's gutter is carved out of the block's own text column rather than the margin left of it: the text is indented by the gutter and the first line hangs back out of it. Nothing of the icon reaches the rail, so the bullet, the fold arrow and the hierarchy color are exactly where they were, at every nesting depth and on the full-width route.
 
 ## Development
 

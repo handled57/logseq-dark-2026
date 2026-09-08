@@ -186,6 +186,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   const unloads = []
   const blockMenuItems = []
   const collapses = []
+  const blockWrites = []
   let blockReads = 0
   const navigations = []
   const documentListeners = new Map()
@@ -225,13 +226,13 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
             (documentListeners.get(type) ?? []).filter((entry) => entry !== handler)
           )
         },
-        /* The two block collections keep their purpose-built stubs; anything
-         * else is served by the host stand-in. */
+        /* The property tables keep their purpose-built stubs, which stand
+         * outside the host tree; everything else, blocks included, is served by
+         * the host stand-in. */
         querySelector: (selector) => host.querySelector(selector),
         querySelectorAll: (selector) =>
           selector === '.block-properties' ? blocks.map(({ table }) => table)
-            : selector === '.ls-block' ? []
-              : host.querySelectorAll(selector)
+            : host.querySelectorAll(selector)
       }
     },
     logseq: {
@@ -243,6 +244,14 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
         async getBlock(uuid) {
           blockReads += 1
           return storedBlocks[uuid] ?? null
+        },
+        /* Nothing this entry does may reach the graph. These record the calls
+         * that would, so a test can assert none was made. */
+        async updateBlock(...args) {
+          blockWrites.push(args)
+        },
+        async insertBlock(...args) {
+          blockWrites.push(args)
         },
         registerBlockContextMenuItem(label, action) {
           blockMenuItems.push({ label, action })
@@ -282,6 +291,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   vm.createContext(context)
   source.runInContext(context)
   context.blockReads = () => blockReads
+  context.blockWrites = blockWrites
   context.navigations = navigations
   context.blockMenuItems = blockMenuItems
   context.collapses = collapses
@@ -697,6 +707,176 @@ test('a passage that runs its verses together keeps its numbers where they are',
     await context.refreshFromStoredSource(passage)
     assert.equal(passage.attributes.has('data-hc-verse-lines'), false, name)
   }
+})
+
+/* Leading emoji as a block icon.
+ *
+ * `index.js` reads the block's own source, so what is asserted here is which
+ * blocks earn the mark and what the mark holds — one whole emoji as a reader
+ * sees it, however many code points it is written with. theme.css draws the
+ * gutter; nothing here moves a character of the block.
+ */
+const ICON_ATTR = 'data-hc-block-icon'
+
+let iconUuids = 0
+async function iconBlock(content, settings = {}, rendered = {}) {
+  iconUuids += 1
+  const uuid = `65f00000-0000-0000-0000-1${String(iconUuids).padStart(11, '0')}`
+  const context = load(settings, [], { [uuid]: { content } })
+  const block = bulletBlock({ text: content, uuid, ...rendered })
+
+  await context.refreshFromStoredSource(block)
+  return { context, block, icon: block.attributes.get(ICON_ATTR) }
+}
+
+test('the block-icon setting is offered as a toggle that is on to begin with', async () => {
+  const context = await render({}, [])
+  const setting = context.logseq.schema.find(({ key }) => key === 'blockIcons')
+
+  assert.ok(setting, 'the theme offers no block-icon setting')
+  assert.equal(setting.type, 'boolean')
+  assert.equal(setting.default, true)
+  assert.equal(setting.title, 'Leading emoji as a block icon')
+})
+
+test('a block opening with one emoji is marked with that emoji', async () => {
+  const { icon } = await iconBlock('\u{1F4CC} Important note')
+
+  assert.equal(icon, '\u{1F4CC}')
+})
+
+test('an emoji written from several code points is marked whole', async () => {
+  // Each of these is one emoji to a reader and more than one code point to a
+  // string: a variation selector, a skin-tone modifier, a flag, a keycap, a
+  // zero-width-joined family, a joined flag, and a tag sequence.
+  const sequences = [
+    '\u2764\uFE0F',
+    '\u{1F44D}\u{1F3FD}',
+    '\u{1F1EC}\u{1F1E7}',
+    '1\uFE0F\u20E3',
+    '\u{1F469}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}',
+    '\u{1F3F3}\uFE0F\u200D\u{1F308}',
+    '\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}'
+  ]
+
+  for (const sequence of sequences) {
+    const { icon } = await iconBlock(`${sequence} a note`)
+    assert.equal(icon, sequence, JSON.stringify(sequence))
+  }
+})
+
+test('the whitespace after a leading emoji is not part of the icon', async () => {
+  const { icon } = await iconBlock('   \u{1F4CC}   Important note')
+
+  assert.equal(icon, '\u{1F4CC}')
+})
+
+test('a property drawer above the emoji is stepped over', async () => {
+  const { icon } = await iconBlock('tags:: study\ntype:: note\n\u{1F4CC} Important note')
+
+  assert.equal(icon, '\u{1F4CC}')
+})
+
+test('an emoji anywhere but the front of the block is left in the line', async () => {
+  for (const content of [
+    'Important note \u{1F4CC}',
+    'An \u{1F4CC} in the middle',
+    'Plain prose with no emoji at all',
+    // Symbols that render as text rather than as emoji are text.
+    '\u00A9 2026 Someone',
+    '\u2764 without a variation selector',
+    ''
+  ]) {
+    const { block } = await iconBlock(content)
+    assert.equal(block.attributes.has(ICON_ATTR), false, JSON.stringify(content))
+  }
+})
+
+test('a leading emoji inside a special block leaves that block its own layout', async () => {
+  // Every one of these opens with its own marker, so the emoji is inside the
+  // structure rather than in front of the block.
+  for (const content of [
+    '## \u{1F4CC} A heading',
+    '> \u{1F4CC} a quotation',
+    '```\n\u{1F4CC} code\n```',
+    '$$\u{1F4CC}$$',
+    '#+BEGIN_QUOTE\n\u{1F4CC} quoted\n#+END_QUOTE',
+    '#+BEGIN_PASSAGE\n**John 3:16**\n#+END_PASSAGE',
+    '{{query (property :status "done")}}',
+    '{{embed [[Page]]}}',
+    '![\u{1F4CC}](../assets/pin.png)',
+    '\u{1F4CC} a prompt #card'
+  ]) {
+    const { block } = await iconBlock(content)
+    assert.equal(block.attributes.has(ICON_ATTR), false, JSON.stringify(content))
+  }
+})
+
+test('a rendered structure keeps its own icon even where the source opens with an emoji', async () => {
+  // The source alone cannot tell: a block written as `📌 {{embed …}}` opens
+  // with the emoji, and what it holds is only visible in the render.
+  for (const renderedSelector of ['.embed', '.custom-query', '.admonitionblock', '.passage', 'img', 'pre']) {
+    const { block } = await iconBlock('\u{1F4CC} an embedded page', {}, { renderedSelector })
+    assert.equal(block.attributes.has(ICON_ATTR), false, renderedSelector)
+  }
+})
+
+test('turning the setting off puts the emoji back in the line', async () => {
+  const { block } = await iconBlock('\u{1F4CC} Important note', { blockIcons: false })
+
+  assert.equal(block.attributes.has(ICON_ATTR), false)
+})
+
+test('a mark already written is given back when the setting is turned off', async () => {
+  const uuid = '65f00000-0000-0000-0000-1f0000000000'
+  const context = load({ blockIcons: true }, [], { [uuid]: { content: '\u{1F4CC} Important note' } })
+  const block = bulletBlock({ text: '\u{1F4CC} Important note', uuid })
+
+  await context.refreshFromStoredSource(block)
+  assert.equal(block.attributes.get(ICON_ATTR), '\u{1F4CC}')
+
+  context.logseq.settings.blockIcons = false
+  await context.refreshFromStoredSource(block)
+  assert.equal(block.attributes.has(ICON_ATTR), false)
+})
+
+test('a repaint gives every mark back the moment the setting is turned off', async () => {
+  // The synchronous pass answers too, so a block whose stored source cannot be
+  // read back still loses its mark.
+  const host = node('body')
+  const block = node('div', { classes: ['ls-block'], attributes: { [ICON_ATTR]: '\u{1F4CC}' } })
+  host.appendChild(block)
+
+  const context = load({ blockIcons: false }, [], {}, host)
+  await Promise.resolve()
+
+  assert.equal(block.attributes.has(ICON_ATTR), false)
+})
+
+test('marking a block writes nothing to the graph and leaves its source alone', async () => {
+  const content = '\u{1F4CC} Important note'
+  const uuid = '65f00000-0000-0000-0000-1e0000000000'
+  const stored = { [uuid]: { content } }
+  const context = load({}, [], stored)
+  const block = bulletBlock({ text: content, uuid })
+
+  await context.refreshFromStoredSource(block)
+
+  assert.equal(block.attributes.get(ICON_ATTR), '\u{1F4CC}')
+  assert.deepEqual(context.blockWrites, [])
+  assert.equal(stored[uuid].content, content)
+})
+
+test('unloading takes every block-icon mark back off the host document', async () => {
+  const host = node('body')
+  const block = node('div', { classes: ['ls-block'], attributes: { [ICON_ATTR]: '\u{1F4CC}' } })
+  host.appendChild(block)
+
+  const context = load({}, [], {}, host)
+  await Promise.resolve()
+  for (const handler of context.logseq.unloads) await handler()
+
+  assert.equal(block.attributes.has(ICON_ATTR), false)
 })
 
 function menuLink(label) {

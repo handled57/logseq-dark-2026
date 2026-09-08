@@ -1916,6 +1916,53 @@ textarea.block-editor:focus {
   margin-bottom: 0;
 }
 
+/* Leading emoji as a block icon --------------------------------------------
+ *
+ * `index.js` marks a block whose own text opens with one emoji with
+ * `data-hc-block-icon`, and that emoji is then set in a gutter of its own left
+ * of the block's text, the way a passage sets a verse number. The emoji is
+ * never moved, copied or replaced: it is still the first character of the
+ * block's text and of its source, and what is drawn around it is a hanging
+ * indent. Clicking into the block shows the line exactly as it is written.
+ *
+ * Logseq renders a block's first line inside `.block-content-inner` and
+ * whatever follows it in a `.block-body`. Both take the gutter as padding, so
+ * every line of the block stands in one column; the first line alone is pulled
+ * back out of it, which is what leaves the emoji hanging beside that column.
+ *
+ * The gutter is carved out of the block's own text column rather than the
+ * margin left of it, so nothing here reaches the rail: the bullet, the fold
+ * arrow and the neighbouring blocks stand where they did, at every nesting
+ * depth and in both desktop layouts. A block carrying a render with an icon or
+ * a layout of its own — an admonition, a passage, a code block, a query, an
+ * embed, a piece of media — is never marked in the first place, so none of
+ * this reaches one. */
+:root {
+  --hc-block-icon-gutter: 1.5em;
+}
+
+/* The block's text, all of it, in one column right of the gutter. */
+.ls-block[data-hc-block-icon] > .block-main-container > .block-content-wrapper .block-content > .block-content-inner,
+.ls-block[data-hc-block-icon] > .block-main-container > .block-content-wrapper .block-content > .block-body {
+  padding-left: var(--hc-block-icon-gutter);
+}
+
+/* The first line, which is the one the emoji opens, hangs back out of that
+ * column. The gutter is one emoji's advance plus the space that follows it,
+ * which is what puts the words after the emoji in the same column as the lines
+ * below them; an emoji font draws practically every emoji at one width, so the
+ * one number holds for all of them, and a graph that wants a wider icon column
+ * can retune it from `custom.css`. */
+.ls-block[data-hc-block-icon] > .block-main-container > .block-content-wrapper .block-content > .block-content-inner > :first-child {
+  text-indent: calc(-1 * var(--hc-block-icon-gutter));
+}
+
+/* `text-indent` inherits, so a block container nested inside that first line
+ * would hang a line of its own out of the gutter as well. */
+.ls-block[data-hc-block-icon] > .block-main-container > .block-content-wrapper .block-content > .block-content-inner > :first-child * {
+  text-indent: 0;
+}
+
 /* Collapsible rich content -------------------------------------------------
  *
  * `index.js` marks every render in the main editor that can be folded on its

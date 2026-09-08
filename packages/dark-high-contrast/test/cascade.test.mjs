@@ -352,6 +352,39 @@ const popupMetrics = [
   '.ui__ac-group-name{color:hsl(var(--popover-foreground)/.2);font-size:.75rem;font-weight:500;line-height:1rem;padding:.5rem}'
 ]
 
+/* The leading-emoji gutter is a hanging indent inside the block's own text
+ * column, so what it is measured against is how Logseq lays that column out:
+ * the block's first line sits in a `.flex-1` box inside `.block-content-inner`,
+ * the box is `w-full` under Tailwind's border-box reset so the gutter's padding
+ * stays inside it, and `.block-content` keeps its whitespace, which is what
+ * makes the space after the emoji part of the column the gutter reserves. */
+const iconMetrics = [
+  '.flex-1{flex:1 1 0%}',
+  '.w-full{width:100%}',
+  '.block-content{cursor:text;max-width:100%;min-height:24px;overflow:initial;' +
+    'overflow-wrap:break-word;white-space:pre-wrap;word-break:break-word}'
+]
+
+test('the block-icon gutter and the indent that hangs out of it are one number', () => {
+  const gutter = 'var(--hc-block-icon-gutter)'
+  const scope = '.ls-block[data-hc-block-icon] > .block-main-container > ' +
+    '.block-content-wrapper .block-content > '
+
+  // Both halves read the same variable, so the line the emoji opens always
+  // hangs out by exactly what the text below it is indented by. Anything else
+  // would leave a wrapped line short of, or past, the words above it.
+  assert.ok(css.includes(`${scope}.block-content-inner,\n${scope}.block-body {\n  padding-left: ${gutter};`))
+  assert.ok(css.includes(`${scope}.block-content-inner > :first-child {\n  text-indent: calc(-1 * ${gutter});`))
+
+  // The gutter is set in `em`, so it is one emoji of the block's own text
+  // rather than a fixed distance that would drift as the text is resized.
+  const declared = css.match(/--hc-block-icon-gutter:\s*([\d.]+)em;/)
+  assert.ok(declared, 'the icon gutter is not declared in em')
+  // One emoji's advance plus the space after it, which is what puts the words
+  // following the emoji in the column the lines below them stand in.
+  assert.ok(Number(declared[1]) > 1 && Number(declared[1]) < 2, 'the icon gutter is not about one emoji wide')
+})
+
 /* Read back off the declarations above. */
 const rail = { indent: 29, arrow: 22, bullet: 16, dot: 6, box: 24, gutter: 6, orderList: 22, pagePad: 32 }
 
@@ -933,7 +966,9 @@ test(
         `${surface}: upstream no longer ships "${selector}"`
       )
     }
-    for (const declaration of [...admonitionMetrics, ...spacingMetrics, ...railMetrics, ...popupMetrics]) {
+    for (const declaration of [
+      ...admonitionMetrics, ...spacingMetrics, ...railMetrics, ...popupMetrics, ...iconMetrics
+    ]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }
     assert.ok(upstream.includes(markDeclaration), 'Logseq no longer ships the page-mark rule')

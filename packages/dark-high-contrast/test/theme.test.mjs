@@ -663,6 +663,58 @@ test('verse numbers are cyan, and hang in a gutter where the block asks for one'
   )
 })
 
+test('a leading emoji hangs in a gutter of its own beside the block text', () => {
+  const scope = '.ls-block[data-hc-block-icon] > .block-main-container > ' +
+    '.block-content-wrapper .block-content > '
+
+  // One variable carries the gutter, on the root, so a graph can retune the
+  // icon column from `custom.css` the way it can the rail's own offset.
+  assert.match(css, /:root \{\n  --hc-block-icon-gutter: 1\.5em;\n\}/)
+
+  // Logseq renders the block's first line inside `.block-content-inner` and
+  // whatever follows it in a `.block-body`. Both are indented by the gutter, so
+  // every line of the block stands in one column.
+  assert.ok(
+    css.includes(
+      `${scope}.block-content-inner,\n${scope}.block-body {\n  padding-left: var(--hc-block-icon-gutter);\n}`
+    ),
+    'the block text is not indented by the icon gutter'
+  )
+
+  // The first line alone is pulled back out of that column, by exactly the
+  // gutter, which is what leaves the emoji hanging beside the text and puts a
+  // wrapped line under the words rather than under the emoji.
+  assert.ok(
+    css.includes(
+      `${scope}.block-content-inner > :first-child {\n  text-indent: calc(-1 * var(--hc-block-icon-gutter));\n}`
+    ),
+    'the first line is not pulled back out of the gutter'
+  )
+
+  // `text-indent` inherits, so a block container nested inside that first line
+  // would hang a line of its own out of the gutter as well.
+  assert.ok(
+    css.includes(`${scope}.block-content-inner > :first-child * {\n  text-indent: 0;\n}`),
+    'the inherited first-line indent is not reset'
+  )
+
+  // The gutter is carved out of the block's own text column, never out of the
+  // margin the rail stands in: nothing in this section reaches the control
+  // column, the bullet or the fold arrow, so the rail is untouched at every
+  // nesting depth and in both desktop layouts. Nor is the icon drawn from the
+  // mark — the emoji in the block's own text is the icon.
+  const section = css.slice(
+    css.indexOf('/* Leading emoji as a block icon'),
+    css.indexOf('/* Collapsible rich content ---')
+  )
+  assert.ok(section.length > 0, 'the block-icon section is missing')
+
+  // The prose above says as much; these are the rules themselves.
+  const rules = section.replace(/\/\*[\s\S]*?\*\//g, '')
+  assert.doesNotMatch(rules, /block-control-wrap|bullet|--hc-rail-/)
+  assert.doesNotMatch(rules, /content:\s*attr\(data-hc-block-icon\)/)
+})
+
 test('a visible property table renders below the admonition or passage it names', () => {
   // Logseq renders `.block-properties` ahead of `.block-body`, so the scope has
   // to name both halves at once: a rendered box, and a table `index.js` has not
