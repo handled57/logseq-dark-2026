@@ -73,11 +73,31 @@ function descendants(target) {
   return target.children.flatMap((child) => [child, ...descendants(child)])
 }
 
+/* The one part of `CSSStyleDeclaration` the entry uses: the custom properties
+ * it writes on the host's body. */
+function styleDeclaration() {
+  const properties = new Map()
+
+  return {
+    properties,
+    setProperty(name, value) {
+      properties.set(name, value)
+    },
+    removeProperty(name) {
+      properties.delete(name)
+    },
+    getPropertyValue(name) {
+      return properties.get(name) ?? ''
+    }
+  }
+}
+
 function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
   const self = {
     tagName: tag.toUpperCase(),
     id,
     classList: new Set(classes),
+    style: styleDeclaration(),
     attributes: new Map(Object.entries(attributes)),
     children: [],
     listeners: new Map(),
@@ -269,6 +289,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
     for (const handler of documentListeners.get(type) ?? []) handler(event)
   }
   context.documentListeners = documentListeners
+  context.hostStyle = host.style
 
   return context
 }
@@ -423,6 +444,61 @@ test('the entry provides the one style rule that does the hiding, and only that'
   // The entry provides no other style: everything the theme paints is in
   // theme.css, and the Passage dialog is styled by the plugin that owns it.
   assert.equal(context.logseq.provided.length, 1)
+})
+
+/* The bullet rail's base line. theme.css declares the same default, so the two
+ * agree whether or not the entry is running; what the setting adds is an inline
+ * custom property on the host's body, which out-ranks the stylesheet without
+ * depending on the order the theme and the plugin are loaded in. The body is
+ * the element rather than the root because theme.css declares the palette on a
+ * selector list that includes `html[data-theme][data-color]:root body`, which
+ * would otherwise re-declare this variable below anything set on `html`. */
+const RAIL_PROPERTY = '--hc-rail-default-color'
+
+test('the rail color setting is offered with the structural border as its default', async () => {
+  const context = await render({}, [])
+  const setting = context.logseq.schema.find(({ key }) => key === 'defaultRailColor')
+
+  assert.ok(setting, 'the theme offers no rail color setting')
+  assert.equal(setting.type, 'string')
+  assert.equal(setting.inputAs, 'color')
+  assert.equal(setting.title, 'Default rail color')
+  assert.equal(setting.default, '#5B7E96')
+
+  // An unconfigured graph takes that default and paints the rail with it.
+  assert.equal(context.hostStyle.getPropertyValue(RAIL_PROPERTY), '#5b7e96')
+})
+
+test('a chosen rail color is written to the host root and nothing else is', async () => {
+  const context = await render({ defaultRailColor: '#8A2BE2' }, [])
+
+  assert.equal(context.hostStyle.getPropertyValue(RAIL_PROPERTY), '#8a2be2')
+
+  // The eight hierarchy colors are theme.css's own and the setting never
+  // reaches them: the root carries this one property and no other.
+  assert.deepEqual([...context.hostStyle.properties.keys()], [RAIL_PROPERTY])
+})
+
+test('an emptied rail color hands the line back to the stylesheet', async () => {
+  const context = await render({ defaultRailColor: '   ' }, [])
+
+  assert.equal(context.hostStyle.properties.has(RAIL_PROPERTY), false)
+})
+
+test('changing the rail color repaints it', async () => {
+  const context = await render({ defaultRailColor: '#8a2be2' }, [])
+
+  context.logseq.settings.defaultRailColor = '#40b0a6'
+  context.paint()
+
+  assert.equal(context.hostStyle.getPropertyValue(RAIL_PROPERTY), '#40b0a6')
+})
+
+test('unloading takes the rail color back off the host root', async () => {
+  const context = await render({ defaultRailColor: '#8a2be2' }, [])
+  for (const handler of context.logseq.unloads) await handler()
+
+  assert.equal(context.hostStyle.properties.has(RAIL_PROPERTY), false)
 })
 
 function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '', wrapperSelector = '', uuid = '' } = {}) {

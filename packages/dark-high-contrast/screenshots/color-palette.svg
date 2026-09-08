@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="976" viewBox="0 0 1400 976" role="img" aria-labelledby="title description">
   <title id="title">Dark High Contrast complete color palette</title>
-  <desc id="description">Swatches for all 52 opaque colors, 26 alpha overlays, and 9 HSL component colors used by the Logseq theme.</desc>
+  <desc id="description">Swatches for all 57 opaque colors, 26 alpha overlays, and 9 HSL component colors used by the Logseq theme.</desc>
   <defs>
     <pattern id="checker" width="12" height="12" patternUnits="userSpaceOnUse">
       <rect width="12" height="12" fill="#000000"/>
@@ -17,7 +17,7 @@
 
   <rect width="1400" height="976" fill="#000000"/>
   <text class="heading" x="24" y="38">Dark High Contrast — complete color palette</text>
-  <text class="subheading" x="24" y="64">52 opaque colors</text>
+  <text class="subheading" x="24" y="64">57 opaque colors</text>
 
   <!-- Opaque colors: 10 columns by 5 rows. -->
   <g transform="translate(24 82)"><rect class="swatch" width="112" height="36" fill="#000000"/><text class="label" x="56" y="52">#000000</text></g>
@@ -74,8 +74,13 @@
   <g transform="translate(976 330)"><rect class="swatch" width="112" height="36" fill="#eb9091"/><text class="label" x="56" y="52">#eb9091</text></g>
   <g transform="translate(1112 330)"><rect class="swatch" width="112" height="36" fill="#fa934e"/><text class="label" x="56" y="52">#fa934e</text></g>
   <g transform="translate(1248 330)"><rect class="swatch" width="112" height="36" fill="#264f78"/><text class="label" x="56" y="52">#264f78</text></g>
-  <g transform="translate(24 392)"><rect class="swatch" width="112" height="36" fill="#f14c4c"/><text class="label" x="56" y="52">#f14c4c</text></g>
-  <g transform="translate(160 392)"><rect class="swatch" width="112" height="36" fill="#9d8bf5"/><text class="label" x="56" y="52">#9d8bf5</text></g>
+  <g transform="translate(24 392)"><rect class="swatch" width="112" height="36" fill="#dc267f"/><text class="label" x="56" y="52">#dc267f</text></g>
+  <g transform="translate(160 392)"><rect class="swatch" width="112" height="36" fill="#ea5c00"/><text class="label" x="56" y="52">#ea5c00</text></g>
+  <g transform="translate(296 392)"><rect class="swatch" width="112" height="36" fill="#994f00"/><text class="label" x="56" y="52">#994f00</text></g>
+  <g transform="translate(432 392)"><rect class="swatch" width="112" height="36" fill="#ffb000"/><text class="label" x="56" y="52">#ffb000</text></g>
+  <g transform="translate(568 392)"><rect class="swatch" width="112" height="36" fill="#40b0a6"/><text class="label" x="56" y="52">#40b0a6</text></g>
+  <g transform="translate(704 392)"><rect class="swatch" width="112" height="36" fill="#b180d7"/><text class="label" x="56" y="52">#b180d7</text></g>
+  <g transform="translate(840 392)"><rect class="swatch" width="112" height="36" fill="#b66dff"/><text class="label" x="56" y="52">#b66dff</text></g>
 
   <text class="subheading" x="24" y="487">26 alpha overlays — checkerboard shows transparency</text>
   <!-- Alpha overlays: 13 columns by 2 rows. -->

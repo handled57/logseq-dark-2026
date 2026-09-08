@@ -14,9 +14,22 @@ export function descendants(target) {
   return target.children.flatMap((child) => [child, ...descendants(child)])
 }
 
+/* The one part of `CSSStyleDeclaration` a host script needs: the custom
+ * properties it writes on an element, readable back by name. */
+export function styleDeclaration() {
+  const properties = new Map()
+
+  return {
+    properties,
+    setProperty(name, value) { properties.set(name, value) },
+    removeProperty(name) { properties.delete(name) },
+    getPropertyValue(name) { return properties.get(name) ?? '' }
+  }
+}
+
 export function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
   const self = {
-    tagName: tag.toUpperCase(), id, classList: new Set(classes),
+    tagName: tag.toUpperCase(), id, classList: new Set(classes), style: styleDeclaration(),
     attributes: new Map(Object.entries(attributes)), children: [], listeners: new Map(),
     parentElement: null, textContent: '', focused: false, clicks: 0, ...rest,
     setAttribute(name, value) { self.attributes.set(name, value) },

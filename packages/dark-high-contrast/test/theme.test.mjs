@@ -133,7 +133,7 @@ test('README and palette chart document every fixed stylesheet color', async () 
 
   assert.deepEqual(
     { hex: expected.hex.length, rgb: expected.rgb.length, hsl: expected.hsl.length },
-    { hex: 52, rgb: 26, hsl: 9 },
+    { hex: 57, rgb: 26, hsl: 9 },
     'stylesheet color inventory changed unexpectedly'
   )
   assert.deepEqual(readmeColors, expected, 'README fixed-color tables have drifted from theme.css')
@@ -239,50 +239,88 @@ function literal(name) {
   return value
 }
 
-test('the rail hierarchy runs ROYGBIV and stays legible on black', () => {
-  // The bands each color of the spectrum has to fall inside to be the color it
-  // is named after, in the order the rail steps through them.
-  const spectrum = [
-    ['red', 340, 20],
-    ['orange', 20, 45],
-    ['yellow', 45, 70],
-    ['green', 70, 160],
-    ['blue', 160, 240],
-    ['indigo', 240, 280],
-    ['violet', 280, 340]
+test('the rail hierarchy is the eight colors, in order, and stays legible on black', () => {
+  // The cycle the rail steps through, in ROYGBIV order, with the palette token
+  // each level reads it through. These are not the VS Code palette's own hues:
+  // they are chosen to stay apart from one another for a reader with a common
+  // color vision deficiency, which a literal red-to-violet sweep does not.
+  const cycle = [
+    ['magenta', '--hc-rail-magenta', '#dc267f'],
+    ['orange', '--hc-rail-orange', '#ea5c00'],
+    ['brown', '--hc-rail-brown', '#994f00'],
+    ['amber', '--hc-rail-amber', '#ffb000'],
+    ['teal', '--hc-rail-teal', '#40b0a6'],
+    ['blue', '--hc-rail-blue', '#75beff'],
+    ['indigo', '--hc-rail-indigo', '#b180d7'],
+    ['violet', '--hc-rail-violet', '#b66dff']
   ]
 
-  const colors = spectrum.map(([name, start, end], index) => {
-    const color = literal(`--hc-rail-depth-${index + 1}`)
-    const angle = hue(color)
-    const inside = start < end ? angle >= start && angle < end : angle >= start || angle < end
-    assert.ok(inside, `depth ${index + 1} is ${color} at ${Math.round(angle)}°, which is not ${name}`)
-    // Every hierarchy color is a bullet and a hairline on the black canvas, so
-    // each one carries text-weight contrast against it.
+  cycle.forEach(([name, token, hex], index) => {
+    const depth = `--hc-rail-depth-${index + 1}`
+    // Each level names a palette token rather than writing a literal into the
+    // rail, and that token is the color the issue fixed for this level.
+    assert.equal(cssValue(depth), `var(${token})`, `${depth} is not the ${name} token`)
+    assert.equal(cssValue(token), hex, `${token} is not ${hex}`)
+    assert.equal(literal(depth), hex, `${depth} does not resolve to ${hex}`)
+
+    // A bullet and a hairline are non-text user interface components, so 3:1
+    // against the black canvas is the threshold every one of them clears.
     assert.ok(
-      contrast(color, '#000000') >= 4.5,
-      `${name} (${color}) is ${contrast(color, '#000000').toFixed(2)}:1 on the canvas`
+      contrast(hex, '#000000') >= 3,
+      `${name} (${hex}) is ${contrast(hex, '#000000').toFixed(2)}:1 on the canvas`
     )
-    return { name, color, angle }
   })
 
-  // Adjacent levels are the pairs a reader compares, and the seventh is
-  // followed by the first again where the spectrum repeats. No two of them may
-  // read as the same color.
-  for (let index = 0; index < colors.length; index += 1) {
-    const here = colors[index]
-    const next = colors[(index + 1) % colors.length]
-    const apart = Math.min(Math.abs(here.angle - next.angle), 360 - Math.abs(here.angle - next.angle))
-    assert.ok(apart >= 20, `${here.name} and ${next.name} are ${Math.round(apart)}° apart`)
+  // Seven of the eight also carry the 4.5:1 a word set in them would need. The
+  // brown is the one that does not, at 3.47:1, and no text is ever set in it.
+  const legible = cycle.filter(([, , hex]) => contrast(hex, '#000000') >= 4.5)
+  assert.equal(legible.length, 7, 'the palette no longer carries seven text-weight colors')
+  assert.ok(contrast('#994f00', '#000000') < 4.5, 'the brown now clears text contrast on its own')
+
+  // Adjacent levels are the pairs a reader compares, and the eighth is followed
+  // by the first again where the cycle repeats. No two of them are the same
+  // color.
+  for (let index = 0; index < cycle.length; index += 1) {
+    assert.notEqual(cycle[index][2], cycle[(index + 1) % cycle.length][2])
   }
 
-  // Five of the seven are the VS Code palette's own; the two the palette does
-  // not carry are the theme's own tokens rather than literals in the rail.
-  assert.equal(cssValue('--hc-rail-depth-1'), 'var(--hc-red)')
-  assert.equal(cssValue('--hc-rail-depth-6'), 'var(--hc-indigo)')
-  for (const [index, token] of [[2, 'orange'], [3, 'yellow'], [4, 'green'], [5, 'blue'], [7, 'purple']]) {
-    assert.equal(cssValue(`--hc-rail-depth-${index}`), `var(--vscode-hc-${token})`)
-  }
+  // The cycle is exactly eight deep: a ninth level starts it over at magenta
+  // rather than reading a color the palette does not carry.
+  assert.doesNotMatch(css, /--hc-rail-depth-9\s*:/, 'the cycle is longer than eight colors')
+  assert.match(
+    css,
+    /\.block-children \.block-children \.block-children \.block-children \.block-children \.block-children \.block-children \.block-children \.ls-block[^{}]*\{[^{}]*--hc-rail-depth-color: var\(--hc-rail-depth-1\)/,
+    'the ninth nesting level does not start the cycle over at magenta'
+  )
+})
+
+test('the base rail line is the structural border, and the setting writes over it', () => {
+  // The line a block with no hierarchy color of its own paints: the same border
+  // the editor, the left menu and the sidebars are drawn with.
+  assert.equal(cssValue('--hc-rail-default-color'), 'var(--vscode-hc-border)')
+  assert.equal(literal('--hc-rail-default-color').toLowerCase(), '#5b7e96')
+
+  // Ordinary prose reads the line through that one variable, so changing it
+  // changes nothing else the rail draws.
+  assert.match(
+    css,
+    /--hc-rail-line-color: var\(--hc-rail-default-color\);/,
+    'the rail line no longer reads the default rail color'
+  )
+
+  // The setting is declared with the same default and applied as an inline
+  // custom property, so it out-ranks the stylesheet whatever order the theme
+  // and its entry load in. It goes on the body rather than the root element:
+  // the palette block above declares every variable on `:root body` as well,
+  // so on a graph with an accent set the body would re-declare this one below
+  // anything inherited from `html`.
+  assert.match(css, /html\[data-theme\]\[data-color\]:root body,/)
+  assert.match(script, /const \{ style \} = doc\.body/)
+  assert.match(script, /key: RAIL_COLOR_SETTING/)
+  assert.match(script, /const DEFAULT_RAIL_COLOR = '#5B7E96'/)
+  assert.match(script, /const RAIL_COLOR_PROPERTY = '--hc-rail-default-color'/)
+  assert.match(script, /inputAs: 'color'/)
+  assert.match(script, /title: 'Default rail color'/)
 })
 
 test('classic and ShUI theme contracts cover every planned surface', () => {

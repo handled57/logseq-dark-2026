@@ -58,25 +58,42 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 
 Every heading, and every block with children, takes the color of its own depth
 on the rail; the same color paints that block's bullet and the stretch of line
-it is responsible for. Depth 1 is a top-level block. The seven colors repeat
-below the seventh level, and a block deeper than depth 13 — the twelfth level
-below the top, and the last one the rail places — hangs from that level's rail
-position and keeps its color.
+it is responsible for. Depth 1 is a top-level block. The eight colors repeat
+below the eighth level — depth 9 is magenta again — and a block deeper than
+depth 13, the twelfth level below the top and the last one the rail places,
+hangs from that level's rail position and keeps its color.
 
 | Depth | Color | Tokens |
 | --- | --- | --- |
-| 1, 8 | `#f14c4c` red | `--hc-rail-depth-1`, `--hc-red` |
-| 2, 9 | `#f38518` orange | `--hc-rail-depth-2`, `--vscode-hc-orange` |
-| 3, 10 | `#ffff00` yellow | `--hc-rail-depth-3`, `--vscode-hc-yellow` |
-| 4, 11 | `#7ca668` green | `--hc-rail-depth-4`, `--vscode-hc-green` |
-| 5, 12 | `#569cd6` blue | `--hc-rail-depth-5`, `--vscode-hc-blue` |
-| 6, 13 | `#9d8bf5` indigo | `--hc-rail-depth-6`, `--hc-indigo` |
-| 7 | `#c586c0` violet | `--hc-rail-depth-7`, `--vscode-hc-purple` |
+| 1, 9 | `#dc267f` magenta | `--hc-rail-depth-1`, `--hc-rail-magenta` |
+| 2, 10 | `#ea5c00` orange | `--hc-rail-depth-2`, `--hc-rail-orange` |
+| 3, 11 | `#994f00` brown | `--hc-rail-depth-3`, `--hc-rail-brown` |
+| 4, 12 | `#ffb000` amber | `--hc-rail-depth-4`, `--hc-rail-amber` |
+| 5, 13 | `#40b0a6` teal | `--hc-rail-depth-5`, `--hc-rail-teal` |
+| 6 | `#75beff` blue | `--hc-rail-depth-6`, `--hc-rail-blue`, `--vscode-hc-info` |
+| 7 | `#b180d7` indigo | `--hc-rail-depth-7`, `--hc-rail-indigo` |
+| 8 | `#b66dff` violet | `--hc-rail-depth-8`, `--hc-rail-violet` |
 
-Five of the seven are the palette's own colors above. The red and the indigo are
-this theme's additions: VS Code's High Contrast palette carries no indigo, and
-its error salmon sits too close to the orange a level below it. Both clear 6:1
-against the black canvas, as every hierarchy color does.
+These eight are the rail's own colors rather than the VS Code palette above:
+they are chosen to stay apart from one another for a reader with a common color
+vision deficiency, which a literal red-to-violet sweep does not. No text is ever
+set in them — a bullet and a hairline are non-text interface components, so each
+one clears the 3:1 that asks for; seven of the eight clear 4.5:1 as well, and
+the brown, at 3.47:1, is used only as a bullet and a line.
+
+Blocks that carry no hierarchy of their own — ordinary prose without children —
+keep a white bullet, and paint their stretch of rail in the **Default rail
+color** setting instead. That defaults to `#5b7e96`, the same
+`--vscode-hc-border` the editor, the left menu and the sidebars are drawn with.
+
+A bullet also says whether anything is folded away underneath it: a block whose
+children are showing is drawn as an empty ring, while a collapsed block and a
+block with no children of its own stay filled. Hovering a bullet adds a halo
+around it without changing what is inside it.
+
+A page's properties are the page's front matter rather than a block of its text,
+so they render with no bullet and no rail segment, and the rail opens at the
+first content block below them.
 
 ### Neutral surfaces and structural ramps
 

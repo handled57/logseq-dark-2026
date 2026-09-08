@@ -73,6 +73,23 @@ const RULES_SETTING = 'hiddenProperties'
 const DEFAULT_RULES = 'type: passage'
 const ANY_VALUE = '*'
 
+/* The bullet rail's base line: what a block that takes no hierarchy color of
+ * its own paints its stretch of rail with. The default is the structural border
+ * the editor, the left menu and the sidebars are drawn with, which theme.css
+ * also declares as the fallback; the chosen color is written over that as an
+ * inline custom property, which out-ranks every stylesheet rule without
+ * depending on the order the theme and this entry are loaded in.
+ *
+ * It goes on `body`, not on the root element: theme.css declares the whole
+ * palette on a selector list that includes `html[data-theme][data-color]:root
+ * body`, so on a graph with an accent set the body re-declares this variable
+ * and a value inherited from `html` never reaches a block. Everything the rail
+ * draws is inside the body, so the body is where the override belongs.
+ * The eight hierarchy-depth colors are not this setting's to change. */
+const RAIL_COLOR_SETTING = 'defaultRailColor'
+const DEFAULT_RAIL_COLOR = '#5B7E96'
+const RAIL_COLOR_PROPERTY = '--hc-rail-default-color'
+
 const settingsSchema = [
   {
     key: RULES_SETTING,
@@ -84,6 +101,18 @@ const settingsSchema = [
       '"type: foo, type: bar, status: done". A block whose properties match any one pair renders ' +
       'bare. Write "key: *", or the bare key, to match every value of that key. Leave empty to ' +
       'render every block normally.'
+  },
+  {
+    key: RAIL_COLOR_SETTING,
+    type: 'string',
+    inputAs: 'color',
+    default: DEFAULT_RAIL_COLOR,
+    title: 'Default rail color',
+    description:
+      'The color of the bullet rail beside blocks that carry no hierarchy of their own — ' +
+      'ordinary prose, rather than a heading or a block with children. Defaults to the border ' +
+      'color used around the editor, the left menu and the sidebars. Leave empty to keep that ' +
+      'border color. The eight colors the hierarchy itself cycles through are unaffected.'
   }
 ]
 
@@ -527,8 +556,20 @@ async function refreshFromStoredSource(block) {
   }
 }
 
+/* An empty setting hands the line back to the stylesheet's own default rather
+ * than painting it in nothing. */
+function applyRailColor() {
+  const color = readSetting(RAIL_COLOR_SETTING, DEFAULT_RAIL_COLOR)
+  const { style } = doc.body
+
+  if (color) style.setProperty(RAIL_COLOR_PROPERTY, color)
+  else style.removeProperty(RAIL_COLOR_PROPERTY)
+}
+
 function paint() {
   const active = rules()
+
+  applyRailColor()
 
   for (const block of doc.querySelectorAll('.ls-block')) {
     setBulletVisibility(block, shouldHideBullet(block))
@@ -635,6 +676,8 @@ function teardown() {
   doc.removeEventListener('mousedown', toggleCollapse, true)
   doc.removeEventListener('click', toggleCollapse, true)
   doc.removeEventListener('keydown', toggleCollapseOnKey, true)
+
+  doc.body.style.removeProperty(RAIL_COLOR_PROPERTY)
 
   collapsedContent.clear()
   for (const host of doc.querySelectorAll(`[${COLLAPSIBLE_ATTR}]`)) releaseCollapsible(host)
