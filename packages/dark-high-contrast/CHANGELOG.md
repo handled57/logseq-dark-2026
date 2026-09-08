@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## 2.3.0 - 2026-09-07
+
+- Fold a rendered box without folding the block that holds it. Every
+  admonition, passage, table, quote, code block, math block, piece of media and
+  block or page embed in the main editor now carries an expand/collapse control
+  in its top right corner. It is the render that folds, not the block: the
+  block keeps its properties and its children, nothing is written to the graph,
+  and clicking into the block still shows the whole of its source. Each box
+  answers only for itself, and every box opens expanded.
+- Fold to something still worth reading. An admonition keeps its icon, its
+  divider and the first line of what it says; a passage keeps its icon and its
+  reference line; a table keeps its head, or its first row where the markup
+  writes none, in the columns it was laid out in. A quote, a code block, a math
+  block, a piece of media and an embed fold to a one-line box carrying the word
+  for what is inside them — nothing of the hidden content reads through, and no
+  space is left standing for it.
+- The control is operated by pointer or keyboard, takes the theme's orange
+  focus ring, and keeps both of Logseq's own gestures out of it: pressing it
+  neither opens the block for editing nor folds it the way its bullet does.
+
 ## 2.2.1 - 2026-09-07
 
 - Keep the `/` command menu, and every other popup the editor opens over a

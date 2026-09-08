@@ -60,6 +60,12 @@ html[data-theme][data-color]:root body,
   --hc-rail-depth-6: var(--hc-indigo);
   --hc-rail-depth-7: var(--vscode-hc-purple);
 
+  /* Collapsible rich content: the box the control is drawn in, and the height
+   * a folded shell keeps — one line, the same 1.75rem an admonition sets its
+   * first line in. */
+  --hc-collapse-control-size: 1.25rem;
+  --hc-collapsed-shell-height: 1.75rem;
+
   /* Logseq's newer controls use HSL component tokens. Keep those controls in
    * the same palette instead of allowing the active accent theme to leak in. */
   --background: 0 0% 0%;
@@ -1733,6 +1739,12 @@ textarea.block-editor:focus {
   margin-bottom: 0;
 }
 
+/* The collapse control is the passage's last child wherever one is hung, so
+ * the paragraph the rule above was written for is the one before it. */
+.block-body > .passage:has(> [data-hc-collapse]) > :nth-last-child(2) {
+  margin-bottom: 0;
+}
+
 /* The reference is the bold first line of the source, so it is the first
  * paragraph of the render. */
 .block-body > .passage .is-paragraph:first-child {
@@ -1826,6 +1838,164 @@ textarea.block-editor:focus {
  * table. */
 .block-content:has(> .block-properties:not([data-hc-hidden])) > .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage) {
   margin-bottom: 0;
+}
+
+/* Collapsible rich content -------------------------------------------------
+ *
+ * `index.js` marks every render in the main editor that can be folded on its
+ * own with `data-hc-collapsible`, hangs a button in its top right corner, and
+ * writes `data-hc-collapsed` when the reader folds it. Nothing here reaches a
+ * block, a bullet or a child: what folds is one box, and the block holding it
+ * keeps its properties, its descendants and its source.
+ *
+ * A folded box hides what it holds outright rather than scrolling it, so no
+ * hidden line can overflow the shell and no space is left standing for one.
+ * The three boxes that can show a useful first line — an admonition, a passage
+ * and a table — show one; every other kind keeps its own chrome at the height
+ * of a single line, carrying the word for what is inside it. */
+[data-hc-collapsible] {
+  position: relative;
+}
+
+[data-hc-collapse] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: var(--hc-collapse-control-size);
+  min-width: var(--hc-collapse-control-size);
+  margin: 0;
+  padding: 0 0.25rem;
+  font-family: var(--ls-font-family);
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--vscode-hc-white);
+  background: var(--vscode-hc-black);
+  border: 1px solid var(--vscode-hc-border);
+  border-radius: 2px;
+  cursor: pointer;
+  opacity: 0.7;
+  user-select: none;
+}
+
+/* Always drawn, so the affordance is there to be found, and at full strength
+ * whenever it is pointed at, focused, or the only thing left of a folded
+ * box. */
+[data-hc-collapsible]:hover > [data-hc-collapse],
+[data-hc-collapsed] > [data-hc-collapse],
+[data-hc-collapse]:hover,
+[data-hc-collapse]:focus-visible {
+  opacity: 1;
+}
+
+[data-hc-collapse]:hover {
+  color: var(--vscode-hc-bright-blue);
+  border-color: var(--vscode-hc-focus);
+}
+
+[data-hc-collapse]:focus-visible {
+  outline: 2px solid var(--vscode-hc-focus);
+  outline-offset: 1px;
+}
+
+/* The state, as a mark that turns the way Logseq's own fold arrow turns: down
+ * while the box is open, right while it is folded. The word beside it names
+ * what a folded shell is hiding, and is the control's only content, so it is
+ * out of the way while the box is showing its own. */
+[data-hc-collapse]::after {
+  content: "\25be";
+}
+
+[data-hc-collapse][aria-expanded="false"]::after {
+  content: "\25b8";
+}
+
+[data-hc-collapse][aria-expanded="true"] > [data-hc-collapse-label] {
+  display: none;
+}
+
+/* The shells: the box at one line's height, its own border and surface intact.
+ * What it holds is hidden rather than taken out of the layout — a code editor
+ * measured while it was `display: none` comes back blank — and clipped, so
+ * nothing of it reads through. */
+[data-hc-collapsed]:is(
+  [data-hc-collapsible="quote"],
+  [data-hc-collapsible="code"],
+  [data-hc-collapsible="math"],
+  [data-hc-collapsible="media"],
+  [data-hc-collapsible="embed"]
+) {
+  height: var(--hc-collapsed-shell-height) !important;
+  min-height: var(--hc-collapsed-shell-height) !important;
+  max-height: var(--hc-collapsed-shell-height) !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden !important;
+}
+
+[data-hc-collapsed]:is(
+  [data-hc-collapsible="quote"],
+  [data-hc-collapsible="code"],
+  [data-hc-collapsible="math"],
+  [data-hc-collapsible="media"],
+  [data-hc-collapsible="embed"]
+) > *:not([data-hc-collapse]) {
+  visibility: hidden;
+}
+
+/* A quote and an embed carry chrome of their own to fold to — the quote its
+ * panel and its 4px edge, the embed its border. A code block, a math box and a
+ * piece of media are drawn entirely by what is inside them, so a folded one is
+ * given the one-line box the theme draws its own surfaces in; without it there
+ * would be nothing left but a button standing on the canvas. */
+[data-hc-collapsed]:is(
+  [data-hc-collapsible="code"],
+  [data-hc-collapsible="math"],
+  [data-hc-collapsible="media"]
+) {
+  background: var(--vscode-hc-panel) !important;
+  border: 1px solid var(--vscode-hc-border) !important;
+  border-radius: 2px !important;
+}
+
+/* An admonition keeps the icon that says which one it is, the divider beside
+ * it, and the first line of what it says. The content column is clamped rather
+ * than cut, so the line ends in an ellipsis, and it keeps clear of the control
+ * standing in the corner above it. */
+[data-hc-collapsed][data-hc-collapsible="admonition"] > :not(.admonition-icon):not([data-hc-collapse]) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  padding-right: calc(var(--hc-collapse-control-size) + 0.5rem);
+  overflow: hidden;
+}
+
+/* A passage renders as paragraphs of its own rather than through an admonition
+ * container, so the first of them is clamped to the reference line and the
+ * rest are dropped. The icon and the divider are the box's own pseudo-elements
+ * and stand whatever it holds. */
+[data-hc-collapsed][data-hc-collapsible="passage"] > :not([data-hc-collapse]) {
+  display: none;
+}
+
+[data-hc-collapsed][data-hc-collapsible="passage"] > :first-child {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  padding-right: calc(var(--hc-collapse-control-size) + 0.5rem);
+  overflow: hidden;
+}
+
+/* A table folds to its head — or, where the markup writes none, to its first
+ * row. The rows that go are taken out of the table rather than out of the
+ * page, so the row left behind keeps the column widths it was laid out in. */
+[data-hc-collapsed][data-hc-collapsible="table"] thead tr:not(:first-child),
+[data-hc-collapsed][data-hc-collapsible="table"] thead ~ tbody tr,
+[data-hc-collapsed][data-hc-collapsible="table"] tbody tr:not(:first-child) {
+  display: none;
 }
 
 mark {
@@ -2119,6 +2289,12 @@ html.custom-scrollbar ::-webkit-scrollbar-corner {
 
   :where(a, button, input, textarea, select, [role="button"], [tabindex]):focus-visible {
     outline-color: Highlight !important;
+  }
+
+  /* The platform repaints the control itself; what it cannot undo is the
+   * resting dimming, which would leave it faint on a forced background. */
+  [data-hc-collapse] {
+    opacity: 1;
   }
 }
 

@@ -37,6 +37,12 @@ export function node(tag, { id = '', classes = [], attributes = {}, ...rest } = 
     click() { self.clicks += 1; self.dispatch('click') },
     setSelectionRange(start, end) { self.selectionStart = start; self.selectionEnd = end },
     matches: (selector) => matchesSelector(self, selector),
+    closest(selector) {
+      for (let current = self; current; current = current.parentElement) {
+        if (matchesSelector(current, selector)) return current
+      }
+      return null
+    },
     querySelector: (selector) => descendants(self).find((child) => matchesSelector(child, selector)) ?? null,
     querySelectorAll: (selector) => descendants(self).filter((child) => matchesSelector(child, selector)),
     dispatch(type, event = {}) {

@@ -15,6 +15,13 @@
  * content shape, `docs/contracts/passage-v1.md`, not a runtime — the theme
  * styles whatever passage blocks a graph holds, whoever wrote them.
  *
+ * It also hangs an expand/collapse control on every rendered box in the main
+ * editor that can be folded on its own — an admonition, a passage, a table, a
+ * quote, a code block, a math block, a piece of media, an embed — and marks
+ * the folded ones with `data-hc-collapsed`. That fold is the render's alone:
+ * no block is collapsed by it, no descendant is unrendered, and nothing is
+ * written to the graph.
+ *
  * It also takes over the block bullet's left click. Logseq routes that click to
  * the block's own page; here it folds the block instead, the way the arrow
  * beside the bullet does, and opening a block in the main editor moves to the
@@ -180,6 +187,8 @@ function propertyFreeText(wrapper) {
 
   const copy = wrapper.cloneNode(true)
   for (const properties of copy.querySelectorAll('.block-properties')) properties.remove()
+  /* A collapse control is the theme's own UI, not a word of the block. */
+  for (const control of copy.querySelectorAll(`[${CONTROL_ATTR}]`)) control.remove()
   return copy.textContent.trim()
 }
 
@@ -268,6 +277,235 @@ function setVerseLines(block, hanging) {
   else block.removeAttribute(VERSE_ATTR)
 }
 
+/* Collapsible rich content -------------------------------------------------
+ *
+ * A rendered box that runs long — an admonition, a passage, a table, a quote,
+ * a code block, a math block, a piece of media, a block or page embed — takes
+ * a control of its own in its top right corner, which folds that one render
+ * away. It is not the bullet's fold: the block keeps its properties, its
+ * descendants and its source, clicking into it still shows the whole of it,
+ * and nothing is written to the graph.
+ *
+ * The state therefore lives here rather than in a block. Every box opens
+ * expanded, and a fold is remembered under the block's UUID, the kind of
+ * content, and which one of that kind it is inside the block, so the same box
+ * is found again when Logseq re-renders the page.
+ */
+
+const COLLAPSIBLE_ATTR = 'data-hc-collapsible'
+const COLLAPSED_ATTR = 'data-hc-collapsed'
+const CONTROL_ATTR = 'data-hc-collapse'
+const CONTROL_KEY_ATTR = 'data-hc-collapse-key'
+const CONTROL_LABEL_ATTR = 'data-hc-collapse-label'
+
+/* The main editor only. Sidebars, whiteboards and dialogs render their own
+ * copies of the same content and are left as Logseq draws them. */
+const MAIN_EDITOR_SELECTOR = '#main-content-container'
+
+/* One entry per kind of render that earns a control. `name` is what the
+ * control calls the box in its accessible name. `label` is the word a folded
+ * box carries, and having one is also what marks the kind as a shell: the
+ * three kinds without one fold to a readable line of their own content
+ * instead. */
+const RICH_CONTENT = [
+  { type: 'admonition', name: 'admonition', selector: '.admonitionblock' },
+  { type: 'passage', name: 'passage', selector: '.passage' },
+  { type: 'table', name: 'table', selector: '.table-wrapper' },
+  { type: 'quote', name: 'quote', label: 'Quote', selector: 'blockquote' },
+  { type: 'code', name: 'code block', label: 'Code', selector: '.cp__fenced-code-block, pre' },
+  { type: 'math', name: 'math block', label: 'Math', selector: '.latex, .katex-display' },
+  { type: 'media', name: 'media', label: 'Media', selector: '.asset-container, img, video, audio, iframe' },
+  { type: 'embed', name: 'embed', label: 'Embed', selector: '.embed-block, .embed-page' }
+]
+
+const CONTENT_NAMES = new Map(RICH_CONTENT.map(({ type, name }) => [type, name]))
+
+/* Every kind at once, so the editor is read in document order: a box always
+ * reaches the pass before anything it holds, whatever order the kinds are
+ * written in above. */
+const RICH_CONTENT_SELECTOR = RICH_CONTENT.map(({ selector }) => selector).join(', ')
+
+/* The first kind an element answers to. The order above is precedence order,
+ * as it is for the property rules. */
+function contentKind(element) {
+  return RICH_CONTENT.find(({ selector }) => element.matches?.(selector)) ?? null
+}
+
+/* A replaced element holds no children of its own, so its control goes to the
+ * box around it — never to a box that carries the block itself. */
+const REPLACED_MEDIA = new Set(['IMG', 'VIDEO', 'AUDIO', 'IFRAME'])
+const BLOCK_STRUCTURE_SELECTOR =
+  '.ls-block, .block-main-container, .block-content-wrapper, .block-content, .block-body, .block-children'
+
+const collapsedContent = new Set()
+
+function controlHost(element) {
+  if (!REPLACED_MEDIA.has(element.tagName)) return element
+
+  const parent = element.parentElement
+  if (!parent) return null
+  /* Once the box around the media is the marked host it stays the host: the
+   * control's own label is text, and reading it back would answer the test
+   * below differently on the next pass. */
+  if (parent.getAttribute?.(COLLAPSIBLE_ATTR)) return parent
+  if (parent.matches?.(BLOCK_STRUCTURE_SELECTOR)) return null
+
+  /* Media set in a line of prose belongs to that line rather than standing as
+   * a box of its own. */
+  return (parent.textContent ?? '').trim() === '' ? parent : null
+}
+
+function controlOf(host) {
+  for (const child of host.children ?? []) {
+    if (child.matches?.(`[${CONTROL_ATTR}]`)) return child
+  }
+
+  return null
+}
+
+/* One control to a box. The outermost render of a nested pair carries it, so a
+ * quote inside an admonition, one line of a code block, or a block inside an
+ * embed never grows a second one. Only what this pass has marked counts, so a
+ * mark left by the pass before never suppresses a control. */
+function nestedInside(host, marked) {
+  for (let current = host.parentElement; current; current = current.parentElement) {
+    if (marked.has(current)) return true
+  }
+
+  return false
+}
+
+function ensureControl(host, key, label) {
+  const existing = controlOf(host)
+  const control = existing ?? doc.createElement('button')
+
+  if (!existing) {
+    control.setAttribute('type', 'button')
+    control.setAttribute(CONTROL_ATTR, '')
+
+    if (label) {
+      const word = doc.createElement('span')
+      word.setAttribute(CONTROL_LABEL_ATTR, '')
+      word.textContent = label
+      control.appendChild(word)
+    }
+
+    /* Last, so the rules Logseq and this theme write for a box's first child —
+     * a passage's reference line, an admonition's icon column — keep naming
+     * what they were written for. */
+    host.appendChild(control)
+  }
+
+  control.setAttribute(CONTROL_KEY_ATTR, key)
+  return control
+}
+
+function applyCollapse(host, control, collapsed) {
+  const name = CONTENT_NAMES.get(host.getAttribute(COLLAPSIBLE_ATTR)) ?? 'content'
+  const action = collapsed ? 'Expand' : 'Collapse'
+
+  control.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
+  control.setAttribute('aria-label', `${action} ${name}`)
+  control.setAttribute('title', `${action} ${name}`)
+
+  if (collapsed) host.setAttribute(COLLAPSED_ATTR, '')
+  else host.removeAttribute(COLLAPSED_ATTR)
+}
+
+function releaseCollapsible(host) {
+  controlOf(host)?.remove()
+  host.removeAttribute(COLLAPSIBLE_ATTR)
+  host.removeAttribute(COLLAPSED_ATTR)
+}
+
+/* Editing a block replaces its render with a textarea over the raw content, so
+ * there is normally no box left to fold. A code block keeps its editor inside
+ * the render, and this is what opens that one back up. */
+function editingBlock(host) {
+  const block = host.closest?.('.ls-block')
+  return Boolean(block?.querySelector?.('textarea.block-editor, textarea'))
+}
+
+function markCollapsible() {
+  const marked = new Set()
+  const counts = new Map()
+
+  for (const root of doc.querySelectorAll(MAIN_EDITOR_SELECTOR)) {
+    for (const element of root.querySelectorAll(RICH_CONTENT_SELECTOR)) {
+      const kind = contentKind(element)
+      if (!kind) continue
+
+      const host = controlHost(element)
+      /* A box already marked is the media inside it arriving at its own host a
+       * second time, and one inside a marked box is a render the box carries. */
+      if (!host || marked.has(host) || nestedInside(host, marked)) continue
+
+      const block = host.closest?.('.ls-block')
+      const scope = `${block ? blockUuid(block) : ''}:${kind.type}`
+      const seen = counts.get(scope) ?? 0
+      counts.set(scope, seen + 1)
+
+      host.setAttribute(COLLAPSIBLE_ATTR, kind.type)
+      marked.add(host)
+
+      const key = `${scope}:${seen}`
+      const control = ensureControl(host, key, kind.label)
+      applyCollapse(host, control, collapsedContent.has(key) && !editingBlock(host))
+    }
+  }
+
+  /* A box that is no longer rendered as one — a block being edited, a render
+   * Logseq has replaced — gives its control back. */
+  for (const host of doc.querySelectorAll(`[${COLLAPSIBLE_ATTR}]`)) {
+    if (!marked.has(host)) releaseCollapsible(host)
+  }
+}
+
+function collapseControl(event) {
+  return event.target?.closest?.(`[${CONTROL_ATTR}]`) ?? null
+}
+
+function toggleCollapsed(control) {
+  const key = control.getAttribute(CONTROL_KEY_ATTR) ?? ''
+  if (collapsedContent.has(key)) collapsedContent.delete(key)
+  else collapsedContent.add(key)
+
+  const host = control.parentElement
+  if (host) applyCollapse(host, control, collapsedContent.has(key))
+
+  /* The press was taken from the host below, which is where focus would have
+   * come from; handing it to the control keeps the keyboard on the box the
+   * reader just folded. */
+  control.focus?.()
+}
+
+/* The control sits inside a block's rendered content, where a click of
+ * Logseq's own opens the block for editing and a click on a bullet folds it.
+ * Taking both the press and the click in the capture phase, before React's
+ * root container sees either, is what keeps this control's fold to itself. */
+function toggleCollapse(event) {
+  const control = collapseControl(event)
+  if (!control) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  if (event.type === 'click') toggleCollapsed(control)
+}
+
+/* A button is operated with Enter and Space. Both are answered here rather
+ * than left to the click the host would synthesise, so neither key travels on
+ * to Logseq's own shortcut handling. */
+function toggleCollapseOnKey(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+
+  const control = collapseControl(event)
+  if (!control) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  toggleCollapsed(control)
+}
+
 async function refreshFromStoredSource(block) {
   const uuid = blockUuid(block)
   if (!uuid || typeof logseq.Editor?.getBlock !== 'function') return
@@ -312,6 +550,7 @@ function paint() {
     else block.removeAttribute(TYPE_ATTR)
   }
 
+  markCollapsible()
   addOpenMenuItem()
 }
 
@@ -393,6 +632,13 @@ function teardown() {
   observer?.disconnect()
   observer = null
   doc.removeEventListener('click', foldOnBulletClick, true)
+  doc.removeEventListener('mousedown', toggleCollapse, true)
+  doc.removeEventListener('click', toggleCollapse, true)
+  doc.removeEventListener('keydown', toggleCollapseOnKey, true)
+
+  collapsedContent.clear()
+  for (const host of doc.querySelectorAll(`[${COLLAPSIBLE_ATTR}]`)) releaseCollapsible(host)
+  for (const control of doc.querySelectorAll(`[${CONTROL_ATTR}]`)) control.remove()
 
   for (const item of doc.querySelectorAll(`[${OPEN_MENU_ATTR}]`)) item.removeAttribute(OPEN_MENU_ATTR)
   for (const table of doc.querySelectorAll(`[${HIDDEN_ATTR}]`)) table.removeAttribute(HIDDEN_ATTR)
@@ -414,6 +660,9 @@ function main() {
   logseq.beforeunload?.(async () => teardown())
   logseq.Editor.registerBlockContextMenuItem('Open', openBlock)
   doc.addEventListener('click', foldOnBulletClick, true)
+  doc.addEventListener('mousedown', toggleCollapse, true)
+  doc.addEventListener('click', toggleCollapse, true)
+  doc.addEventListener('keydown', toggleCollapseOnKey, true)
 
   /* childList/subtree only: this observer must not see its own attribute
    * writes, or every pass would schedule another one. */

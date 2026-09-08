@@ -151,6 +151,21 @@ there needs no patch of Logseq's; the collapse itself is
 the fold arrow calls. The listener is registered beside the observer and removed
 in the same teardown, so unloading returns the bullet to Logseq.
 
+The theme also adds nodes of its own rather than only attributes: each pass
+marks every render in `#main-content-container` that can be folded on its own
+with `data-hc-collapsible`, hangs one `data-hc-collapse` button inside it, and
+writes `data-hc-collapsed` on the boxes the reader has folded. The pass reads
+the editor in document order, so a box is always reached before anything it
+holds and only the outer of a nested pair takes a control; a marked host that no
+longer answers to any kind gives its control back in the same pass, which is
+what keeps the mutation observer from feeding itself. The folded state is a
+`Set` in the runtime keyed by the block's UUID, the kind of content and which
+one of that kind it is inside the block: nothing reaches the graph, and a
+re-render of the same page finds the same boxes again. Both the press and the
+click on a control are taken in the capture phase, so neither Logseq's
+edit-on-click nor the bullet fold above ever sees them, and `beforeunload`
+removes every control along with the attributes.
+
 ## Passage parser and local text
 
 `packages/passage/bible.js` is a classic browser script loaded before
