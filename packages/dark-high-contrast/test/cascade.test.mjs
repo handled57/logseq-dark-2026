@@ -314,6 +314,11 @@ const railMetrics = [
   '.bullet-container.as-order-list{justify-content:center;padding-left:3px;white-space:nowrap;width:22px}',
   '.block-control-wrap.is-order-list{margin-right:0;padding-right:0}',
   '.block-control-wrap.is-order-list .bullet-link-wrap{left:-3px;position:relative}',
+  /* The two upstream declarations the rail's bullet states answer: the halo a
+   * folded bullet is given, which is what marks it as folded, and the important
+   * fill hovering a bullet would otherwise put inside it. */
+  '.bullet-container:not(.typed-list).bullet-closed{background-color:var(--lx-gray-04-alpha,var(--ls-block-bullet-border-color,var(--rx-gray-04-alpha)))}',
+  '.bullet-link-wrap:hover>.bullet-container:not(.typed-list) .bullet{background-color:var(--lx-gray-08,var(--ls-block-bullet-color,var(--rx-gray-08)))!important;transform:scale(1.2)}',
   '#main-content-container{padding-left:2rem;padding-right:2rem}',
   '.editor-inner .h1.uniline-block,.ls-block h1{font-size:2em;min-height:1.5em}',
   '.editor-inner .h2.uniline-block,.ls-block h2{font-size:1.5em;min-height:1.5em}',
@@ -363,6 +368,10 @@ const block = `${scope} .ls-block:not(.block-content-wrapper *)`
 const row = `${block} > .block-main-container`
 const wrap = `${row} > .block-control-wrap`
 
+/* The two rows that open the rail: the page's first block, and the block under
+ * a page-properties block, which is the first one the reader wrote. */
+const railStart = `${block}:not(.ls-block *):not(.ls-block ~ .ls-block) > .block-main-container > .block-control-wrap::before, ${block}.pre-block:not(.ls-block *):not(.ls-block ~ .ls-block) ~ .ls-block:not(.block-content-wrapper *):not(.ls-block *):not(.ls-block ~ .ls-block ~ .ls-block) > .block-main-container > .block-control-wrap::before`
+
 /* Theme rules, as [selector, declarations], with selectors on one line. */
 const rules = new Map(
   [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)].map(([, selector, body]) => [
@@ -375,6 +384,18 @@ function rule(selector) {
   const body = rules.get(selector)
   assert.ok(body !== undefined, `no rule for "${selector}"`)
   return body
+}
+
+/* A selector with its functional pseudo-classes taken off, innermost first, so
+ * what a rule actually paints can be read off the end of it. */
+function plain(selector) {
+  let stripped = selector
+  let previous
+  do {
+    previous = stripped
+    stripped = stripped.replace(/:(?:has|not|is|where)\([^()]*\)/g, '')
+  } while (stripped !== previous)
+  return stripped
 }
 
 function value(body, property) {
@@ -457,7 +478,7 @@ test('the rail takes back exactly the indentation each nesting level applied', (
 
 /* The rail's hierarchy colors, in the ROYGBIV order it steps through, and the
  * guard the heading rules already qualify themselves by. */
-const spectrum = 7
+const spectrum = 8
 const headingGuard = ':not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)'
 
 /* The three rows that carry the hierarchy: a block Logseq marks as having
@@ -490,27 +511,29 @@ test('every nesting level takes the next color of the spectrum', () => {
     assert.equal(
       value(body, '--hc-rail-depth-color'),
       `var(--hc-rail-depth-${(depth % spectrum) + 1})`,
-      `nesting level ${depth + 1} is not the ${(depth % spectrum) + 1}${'st nd rd th th th th'.split(' ')[depth % spectrum]} color of the spectrum`
+      `nesting level ${depth + 1} is not the ${(depth % spectrum) + 1}${'st nd rd th th th th th'.split(' ')[depth % spectrum]} color of the spectrum`
     )
   }
 
-  // The spectrum itself is seven colors deep, and each one is a palette token
+  // The spectrum itself is eight colors deep, and each one is a palette token
   // rather than a literal written into the rail.
   for (let step = 1; step <= spectrum; step += 1) {
     assert.match(
       css,
       new RegExp(`\\n  --hc-rail-depth-${step}: var\\(--(?:vscode-)?hc-[\\w-]+\\);`),
-      `the spectrum has no ${step}${step === 1 ? 'st' : 'th'} color`
+      `the spectrum has no ${step}${step === 1 ? 'st' : step === 2 ? 'nd' : step === 3 ? 'rd' : 'th'} color`
     )
   }
-  assert.ok(!/--hc-rail-depth-8:/.test(css), 'the spectrum is longer than the seven colors the levels cycle through')
+  assert.ok(!/--hc-rail-depth-9:/.test(css), 'the spectrum is longer than the eight colors the levels cycle through')
 })
 
 test('a heading and a block with children take their depth color; ordinary prose does not', () => {
-  // Ordinary prose is unchanged: a white bullet on the rail's own cyan line.
+  // Ordinary prose keeps its white bullet, on the base rail line the theme's
+  // own setting paints — never on a hierarchy color.
   const defaults = rule(wrap)
-  assert.equal(value(defaults, '--hc-rail-line-color'), 'var(--vscode-hc-cyan)')
+  assert.equal(value(defaults, '--hc-rail-line-color'), 'var(--hc-rail-default-color)')
   assert.equal(value(defaults, '--hc-rail-bullet-color'), 'var(--vscode-hc-white)')
+  assert.equal(value(defaults, '--hc-rail-bullet-fill'), 'var(--hc-rail-bullet-color)')
 
   // A block that carries the hierarchy hands its depth's color to both, so its
   // bullet and the stretch of line it paints always agree.
@@ -528,33 +551,89 @@ test('a heading and a block with children take their depth color; ordinary prose
   // block's segment is painted in the same color as its own bullet.
   assert.equal(value(rule(`${wrap}::before, ${wrap}::after`), 'background-color'), 'var(--hc-rail-line-color)')
   const dot = rule(`${wrap} .bullet-container .bullet`)
-  assert.equal(value(dot, 'background-color'), 'var(--hc-rail-bullet-color)')
+  assert.equal(value(dot, 'background-color'), 'var(--hc-rail-bullet-fill)')
   assert.match(dot, /0 0 0 calc\(2px \* var\(--hc-rail-bullet-scale\)\) var\(--hc-rail-bullet-color\)/)
 
   // Every one of those colors is declared on a block's own control column,
   // which no descendant block sits inside: a child's segment takes the child's
   // depth, never the color of the parent holding it.
   for (const [selector, body] of rules) {
-    if (!/(?:^|;|\n)\s*--hc-rail-(?:depth|line|bullet)-color:/.test(body)) continue
+    if (!/(?:^|;|\n)\s*--hc-rail-(?:depth-color|line-color|bullet-color|bullet-fill):/.test(body)) continue
     for (const part of splitSelectors(selector)) {
       assert.ok(
-        part.endsWith('.block-control-wrap'),
+        plain(part).endsWith('.block-control-wrap'),
         `a hierarchy color is declared where a descendant block inherits it: "${part.slice(0, 60)}…"`
       )
     }
   }
 
-  // Pointing at the control column still fills the bullet the way it does
-  // everywhere outside the rail, which the colored bullet would otherwise
-  // out-rank.
+  // Pointing at a bullet leaves its inside alone: the same fill it is drawn
+  // with at rest, and `!important` because upstream repaints the inside from
+  // `.bullet-link-wrap:hover` with an important declaration of its own.
   assert.equal(
     value(rule(`${wrap}:hover .bullet-container .bullet`), 'background-color'),
-    'var(--vscode-hc-focus)'
+    'var(--hc-rail-bullet-fill) !important'
   )
   assert.ok(
     compare(specificity(`${wrap}:hover .bullet-container .bullet`), specificity(`${wrap} .bullet-container .bullet`)) > 0,
     'the bullet under the pointer does not out-rank its own depth color'
   )
+  assert.ok(
+    compare(
+      specificity(`${wrap}:hover .bullet-container .bullet`),
+      specificity('.bullet-link-wrap:hover > .bullet-container:not(.typed-list) .bullet')
+    ) > 0,
+    "the rail's hover does not out-rank the upstream fill it answers"
+  )
+})
+
+test('a block standing open is a ring; a folded or childless one is filled', () => {
+  // Logseq marks a block that has children with `haschild`, and closes the
+  // bullet of a folded one with `bullet-closed`. A bullet with the first and
+  // without the second is a block whose children are showing, and it gives up
+  // its inside while keeping the two colored rings around it.
+  const open = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap:has(.bullet-container:not(.bullet-closed))`
+  assert.equal(value(rule(open), '--hc-rail-bullet-fill'), 'transparent')
+
+  // Only the fill: the rings the bullet is drawn with are still its own color,
+  // so an open block reads as its depth's hue rather than disappearing.
+  assert.doesNotMatch(rule(open), /--hc-rail-(?:bullet|line|depth)-color:/)
+
+  // A collapsed block and a leaf are untouched, so the ring is the one state
+  // that is different rather than a new appearance for every bullet.
+  assert.ok(
+    compare(specificity(open), specificity(wrap)) > 0,
+    'the open block does not out-rank the fill it replaces'
+  )
+  assert.deepEqual(
+    [...rules.keys()].filter((selector) => selector.startsWith(scope) && selector.includes('.bullet-closed')),
+    [open],
+    'the rail names a folded bullet somewhere other than the guard that leaves it alone'
+  )
+})
+
+test('page properties carry no bullet and no rail, and the rail opens under them', () => {
+  // Logseq renders a page's properties as its first block and marks it
+  // `pre-block`, in view and while they are being typed.
+  const properties = `${scope} .ls-block:not(.block-content-wrapper *).pre-block > .block-main-container > .block-control-wrap`
+  assert.equal(value(rule(`${properties}::before, ${properties}::after`), 'display'), 'none')
+  assert.equal(value(rule(`${properties} .bullet-container`), 'visibility'), 'hidden')
+
+  // Both halves out-rank the rules that draw the line and reveal the bullet,
+  // which are the only ones they have to beat.
+  assert.ok(
+    compare(specificity(`${properties}::before`), specificity(`${wrap}::before`)) > 0,
+    'the property row still paints its stretch of rail'
+  )
+  assert.ok(
+    compare(specificity(`${properties} .bullet-container`), specificity(`${wrap} .bullet-container`)) > 0,
+    'the property row still shows a bullet'
+  )
+
+  // The rail opens at the first bullet under the properties rather than at the
+  // top of the page: the page's first block, and the block after a property
+  // block, both paint nothing above their own bullet.
+  assert.equal(value(rule(railStart), 'display'), 'none')
 })
 
 test("a bullet sits on the middle of its block's first line", () => {
@@ -679,10 +758,7 @@ test('the rail line runs from the first bullet to the end of the last block', ()
 
   // The rail starts at a bullet center: the first rendered block draws nothing
   // above its own bullet.
-  assert.match(
-    rule(`${block}:not(.ls-block *):not(.ls-block ~ .ls-block) > .block-main-container > .block-control-wrap::before`),
-    /display:\s*none/
-  )
+  assert.match(rule(railStart), /display:\s*none/)
   // It ends with the last rendered block rather than past it: that block's tail
   // stops at its own foot instead of overdrawing into the space below.
   assert.equal(
@@ -702,7 +778,7 @@ test('an ordered list keeps its number beside the content and a bullet on the ra
   // sized like every other bullet by the line it hangs beside.
   assert.equal(value(marker, 'width'), 'var(--hc-rail-bullet-size)')
   assert.equal(px(marker, 'padding-left'), 0)
-  assert.match(rule(`${wrap} .bullet-container.typed-list .bullet`), /background-color:\s*var\(--hc-rail-bullet-color\)/)
+  assert.match(rule(`${wrap} .bullet-container.typed-list .bullet`), /background-color:\s*var\(--hc-rail-bullet-fill\)/)
 
   // Logseq drops the gutter for an ordered list because its number is wider
   // than a bullet. The number is no longer there, so the gutter comes back and

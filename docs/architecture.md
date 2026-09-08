@@ -62,18 +62,49 @@ upstream declarations; change arithmetic, selectors, and cascade tests
 together.
 
 The rail also carries the hierarchy. `--hc-rail-depth-color` is declared once
-per nesting level beside that level's `--hc-rail-indent`, cycling the seven
-ROYGBIV tokens `--hc-rail-depth-1`…`--hc-rail-depth-7` so adjacent levels never
-share a hue and the spectrum starts again below the seventh. A row that carries
-the hierarchy — Logseq's own `haschild="true"`, which holds while a block is
-folded, or a first line that renders or is being typed as a heading — copies
-that color into `--hc-rail-line-color` and `--hc-rail-bullet-color`; every other
-row keeps the line's cyan and a white bullet. Both variables are declared on a
-block's own control column, which no descendant block sits inside, so a child's
-segment always takes the child's depth rather than its parent's. Two of the
-seven hues, `--hc-red` and `--hc-indigo`, are the theme's own additions to the
-VS Code palette; `test/theme.test.mjs` holds them to contrast against the canvas
-and separation from the levels beside them.
+per nesting level beside that level's `--hc-rail-indent`, cycling the eight
+ROYGBIV tokens `--hc-rail-depth-1`…`--hc-rail-depth-8` so adjacent levels never
+share a hue and the cycle starts again below the eighth — depth 9 is depth 1's
+magenta. A row that carries the hierarchy — Logseq's own `haschild="true"`,
+which holds while a block is folded, or a first line that renders or is being
+typed as a heading — copies that color into `--hc-rail-line-color` and
+`--hc-rail-bullet-color`; every other row keeps `--hc-rail-default-color` and a
+white bullet. Both variables are declared on a block's own control column, which
+no descendant block sits inside, so a child's segment always takes the child's
+depth rather than its parent's. All eight hues are the rail's own additions to
+the VS Code palette, chosen to stay apart under the common color vision
+deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
+pins each literal, its position in the cycle, and the 3:1 a non-text interface
+component owes the canvas.
+
+The bullet's inside is a fourth variable, `--hc-rail-bullet-fill`, which follows
+`--hc-rail-bullet-color` everywhere except on a block whose children are
+showing: `[haschild="true"]` with a `.bullet-container` Logseq has not marked
+`.bullet-closed` sets the fill to `transparent`, so an open block is a ring, a
+folded one stays filled, and a leaf is unchanged. Both the rest state and the
+hover state paint from that one variable, the hover with `!important`, because
+upstream repaints a hovered bullet's inside from `.bullet-link-wrap:hover` with
+an important declaration of its own; the halo and the scale it adds are left
+alone.
+
+`--hc-rail-default-color` is the base line, and the only part of the rail a
+reader configures. theme.css declares it as `--vscode-hc-border`, the structural
+border the editor, the left menu and the sidebars are drawn with, and `index.js`
+writes the **Default rail color** setting over it as an inline custom property,
+so it out-ranks the stylesheet without depending on the order the theme and its
+entry are loaded in. That inline style goes on `body`, not on the root element:
+the palette's selector list includes `html[data-theme][data-color]:root body`,
+so on a graph with an accent set the body re-declares every palette variable and
+a value inherited from `html` never reaches a block. The eight depth colors are
+not the setting's to change.
+
+The rail is the page's own tree and nothing above it. Logseq renders a page's
+properties as its first block, marked `pre-block` in view and while they are
+being typed; that row keeps its place in the column so the content column does
+not shift, and gives up its bullet and both ends of its line. The rail therefore
+opens at the first bullet under the properties, which is why two selectors
+suppress the upward segment: the page's first block, and the block following a
+`pre-block` first block.
 
 Because the rail paints its line behind the bullets, each row is its own
 stacking context. That matters to the editor's popups: Logseq opens the `/`

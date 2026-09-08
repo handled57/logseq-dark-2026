@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented here.
 
+## 2.4.0 - 2026-09-07
+
+- Repaint the bullet rail's hierarchy in eight colors instead of seven:
+  `#dc267f` magenta, `#ea5c00` orange, `#994f00` brown, `#ffb000` amber,
+  `#40b0a6` teal, `#75beff` blue, `#b180d7` indigo and `#b66dff` violet, one
+  per nesting level in that order. The cycle repeats every eight levels — a
+  depth-9 block is magenta again — and the eight are chosen to stay apart from
+  one another for a reader with a common color vision deficiency, which the
+  previous seven-hue spectrum did not. `--hc-red` and `--hc-indigo` are
+  replaced by the eight `--hc-rail-*` hue tokens the depths read through.
+- Add a **Default rail color** setting for the base rail line: the color a
+  block that carries no hierarchy of its own — ordinary prose, rather than a
+  heading or a block with children — paints its stretch of rail with. It
+  defaults to `#5b7e96`, the `--vscode-hc-border` the editor, the left menu and
+  the sidebars are drawn with, replacing the cyan that line used to take.
+  Leaving it empty keeps that border color, and the eight hierarchy colors are
+  unaffected by it.
+- Draw a block whose children are showing as an empty ring, so a bullet says at
+  a glance whether anything is folded away under it. A collapsed block and a
+  block with no children of its own keep the bullet they had.
+- Keep a bullet's inside its own color while the pointer is on it. Logseq
+  repaints it in the stock bullet gray on hover, which took a depth's color off
+  the one bullet being looked at; the halo and the slight growth it adds are
+  unchanged.
+- Start the rail at the first block of a page's own text. A page's properties
+  are its front matter rather than a block of it, so that row now renders with
+  no bullet and no rail segment, in view and while the properties are being
+  typed, and nothing is drawn above the first content bullet.
 ## 2.3.1 - 2026-09-07
 
 - Keep the `/` command menu above the children of the block it is opened in.
