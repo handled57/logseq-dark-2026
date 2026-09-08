@@ -160,6 +160,7 @@ test('the command script reads the host document and namespaces what it writes',
   assert.match(script, /parent\.document/)
   assert.match(script, /logseq\.ready\(main\)/)
   assert.match(script, /registerSlashCommand/)
+  assert.match(script, /registerCommandPalette/)
 
   /* Observing attributes would make each pass schedule the next one, and the
    * sandbox iframe is never rendered, so its own rAF never fires. */

@@ -202,6 +202,7 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
   const provided = []
   const observers = []
   const commands = []
+  const paletteCommands = []
   const updates = []
   const edits = []
   const exits = []
@@ -270,6 +271,12 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
       provided,
       observers,
       unloads,
+      App: {
+        paletteCommands,
+        registerCommandPalette(command, action) {
+          paletteCommands.push({ command, action })
+        }
+      },
       Editor: {
         commands,
         updates,
@@ -443,7 +450,7 @@ test('the slash command writes the passage source and leaves the cursor on the w
   await Promise.resolve()
 
   const [command] = context.logseq.Editor.commands
-  assert.equal(command.name, 'Passage')
+  assert.equal(command.name, 'Passage: Insert a passage')
 
   await invoke(context, () => command.action())
 
@@ -452,6 +459,24 @@ test('the slash command writes the passage source and leaves the cursor on the w
   assert.equal(host.querySelector('textarea').selectionStart, WRITING_LINE)
   // The cursor sits at the start of the blank line, with the terminator below.
   assert.equal(PASSAGE_BLOCK.slice(WRITING_LINE), '\n#+END_PASSAGE')
+})
+
+test('the command palette registers a stable Passage command and uses the insertion flow', async () => {
+  const value = 'keep this text'
+  const { context } = commandContext({ value })
+  await Promise.resolve()
+
+  const [palette] = context.logseq.App.paletteCommands
+  assert.equal(palette.command.key, 'passage.insert-passage')
+  assert.equal(palette.command.label, 'Passage: Insert a passage')
+
+  await invoke(context, () => palette.action())
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    `${PASSAGE_PROPERTIES}\n${value}\n${PASSAGE_SOURCE}`
+  )
+  assert.equal(context.logseq.Editor.commands.length, 1, 'the slash command was replaced')
 })
 
 test('the passage becomes the value saved by the existing edit session', async () => {
@@ -580,7 +605,7 @@ test('the angle-bracket picker gains exactly one Passage entry, however often it
 
   const entries = () => menu.querySelectorAll('[data-passage-command]')
   assert.equal(entries().length, 1)
-  assert.equal(entries()[0].textContent, 'Passage')
+  assert.equal(entries()[0].textContent, 'Passage: Insert a passage')
   // Cloned from the host's own entry, so it inherits the popup's markup.
   assert.equal(entries()[0].classList.has('menu-link'), true)
 

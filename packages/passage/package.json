@@ -1,6 +1,6 @@
 {
   "name": "logseq-passage",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Insert a Bible passage into a Logseq block, with a canonical reference, per-chapter tags and text from a local index.",
   "author": "Peter Cole",
   "license": "MIT",
