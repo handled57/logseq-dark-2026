@@ -227,7 +227,7 @@ The emoji is not moved, copied or replaced. It is still the first character of t
 
 - What counts as the icon is one emoji grapheme, however many code points it takes: a variation selector, a skin tone, a flag, a keycap and a ZWJ sequence like 👩‍💻 are each one icon.
 - A character that only becomes an emoji when it is asked to — `©`, `™`, a bare `❤` — stays text.
-- Whitespace between the emoji and the text is part of neither: the text begins in the same column whether it is separated by one space or three.
+- The space between the emoji and the text is not part of the icon. The gutter is one emoji and the single space that ordinarily follows it, so the text begins in the block's own column. Several literal spaces are still rendered as they are written, exactly as Logseq renders them without this feature — the theme adds no indent of its own.
 - An emoji anywhere else in the line stays inline, and a block that opens with anything else is untouched.
 - A block that renders as something with an icon or a layout of its own — an admonition, a passage, a code block, a query, an embed, a piece of media — keeps that structure; a leading emoji never overrides it.
 - The bullet on the rail is Logseq's own and is left alone. Folding, hovering, clicking, dragging and the hierarchy colors all behave as they did.
