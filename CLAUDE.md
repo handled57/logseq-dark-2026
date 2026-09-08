@@ -11,13 +11,14 @@ The root `package.json` is a private coordinator: it declares `workspaces: ["pac
 Paths below are relative to `packages/dark-high-contrast/` unless noted.
 
 - `theme.css` is the canonical stylesheet.
-- `index.js` is the canonical entry script for property-table hiding and `data-hc-block-type` annotations.
+- `index.js` is the canonical entry script for property-table hiding, `data-hc-block-type` annotations, and the collapse control it hangs on every foldable render.
 - `index.html` loads the entry script.
 - `../../vendor/logseq/lsplugin.user.js` is the one canonical vendored Logseq SDK file. Root release tooling copies it into each archive as `lib/lsplugin.user.js`; source workspaces do not contain `lib/`.
 - `package.json` and `manifest.json` define package and Marketplace metadata.
 - `test/theme.test.mjs` checks package structure, workspace layout, required selectors, palette values, accessibility, and release metadata.
 - `test/cascade.test.mjs` checks selector specificity against pinned Logseq CSS behavior.
 - `test/properties.test.mjs` behaviorally tests `index.js` against a stub host document.
+- `test/collapsible.test.mjs` drives the same entry over a stub page tree for the collapse control: which renders earn one, where it is hung, and that folding one touches nothing else.
 - `../anno/index.js` is Anno's canonical runtime: the **Anno: Import PDF** command, its prompt, and the asset-naming rule that decides which page Logseq collects a PDF's highlights on. `../anno/test/package.test.mjs` checks its structure and metadata; `../anno/test/anno.test.mjs` drives that runtime against a stub host document and file bridge.
 - Each package's `package.json#release.files` is its exact package-owned archive allowlist.
 - Root `scripts/build-release.mjs` creates extracted packages and Marketplace ZIPs in root `dist/`; aggregate builds clean once and targeted workspace builds remove only their own outputs.
@@ -49,6 +50,7 @@ Read the package's `README.md` and `CHANGELOG.md` before changing public behavio
 - The rail reaches `#main-content-container .page-blocks-inner .content:not(.doc-mode)` only, excludes blocks inside a `.block-content-wrapper` (embeds, queries, references), and steps aside for `main.ls-fold-button-on-right` and document mode, both of which re-measure that indentation. Sidebars, whiteboards, and dialogs render outside the scope.
 - A block that carries the hierarchy — one Logseq marks `haschild="true"`, or one whose first line renders or is typed as a heading — takes the colour of its own depth for its bullet and for its stretch of the rail: `--hc-rail-depth-1` to `--hc-rail-depth-7` in ROYGBIV order, red at the top level, repeating below the seventh. Every other block keeps `--vscode-hc-cyan` and a white bullet. Both colours are declared on the block's own control column, so a child's segment never takes its parent's.
 - Untyped bullets are always visible for ordinary prose blocks. Structural and special blocks, including `src`, `center`, and `verse`, are marked with `data-hc-hide-bullet` and remain bulletless in every interaction state *outside the rail*; on the rail they show a bullet like any other block. Child hover never reveals ancestor bullets. Nested connector/thread lines remain transparent — the rail replaces them.
+- Every render in the main editor that can be read on its own — a named admonition, a passage, a table, a quote, a code block, a math block, a piece of media, a block or page embed — carries one `data-hc-collapse` button, hung inside the outermost box of a nested pair and last among its children. Folding is display-only: no block is collapsed, no descendant is unrendered, and nothing is written to the graph. The state lives in the runtime, keyed by block UUID, kind and ordinal, so every box opens expanded and a re-render finds it again. A folded box hides what it holds rather than removing it from the layout, and a block being edited shows the whole of its content.
 - Keep proportional typography for notes and monospace limited to code and keyboard-oriented UI.
 - Property rules are case-insensitive `key: value` pairs separated by commas, semicolons, or newlines. Matching any pair hides the table. Bare keys and `key: *` are wildcards. Configuration order determines the `data-hc-block-type` precedence.
 - Do not claim a visual behavior is confirmed from source or automated tests alone. Render in Logseq or an appropriate browser fixture when visual acceptance matters, and state clearly when that check was not possible.

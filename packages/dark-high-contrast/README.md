@@ -17,6 +17,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../passage) plugin's job, and the theme does not require it.
 - Sizes named-admonition and passage icons at 1.5 times the first line's font and aligns them with that line while their semantic divider continues through the full block height.
+- Folds a long rendered box — an admonition, a passage, a table, a quote, a code block, a math block, a piece of media, a block or page embed — on a control of its own, without folding the block that holds it or touching a line of its source.
 - Left-clicking a block bullet expands or collapses that block rather than opening it. Shift-click still opens the block in the sidebar, and right-clicking offers **Open**, immediately above **Open in sidebar**, to open the block in the main editor.
 - No build runtime, tracking, remote imports, or network access.
 
@@ -176,6 +177,24 @@ These values cannot have a single fixed swatch:
 - `inherit` and `currentColor` reuse the surrounding foreground; the pinned admonition uses `currentColor` for its icon and divider.
 - In Windows forced-colors mode, `Canvas`, `CanvasText`, `LinkText`, `Highlight`, and `HighlightText` defer to the user's operating-system contrast palette.
 
+## Folding a rendered box
+
+Every rendered box in the main editor that can be read on its own carries a small expand/collapse control in its top right corner: named admonitions and passage blocks, tables, quotes, code blocks, math blocks, rendered media, and block and page embeds. Pressing it folds that one box away.
+
+This is not the bullet's fold. The block keeps its properties and its children, no descendant is unrendered, and nothing is written to the graph — clicking into the block still shows the whole of its source, exactly as it is written. Every box opens expanded, each one answers only for itself, and a fold lasts as long as the graph is open.
+
+What a folded box keeps:
+
+| Box | Folded |
+| --- | --- |
+| Named admonition | Its icon and divider, and the first line of its text |
+| Passage | Its icon and divider, and the reference line |
+| Table | Its head, or its first row where the markup writes none, in the same columns |
+| Quote | Its panel and its edge, at one line's height |
+| Code block, math block, media, block/page embed | A one-line box carrying the word for what is inside it |
+
+The control is a button: it takes Tab, answers Enter and Space, and shows the theme's orange focus ring. Pressing it never opens the block for editing and never folds the block the way its bullet does. Boxes rendered outside the main editor — in the sidebars, in a whiteboard, in a dialog — are left exactly as Logseq draws them, and where one box holds another, only the outer one takes a control.
+
 ## Hiding properties by property value
 
 Blocks whose rendered properties match any one of the configured `key: value` pairs render as bare content: the whole property table is hidden. Clicking into such a block still shows its content *and* its properties as source, because Logseq replaces the entire rendered block with a textarea over the raw block content, and custom properties are part of that content — nothing needs to be un-hidden.
@@ -299,6 +318,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 - The active block receives a steel-blue outline; hovering a child never reveals or recolors ancestor bullets, and Logseq's connector/thread lines remain hidden — the rail replaces them.
 - A block nested deeper than twelve levels hangs from the twelfth level's position rather than its own.
 - An admonition centres a short text against its icon, so its bullet marks the head of its box rather than that first line.
+- A folded rendered box hides what it holds outright rather than scrolling it, so nothing of it overflows the box and no space is left standing for it. A code block's editor is hidden rather than removed from the layout, because one measured while it was out of the layout comes back blank.
 
 ## Development
 

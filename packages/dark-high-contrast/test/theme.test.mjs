@@ -672,6 +672,87 @@ test('a visible property table renders below the admonition or passage it names'
   }
 })
 
+/* Collapsible rich content. `collapsible.test.mjs` drives the script that marks
+ * a box and hangs its control; these are the rules about what a folded one
+ * shows, and about the control being reachable and visible while it does. */
+test('a folded box shows a line of itself, or its own shell, and never both', () => {
+  const shells = ['quote', 'code', 'math', 'media', 'embed']
+  const shellScope = shells
+    .map((type) => `\\[data-hc-collapsible="${type}"\\]`)
+    .join(',\\s*')
+
+  // Every shell folds to one line's height and clips what it holds, so no
+  // hidden line overflows it and no space is left standing for one.
+  assert.match(
+    css,
+    new RegExp(`\\[data-hc-collapsed\\]:is\\(\\s*${shellScope}\\s*\\) \\{[\\s\\S]*?height:\\s*var\\(--hc-collapsed-shell-height\\)\\s*!important;[\\s\\S]*?max-height:\\s*var\\(--hc-collapsed-shell-height\\)\\s*!important;[\\s\\S]*?overflow:\\s*hidden\\s*!important`)
+  )
+  // Hidden rather than removed: a code editor measured while it was
+  // `display: none` comes back blank.
+  assert.match(
+    css,
+    new RegExp(`\\[data-hc-collapsed\\]:is\\(\\s*${shellScope}\\s*\\) > \\*:not\\(\\[data-hc-collapse\\]\\) \\{\\s*\\n\\s*visibility:\\s*hidden;`)
+  )
+
+  // A code block, a math box and a piece of media are drawn by what is inside
+  // them, so a folded one is given a box of the theme's own; without it the
+  // shell would be a button standing on the canvas.
+  assert.match(
+    css,
+    /\[data-hc-collapsed\]:is\(\s*\[data-hc-collapsible="code"\],\s*\[data-hc-collapsible="math"\],\s*\[data-hc-collapsible="media"\]\s*\) \{[\s\S]*?background:\s*var\(--vscode-hc-panel\)\s*!important;[\s\S]*?border:\s*1px solid var\(--vscode-hc-border\)\s*!important;/
+  )
+
+  // An admonition keeps its icon and one clamped line of what it says; a
+  // passage keeps its own first line and drops the rest of its paragraphs.
+  assert.match(
+    css,
+    /\[data-hc-collapsed\]\[data-hc-collapsible="admonition"\] > :not\(\.admonition-icon\):not\(\[data-hc-collapse\]\) \{[\s\S]*?-webkit-line-clamp:\s*1;/
+  )
+  assert.match(
+    css,
+    /\[data-hc-collapsed\]\[data-hc-collapsible="passage"\] > :not\(\[data-hc-collapse\]\) \{\s*\n\s*display:\s*none;/
+  )
+  assert.match(
+    css,
+    /\[data-hc-collapsed\]\[data-hc-collapsible="passage"\] > :first-child \{[\s\S]*?-webkit-line-clamp:\s*1;/
+  )
+
+  // A table keeps its head, or its first row where the markup writes no head.
+  // The rows that go are taken out of the table, so the row left behind keeps
+  // the column widths it was laid out in.
+  for (const rows of [
+    'thead tr:not(:first-child)',
+    'thead ~ tbody tr',
+    'tbody tr:not(:first-child)'
+  ]) {
+    assert.ok(
+      css.includes(`[data-hc-collapsed][data-hc-collapsible="table"] ${rows}`),
+      `a folded table does not hide ${rows}`
+    )
+  }
+
+  // The passage's own last-child rule names a paragraph; the control is the
+  // box's last child wherever one is hung, so the rule needs the one before it.
+  assert.match(
+    css,
+    /\.block-body > \.passage:has\(> \[data-hc-collapse\]\) > :nth-last-child\(2\) \{\s*\n\s*margin-bottom:\s*0;/
+  )
+})
+
+test('the collapse control is visible, focusable and in the theme palette', () => {
+  // Drawn at all times rather than on hover, so the affordance can be found,
+  // and never faint once the box it belongs to is the only thing left.
+  assert.match(css, /\[data-hc-collapse\] \{[\s\S]*?position:\s*absolute;[\s\S]*?color:\s*var\(--vscode-hc-white\);[\s\S]*?background:\s*var\(--vscode-hc-black\);[\s\S]*?border:\s*1px solid var\(--vscode-hc-border\);/)
+  assert.match(css, /\[data-hc-collapsible\]:hover > \[data-hc-collapse\],[\s\S]*?\[data-hc-collapse\]:focus-visible \{\s*\n\s*opacity:\s*1;/)
+  assert.match(css, /\[data-hc-collapse\]:focus-visible \{\s*\n\s*outline:\s*2px solid var\(--vscode-hc-focus\);/)
+  // The platform repaints the control in forced colors; the resting dimming is
+  // what it cannot undo.
+  assert.match(css, /forced-colors:\s*active\)\s*\{[\s\S]*?\[data-hc-collapse\] \{\s*\n\s*opacity:\s*1;/)
+  // Nothing about the fold animates, so there is nothing for reduced motion to
+  // turn off beyond the blanket rule the theme already carries.
+  assert.doesNotMatch(css, /\[data-hc-collapse[^\]]*\][^{]*\{[^}]*(?:transition|animation):/)
+})
+
 test('workbench chrome is bordered in the contrast border, not white', () => {
   // Panes, panels, sidebars and controls all draw their edges with
   // --vscode-hc-border. Two declarations use a border property to paint

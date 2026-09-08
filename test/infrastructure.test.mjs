@@ -34,6 +34,13 @@ test('shared host fixture models host descendants and event delivery', () => {
   assert.equal(host.querySelector('.menu-link'), child)
   child.dispatch('click')
   assert.equal(clicked, true)
+
+  /* `closest` walks the fixture's own parent chain, starting at the element
+   * itself, the way a host document's does. */
+  const inner = child.appendChild(node('span'))
+  assert.equal(inner.closest('.menu-link'), child)
+  assert.equal(child.closest('.menu-link'), child)
+  assert.equal(inner.closest('.nothing-here'), null)
 })
 
 test('repository documentation covers package ownership and independent migration', async () => {
