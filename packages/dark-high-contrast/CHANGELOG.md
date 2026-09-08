@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here.
 
+## 2.5.0 - 2026-09-08
+
+- Set the emoji a block opens with in a gutter of its own, left of the block's
+  text, so it reads as that block's icon. `📌 Important note` renders the pin
+  beside the text rather than in it, and a line long enough to wrap comes back
+  to the text's column instead of under the pin. The emoji is not moved, copied
+  or replaced: it is still the first character of the block's source and of the
+  text the block renders, clicking in shows the line as it was typed, and
+  nothing is written to the graph. One emoji grapheme is one icon however many
+  code points it takes — a variation selector, a skin tone, a flag, a keycap or
+  a ZWJ sequence — while a character that is only an emoji when asked, `©` or a
+  bare `❤`, stays text. A block that renders as an admonition, a passage, a
+  code block, a query, an embed or a piece of media keeps its own icon and
+  layout, and Logseq's bullet is untouched. Add a **Leading emoji as a block
+  icon** setting, on by default, that puts every emoji back in its line when it
+  is turned off, and `--hc-block-icon-gutter`, `1.5em`, for a graph that wants
+  the gutter retuned from `custom.css`.
+
 ## 2.4.0 - 2026-09-07
 
 - Repaint the bullet rail's hierarchy in eight colors instead of seven:

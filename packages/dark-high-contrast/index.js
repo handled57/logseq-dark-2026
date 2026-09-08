@@ -22,6 +22,11 @@
  * no block is collapsed by it, no descendant is unrendered, and nothing is
  * written to the graph.
  *
+ * It also reads a block that opens with an emoji and marks it, so theme.css can
+ * set that one emoji in a gutter of its own beside the block's text. Only the
+ * mark is written: the emoji stays where the reader typed it, in the block's
+ * source and in its rendered text.
+ *
  * It also takes over the block bullet's left click. Logseq routes that click to
  * the block's own page; here it folds the block instead, the way the arrow
  * beside the bullet does, and opening a block in the main editor moves to the
@@ -42,6 +47,7 @@ const HIDDEN_ATTR = 'data-hc-hidden'
 const TYPE_ATTR = 'data-hc-block-type'
 const BULLET_ATTR = 'data-hc-hide-bullet'
 const VERSE_ATTR = 'data-hc-verse-lines'
+const ICON_ATTR = 'data-hc-block-icon'
 const OPEN_MENU_ATTR = 'data-hc-open-block'
 const BULLET_SELECTOR = '.bullet-link-wrap, .bullet-container'
 /* Whiteboard bullets carry gestures of their own — a portal shape, a shape
@@ -90,6 +96,14 @@ const RAIL_COLOR_SETTING = 'defaultRailColor'
 const DEFAULT_RAIL_COLOR = '#5B7E96'
 const RAIL_COLOR_PROPERTY = '--hc-rail-default-color'
 
+/* Leading-emoji block icons. A block whose text opens with one emoji has that
+ * emoji set in a gutter to the left of the text, the way a passage sets a verse
+ * number, so it reads as the block's icon. Nothing is rewritten: the emoji is
+ * still the first character of the block's source and of its rendered text, and
+ * the gutter is a hanging indent theme.css draws around it. */
+const BLOCK_ICONS_SETTING = 'blockIcons'
+const DEFAULT_BLOCK_ICONS = true
+
 const settingsSchema = [
   {
     key: RULES_SETTING,
@@ -113,6 +127,17 @@ const settingsSchema = [
       'ordinary prose, rather than a heading or a block with children. Defaults to the border ' +
       'color used around the editor, the left menu and the sidebars. Leave empty to keep that ' +
       'border color. The eight colors the hierarchy itself cycles through are unaffected.'
+  },
+  {
+    key: BLOCK_ICONS_SETTING,
+    type: 'boolean',
+    default: DEFAULT_BLOCK_ICONS,
+    title: 'Leading emoji as a block icon',
+    description:
+      'Set the emoji a block opens with in a gutter of its own, left of the block text, so it ' +
+      'reads as that block\u2019s icon and the lines below it stay in one column. The emoji is ' +
+      'left exactly as it is written: nothing is added to the graph, and turning this off puts ' +
+      'the emoji back in the line.'
   }
 ]
 
@@ -121,6 +146,13 @@ const settingsSchema = [
 function readSetting(key, fallback) {
   const value = logseq.settings?.[key]
   return typeof value === 'string' ? value.trim().toLowerCase() : fallback
+}
+
+/* Logseq stores a checkbox setting as a real boolean once the schema is
+ * written; anything else means the graph has not answered it yet. */
+function readFlag(key, fallback) {
+  const value = logseq.settings?.[key]
+  return typeof value === 'boolean' ? value : fallback
 }
 
 /* Rules are matched against the rendered table, which is lower-cased, so both
@@ -223,19 +255,22 @@ function propertyFreeText(wrapper) {
 
 const PROPERTY_LINE = /^[\w.-]+::(?:\s|$)/
 
-/* A block's property drawer sits at the top of its content, so a marker such as
- * `#+BEGIN_PASSAGE` only opens the block once those lines are stepped over — a
- * passage carries `type:: Passage` above its own marker. A block that is
- * nothing but properties is special in its own right. */
-function specialSource(text) {
-  if (!text) return true
-
+/* A block's property drawer sits at the top of its content, so everything that
+ * reads what the block itself opens with steps over those lines first — a
+ * passage carries `type:: Passage` above its own `#+BEGIN_PASSAGE`. */
+function contentLines(text) {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
   let start = 0
   while (start < lines.length && PROPERTY_LINE.test(lines[start])) start += 1
-  if (start === lines.length) return true
+  return lines.slice(start)
+}
 
-  const body = lines.slice(start).join('\n')
+/* A block that is nothing but properties is special in its own right. */
+function specialSource(text) {
+  if (!text) return true
+
+  const body = contentLines(text).join('\n')
+  if (!body) return true
 
   return /^(?:#{1,6}\s|>|```|~~~|\$\$|#\+BEGIN_)/i.test(body) ||
     /^(?:\(\([^\n]+\)\)|\[\[[^\n]+\]\])$/.test(body) ||
@@ -304,6 +339,62 @@ function versesOpenLines(text) {
 function setVerseLines(block, hanging) {
   if (hanging) block.setAttribute(VERSE_ATTR, '')
   else block.removeAttribute(VERSE_ATTR)
+}
+
+/* One emoji as a reader sees it, rather than the code points it is written
+ * with: a pictograph, optionally carrying a variation selector and a skin-tone
+ * modifier; a two-letter flag; a keycap; a tag sequence such as a regional
+ * flag; and any chain of those joined by zero-width joiners. Matching the whole
+ * cluster is what keeps a family, a flag or a toned hand from being split.
+ *
+ * The pictograph is required to be an emoji rather than a symbol set in text:
+ * `\p{Emoji_Presentation}` is the character that is drawn as an emoji on its
+ * own, and `\p{Extended_Pictographic}\uFE0F` the one that is only drawn as an
+ * emoji when a variation selector asks for it. A block opening with `©`, `™` or
+ * a bare `❤` therefore keeps the text it renders as. */
+const EMOJI_TAG_SEQUENCE = '\\u{1F3F4}[\\u{E0020}-\\u{E007E}]+\\u{E007F}'
+const EMOJI_FLAG = '[\\u{1F1E6}-\\u{1F1FF}]{2}'
+const EMOJI_KEYCAP = '[0-9#*]\\uFE0F?\\u20E3'
+const EMOJI_PICTOGRAPH =
+  '(?:\\p{Emoji_Presentation}\\uFE0F?|\\p{Extended_Pictographic}\\uFE0F)[\\u{1F3FB}-\\u{1F3FF}]?'
+const EMOJI_ELEMENT =
+  `(?:${EMOJI_TAG_SEQUENCE}|${EMOJI_FLAG}|${EMOJI_KEYCAP}|${EMOJI_PICTOGRAPH})`
+const LEADING_EMOJI = new RegExp(`^${EMOJI_ELEMENT}(?:\\u200D${EMOJI_ELEMENT})*`, 'u')
+
+/* The emoji a block's own text opens with, or nothing. Only the first line is
+ * read, and only its very first character: an emoji anywhere else is a word of
+ * the block and stays in the line. */
+function leadingIcon(text) {
+  const match = LEADING_EMOJI.exec(contentLines(text)[0] ?? '')
+  return match ? match[0] : ''
+}
+
+/* A render that carries an icon or a layout of its own — an admonition, a
+ * passage, a code block, a query, an embed, a piece of media — keeps them. The
+ * source is answered first, which is what excludes a heading, a quote or a
+ * `#+BEGIN_` block: none of those opens with the emoji. This catches the rest,
+ * where the marker is inside a line that does. */
+function renderedSpecial(block) {
+  const wrapper = block.querySelector(':scope > .block-main-container > .block-content-wrapper')
+  if (!wrapper) return true
+  if (typeof wrapper.matches === 'function' && wrapper.matches(SPECIAL_CONTENT_SELECTOR)) return true
+  return Boolean(wrapper.querySelector(SPECIAL_CONTENT_SELECTOR))
+}
+
+function blockIcon(block, source) {
+  if (!readFlag(BLOCK_ICONS_SETTING, DEFAULT_BLOCK_ICONS)) return ''
+
+  const icon = leadingIcon(source)
+  if (!icon || specialSource(source) || renderedSpecial(block)) return ''
+  return icon
+}
+
+/* The emoji itself is the value, so the mark says what it was read from. Only
+ * theme.css keys on it; nothing here draws the icon, because the one in the
+ * block's text is the icon. */
+function setBlockIcon(block, icon) {
+  if (icon) block.setAttribute(ICON_ATTR, icon)
+  else block.removeAttribute(ICON_ATTR)
 }
 
 /* Collapsible rich content -------------------------------------------------
@@ -550,6 +641,7 @@ async function refreshFromStoredSource(block) {
     const source = stored.content.trim()
     setBulletVisibility(block, specialSource(source) || shouldHideBullet(block))
     setVerseLines(block, versesOpenLines(source))
+    setBlockIcon(block, blockIcon(block, source))
   } catch (error) {
     sourceCache.delete(uuid)
     console.warn('Dark High Contrast could not classify block source', uuid, error)
@@ -571,8 +663,13 @@ function paint() {
 
   applyRailColor()
 
+  /* Turning the setting off answers here as well as in the pass below, so a
+   * block whose source cannot be read back still gives its mark up. */
+  const icons = readFlag(BLOCK_ICONS_SETTING, DEFAULT_BLOCK_ICONS)
+
   for (const block of doc.querySelectorAll('.ls-block')) {
     setBulletVisibility(block, shouldHideBullet(block))
+    if (!icons) setBlockIcon(block, '')
     void refreshFromStoredSource(block)
   }
 
@@ -687,6 +784,7 @@ function teardown() {
   for (const table of doc.querySelectorAll(`[${HIDDEN_ATTR}]`)) table.removeAttribute(HIDDEN_ATTR)
   for (const block of doc.querySelectorAll(`[${BULLET_ATTR}]`)) block.removeAttribute(BULLET_ATTR)
   for (const block of doc.querySelectorAll(`[${VERSE_ATTR}]`)) block.removeAttribute(VERSE_ATTR)
+  for (const block of doc.querySelectorAll(`[${ICON_ATTR}]`)) block.removeAttribute(ICON_ATTR)
   for (const block of doc.querySelectorAll(`[${TYPE_ATTR}]`)) block.removeAttribute(TYPE_ATTR)
 }
 
