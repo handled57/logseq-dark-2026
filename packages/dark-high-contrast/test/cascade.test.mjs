@@ -797,11 +797,31 @@ test('the slash-command menu is opaque and paints over the blocks below it', () 
 
   // The lift is on the block rather than the row because the block is already
   // positioned: a row given `position: relative` would become the containing
-  // block the popup is measured from and move it.
+  // block every absolutely positioned thing inside it is measured from,
+  // including the fold arrow Logseq hangs off the block on the right-hand
+  // layout.
   assert.doesNotMatch(rule(lift), /position:/)
   assert.ok(
     [...rules].some(([selector, body]) => selector.endsWith('> .block-main-container') && /isolation:\s*isolate/.test(body)),
     'the row no longer isolates the rail, so the popup no longer needs lifting with the block'
+  )
+
+  // Lifting the block takes its children up with it, so the last thing left
+  // painting over the popup is the edited block's own subtree: the row
+  // isolates without being positioned, which orders it against the block's
+  // positioned descendants by tree order, and Logseq's children container
+  // comes after it. Ordering the children under the row settles that, off the
+  // same `:has()` as the lift, so the block is always the stacking context
+  // holding them and they go back no further than it.
+  const children = `${lift} > .block-children-container`
+  assert.equal(value(rule(children), 'z-index'), '-1')
+
+  // Paint order only: upstream already positions the container, so the theme
+  // adds no positioning of its own and nothing moves when a popup opens.
+  assert.doesNotMatch(rule(children), /position:/)
+  assert.ok(
+    railMetrics.includes('.block-children-container{margin-left:29px;position:relative}'),
+    'the children container is no longer positioned upstream, so ordering it now needs positioning too'
   )
 })
 

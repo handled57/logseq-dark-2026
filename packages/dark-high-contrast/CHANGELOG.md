@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## 2.3.1 - 2026-09-07
+
+- Keep the `/` command menu above the children of the block it is opened in.
+  The menu stopped the blocks *after* the edited one from reading through it,
+  but not that block's own child blocks, which went on painting their text over
+  it — the same defect, one level in, and a parent block is where the menu is
+  used most. A block's children are now ordered under the row holding the popup
+  for as long as it is open. Every other popup the editor opens — `[[`, `((`,
+  the template, property and date pickers and the code block mode picker —
+  is fixed with it. Nothing moves when a popup opens, and with no popup open a
+  block paints exactly as before.
+
 ## 2.3.0 - 2026-09-07
 
 - Fold a rendered box without folding the block that holds it. Every
