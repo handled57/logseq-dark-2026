@@ -83,8 +83,18 @@ text over an otherwise opaque menu. The theme gives `.absolute-modal
 [data-modal-name]` Logseq's `--ls-z-index-level-1`, and lifts the containing
 `.ls-block` to the same level so the popup escapes its row's isolation. The lift
 is on the block, which Logseq already positions, rather than on the row, which
-would otherwise become the containing block the popup is measured from. Both
-levels stay below the sticky header at `z-index: 10`.
+would otherwise become the containing block everything absolutely positioned
+inside it is measured from. Both levels stay below the sticky header at
+`z-index: 10`.
+
+Lifting the block carries its children with it, so the popup is still painted
+over by the edited block's own subtree: the isolated row is a stacking context
+that is not positioned, which orders it against the block's positioned
+descendants by tree order, and Logseq's `.block-children-container` comes after
+it. The theme orders that container under the row while a popup is open, off
+the same `:has()` as the lift, so the block is always the stacking context
+holding it. It is paint order alone — the container is positioned upstream, so
+nothing moves when a popup opens.
 
 Those popups' section headings are a second upstream assumption the theme
 cannot inherit: Logseq draws `.ui__ac-group-name` at a fifth of
