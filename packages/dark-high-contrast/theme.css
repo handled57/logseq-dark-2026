@@ -1533,6 +1533,22 @@ tr:nth-child(even) td,
   z-index: var(--ls-z-index-level-1);
 }
 
+/* Lifting the block carries its children up with it, so the one thing left
+ * painting over the popup is the edited block's own subtree. The rail's
+ * isolation makes the row a stacking context without positioning it, which
+ * paints the row in the same step as the positioned descendants of the block,
+ * ordered against them by the tree; Logseq's own children container is
+ * `position: relative` and comes after the row, so every child block lands on
+ * top of the popup the row holds. Ordering the children under the row while a
+ * popup is open settles it and moves nothing: the container is already
+ * positioned, so this is paint order alone, and the rule above makes the block
+ * a stacking context, so the children stay inside it and go back no further
+ * than its own transparent background. Where the rail steps aside the row never
+ * isolates and the popup's own z-index is enough, and this changes nothing. */
+.ls-block:has(> .block-main-container .absolute-modal[data-modal-name]) > .block-children-container {
+  z-index: -1;
+}
+
 .cp__cmdk .form-input,
 .cp__cmdk [cmdk-input] {
   border: 0 !important;
