@@ -214,10 +214,18 @@ removes every control along with the attributes.
 the parser/formatter surface the entry consumes. The shipped
 `resources/bible.books.json` contains structural book and verse metadata only.
 
-Text lives, if present, in ignored `resources/nrsvue.text.json` or at the
-absolute path in the `biblePassageText` setting. The build may copy the
-package-local file into the already archived extracted folder for manual
-testing. Verification rejects missing or unexpected ZIP members.
+Verse text lives in one `resources/<abbreviation>.text.json` per translation,
+each naming the translation it holds, and `resources/translations.json` is the
+registry the runtime reads at startup to build its **Translation** dropdown: it
+is kilobytes where an index is megabytes, so no verse is read to learn what is
+on offer. The default translation's index ships in the archive; every other one
+is ignored by Git and local to a developer's checkout, and the build may copy
+such a file into the already archived extracted folder for manual testing.
+Verification rejects missing or unexpected ZIP members.
+
+Reference resolution still reads the single shared `bible.books.json` whichever
+translation is selected; pairing a manifest with its own translation is tracked
+separately.
 
 ## Shared release infrastructure
 

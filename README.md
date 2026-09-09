@@ -17,10 +17,11 @@ another. Dark High Contrast styles any
 block that follows the [Passage v1 content contract](docs/contracts/passage-v1.md);
 Passage writes that ordinary Logseq markup readably with any theme, or none.
 
-Passage uses a local `nrsvue.text.json` when one is available. Its release
-contains the book, chapter, and verse-count manifest needed to validate and
-canonicalize a reference. To insert text, build or supply a local index as
-described in the [Passage setup guide](packages/passage/README.md#passage-text).
+Passage's release contains the book, chapter, and verse-count manifest needed to
+validate and canonicalize a reference, and the New English Translation's verse
+text, which it writes by default. Another translation is chosen from the
+**Translation** dropdown once its index has been built locally, as described in
+the [Passage setup guide](packages/passage/README.md#choosing-a-translation).
 
 Anno needs nothing beyond an open file graph. It imports a PDF into that graph's
 `assets/` folder under the page title you give it, which is what puts Logseq's

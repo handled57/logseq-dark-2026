@@ -1,5 +1,9 @@
 {
   "schemaVersion": 2,
+  "translation": {
+    "name": "New English Translation",
+    "abbreviation": "NET"
+  },
   "stats": {
     "books": 66,
     "chapters": 1189,

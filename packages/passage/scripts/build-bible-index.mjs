@@ -1,14 +1,24 @@
-/* Turns a Bible index into the two artifacts the Passage command reads.
+/* Turns a Bible index into the artifacts the Passage command reads.
  *
  *   node scripts/build-bible-index.mjs [--input <file>] [--out <directory>]
+ *     [--name <translation name>] [--abbreviation <abbreviation>]
  *
- * Two files come out of it:
+ * Three files come out of it:
  *
- *   resources/bible.books.json  the manifest: book names, chapter counts, verse
- *                               counts and verse-id offsets, and no verse text.
- *                               Committed, shipped in the package, and what the
- *                               reference parser resolves against.
- *   resources/nrsvue.text.json  the text index: the verse text itself.
+ *   resources/bible.books.json   the manifest: book names, chapter counts, verse
+ *                                counts and verse-id offsets, and no verse text.
+ *                                Committed, shipped in the package, and what the
+ *                                reference parser resolves against.
+ *   resources/<abbr>.text.json   the text index: the verse text itself, under the
+ *                                lower-cased abbreviation of the translation it
+ *                                holds, and naming that translation inside.
+ *   resources/translations.json  the registry: one line-sized entry per built
+ *                                translation. Committed and shipped, and small
+ *                                enough for the plugin to read at startup to
+ *                                build its Translation dropdown.
+ *
+ * A translation names itself. The source index may declare a `translation`
+ * block, and `--name` and `--abbreviation` state or override it.
  *
  * The schemaVersion 2 input keeps every verse once in its paragraph. The
  * NRSVue input carries four defects this script repairs; see REPAIRS below.
@@ -77,6 +87,9 @@ const SUPERSCRIPTION =
   /^(?:To the leader\b|Of [A-Z]|A (?:Psalm|Song|Maskil|Miktam|Prayer|prayer|Shiggaion|love song)\b|Praise\. )/
 const PSALMS = 19
 
+/* Schema 2 of the text index is schema 1 with the translation named in it. */
+const TEXT_SCHEMA_VERSION = 2
+
 function headingLine(line) {
   if (!line || line.length > 64 || TERMINAL_PUNCTUATION.test(line)) return false
 
@@ -123,6 +136,21 @@ function splitTrailingMatter(text, { psalm, last }) {
 const input = JSON.parse(await readFile(inputPath, 'utf8'))
 const sourceIndex = new TranslationIndex(input)
 const problems = []
+
+/* The translation the text index holds, named in the index itself so no reader
+ * of the file has to infer it from the filename. Either the source index
+ * declares it or the command line does; the command line wins. */
+const declared = input.translation ?? {}
+const translation = {
+  name: option('name', declared.name),
+  abbreviation: option('abbreviation', declared.abbreviation)
+}
+
+if (!translation.name || !translation.abbreviation) {
+  throw new Error(
+    'name the translation: pass --name and --abbreviation, or declare a translation block in the source index'
+  )
+}
 
 function versesOf(chapter) {
   return chapter.paragraphs.flatMap((paragraph) =>
@@ -245,13 +273,35 @@ const manifest = {
   books
 }
 
+const textFile = `${translation.abbreviation.toLowerCase()}.text.json`
+
 await writeFile(resolve(outDirectory, 'bible.books.json'), `${JSON.stringify(manifest, null, 2)}\n`)
 await writeFile(
-  resolve(outDirectory, 'nrsvue.text.json'),
-  JSON.stringify({ schemaVersion: 1, books: text })
+  resolve(outDirectory, textFile),
+  JSON.stringify({ schemaVersion: TEXT_SCHEMA_VERSION, translation, books: text })
+)
+
+/* The registry is the one file the plugin reads to know what it can offer, so
+ * building a translation adds it to the list rather than replacing the list:
+ * a graph with both translations built keeps both options. Sorted by
+ * abbreviation, so the same set of translations always writes the same bytes. */
+const registryPath = resolve(outDirectory, 'translations.json')
+const registered = await readFile(registryPath, 'utf8').then(
+  (contents) => JSON.parse(contents).translations ?? [],
+  () => []
+)
+const translations = [
+  ...registered.filter((entry) => entry.abbreviation !== translation.abbreviation),
+  { ...translation, text: `resources/${textFile}` }
+].sort((first, second) => first.abbreviation.localeCompare(second.abbreviation))
+
+await writeFile(
+  registryPath,
+  `${JSON.stringify({ schemaVersion: 1, translations }, null, 2)}\n`
 )
 
 console.log(
-  `Wrote bible.books.json and nrsvue.text.json: ${manifest.stats.books} books, ` +
+  `Wrote bible.books.json, ${textFile} and translations.json for ` +
+    `${translation.name} (${translation.abbreviation}): ${manifest.stats.books} books, ` +
     `${manifest.stats.chapters} chapters, ${manifest.stats.verses} verses`
 )

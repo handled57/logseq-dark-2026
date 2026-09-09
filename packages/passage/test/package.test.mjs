@@ -96,13 +96,16 @@ test('the package ships the reference manifest', async () => {
 
   assert.ok(pkg.files.includes('bible.js'))
   assert.ok(pkg.files.includes('resources/bible.books.json'))
-  // The manifest carries structural data; the optional text index is local.
+  /* The manifest and the registry carry structural data, and the default
+   * translation's verse text ships with them so an install writes passages
+   * with no further setup. Every other translation's text is local. */
   assert.deepEqual(
     pkg.files.filter((file) => file.startsWith('resources')),
-    ['resources/bible.books.json']
+    ['resources/bible.books.json', 'resources/translations.json', 'resources/net.text.json']
   )
-  assert.match(ignored, /^resources\/\*$/m)
-  assert.match(ignored, /^!resources\/bible\.books\.json$/m)
+  assert.match(ignored, /^resources\/nrsvue/m)
+  // A blanket ignore would keep the shipped files out of the package.
+  assert.doesNotMatch(ignored, /^resources\/\*$/m)
 
   assert.deepEqual(books.stats, { books: 84, chapters: 1398, verses: 37758 })
   // Names, counts and offsets, and nothing else.
@@ -127,13 +130,65 @@ test('the package ships the reference manifest', async () => {
   assert.doesNotMatch(code, /parent\.|document|fetch\(|logseq\./)
 })
 
-test('generated text indexes remain local', async () => {
+test('locally built text indexes stay local', async () => {
   const shipped = await readdir(resolve(root, 'resources'))
-  // Whatever a local build has left in the working tree, the manifest remains
-  // the tracked resource.
-  assert.ok(shipped.includes('bible.books.json'))
+  // Whatever a local build has left in the working tree, the manifest, the
+  // registry and the default translation remain the tracked resources.
+  for (const file of ['bible.books.json', 'translations.json', 'net.text.json']) {
+    assert.ok(shipped.includes(file), file)
+  }
   const ignored = await readFile(resolve(root, '.gitignore'), 'utf8')
-  assert.match(ignored, /bible\.text\.json|resources\/\*/)
+  assert.match(ignored, /^resources\/nrsvue/m)
+})
+
+test('the registry names every translation, and the package ships one of their indexes', async () => {
+  const registry = JSON.parse(await readFile(resolve(root, 'resources', 'translations.json'), 'utf8'))
+
+  assert.equal(registry.schemaVersion, 1)
+  assert.ok(registry.translations.length >= 1)
+  for (const entry of registry.translations) {
+    assert.deepEqual(Object.keys(entry), ['name', 'abbreviation', 'text'], entry.abbreviation)
+    assert.match(entry.text, /^resources\/[a-z0-9]+\.text\.json$/)
+    assert.equal(entry.text, `resources/${entry.abbreviation.toLowerCase()}.text.json`)
+  }
+  // Sorted by abbreviation, so the same set of translations writes the same file.
+  assert.deepEqual(
+    registry.translations.map(({ abbreviation }) => abbreviation),
+    [...registry.translations.map(({ abbreviation }) => abbreviation)].sort()
+  )
+
+  /* Whichever index is present, it names the translation it holds, and names
+   * the same one the registry does: the dropdown's options and the text behind
+   * them are one data set. */
+  for (const entry of registry.translations) {
+    const path = resolve(root, entry.text)
+    if (!(await access(path, constants.R_OK).then(() => true, () => false))) continue
+    const index = JSON.parse(await readFile(path, 'utf8'))
+    assert.equal(index.schemaVersion, 2, entry.text)
+    assert.deepEqual(
+      index.translation,
+      { name: entry.name, abbreviation: entry.abbreviation },
+      entry.text
+    )
+    assert.ok(Object.keys(index.books).length > 0, entry.text)
+  }
+
+  // NET is the default translation, and the only verse text in the archive.
+  const net = registry.translations.find(({ abbreviation }) => abbreviation === 'NET')
+  assert.deepEqual(net, {
+    name: 'New English Translation',
+    abbreviation: 'NET',
+    text: 'resources/net.text.json'
+  })
+  assert.deepEqual(
+    pkg.release.files.filter((file) => file.endsWith('.text.json')),
+    ['resources/net.text.json']
+  )
+  assert.ok(pkg.release.files.includes('resources/translations.json'))
+
+  // The runtime builds its dropdown from the registry, not from a verse index.
+  assert.match(script, /resources\/translations\.json/)
+  assert.match(script, /enumChoices/)
 })
 
 test('the build stages a local verse index only after the archive is closed', async () => {

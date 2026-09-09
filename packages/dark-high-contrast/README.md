@@ -292,7 +292,7 @@ Writing a passage belongs to the [**Passage**](../passage) plugin, which install
 
 Neither package needs the other. The theme styles whatever passage blocks a graph holds, whoever wrote them; Passage writes ordinary Logseq markup that renders readably with any theme, or none. What the two agree on is a block shape, published as [`docs/contracts/passage-v1.md`](../../docs/contracts/passage-v1.md) and tested from both sides against the same fixtures.
 
-Through version 1.10.1 the Passage command was part of this theme. Upgrading to 2.0.0 leaves every passage already in your graph exactly as it is; to keep the commands, install Passage, and re-enter the **Passage text index** path once under its own settings.
+Through version 1.10.1 the Passage command was part of this theme. Upgrading to 2.0.0 leaves every passage already in your graph exactly as it is; to keep the commands, install Passage and choose its **Translation** once under its own settings.
 
 ## Compatibility
 

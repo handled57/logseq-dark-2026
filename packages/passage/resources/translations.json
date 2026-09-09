@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "translations": [
+    {
+      "name": "New English Translation",
+      "abbreviation": "NET",
+      "text": "resources/net.text.json"
+    },
+    {
+      "name": "New Revised Standard Version Updated Edition",
+      "abbreviation": "NRSVUE",
+      "text": "resources/nrsvue.text.json"
+    }
+  ]
+}

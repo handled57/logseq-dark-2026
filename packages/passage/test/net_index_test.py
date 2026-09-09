@@ -32,6 +32,10 @@ class NetIndexTest(unittest.TestCase):
         self.assertEqual(index["stats"],
                          {"books": 1, "chapters": 1, "paragraphs": 2, "verses": 3})
         self.assertEqual(index["schemaVersion"], 2)
+        # The index names the translation it holds, so build-bible-index.mjs
+        # needs no arguments to say what it is converting.
+        self.assertEqual(index["translation"],
+                         {"name": "New English Translation", "abbreviation": "NET"})
         self.assertNotIn("indexes", index)
         self.assertNotIn("generatedAt", index)
         self.assertEqual(index["books"][0]["longName"], "Song of Solomon")

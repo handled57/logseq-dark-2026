@@ -2,6 +2,38 @@
 
 All notable changes to this package are documented here.
 
+## 0.7.0 - 2026-09-09
+
+- Choose the translation from a dropdown. **Plugins → Passage → Settings →
+  Translation** lists the translations this installation has, each named and
+  abbreviated — `New English Translation (NET)` — and the next passage is
+  written from the selected one.
+- Bundle the New English Translation and select it by default, so an
+  installation writes passage text with no further setup. The NET Bible's
+  copyright and API terms are recorded in `THIRD_PARTY_NOTICES.md`; no other
+  translation's verse text is committed or released.
+- Name the translation inside every index. `*.text.json` files use schema
+  version 2, which is schema 1 with a `translation` block holding the
+  translation's full name and abbreviation, and `*.index.json` source files
+  declare the same block. `scripts/build-bible-index.mjs` reads it from the
+  source index or from `--name` and `--abbreviation`, writes the verse text as
+  `resources/<abbreviation>.text.json`, and records the translation in a new
+  `resources/translations.json` registry that the dropdown is built from.
+  Building a translation adds it to that registry rather than replacing it.
+- **Breaking:** the **Passage text index** setting (`biblePassageText`) is
+  gone. A path left in a settings file is ignored. Choose the translation by
+  name instead and keep its index in the plugin's own `resources` folder; a
+  registry entry may state a path in full for an index kept elsewhere.
+- A translation with no index behind it still writes the canonical reference
+  and its chapter tags, and the notice now names the translation it could not
+  read.
+
+Reference resolution still runs against the single shared
+`resources/bible.books.json`, built from the NRSVue canon, so a translation
+with a different canon accepts references to books it does not contain and
+reports no text for them. That pairing is
+[issue #44](https://github.com/handled57/logseq-dark-2026/issues/44).
+
 ## 0.6.1 - 2026-09-09
 
 - Run the NET source-index tests by file path so they work in clean Linux

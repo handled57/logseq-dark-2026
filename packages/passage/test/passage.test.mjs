@@ -732,10 +732,48 @@ test('the plugin provides exactly one style, and it is its own dialog', async ()
 
 /* The Bible files the loader reads, keyed by the paths `index.js` asks for. */
 const MANIFEST_FILE = 'resources/bible.books.json'
-const TEXT_FILE = 'resources/nrsvue.text.json'
-const TEXT_SETTING = 'biblePassageText'
+const REGISTRY_FILE = 'resources/translations.json'
+const TEXT_FILE = 'resources/net.text.json'
+const NRSVUE_FILE = 'resources/nrsvue.text.json'
+const TRANSLATION_SETTING = 'biblePassageTranslation'
+const NET_OPTION = 'New English Translation (NET)'
+const NRSVUE_OPTION = 'New Revised Standard Version Updated Edition (NRSVUE)'
+
+/* The registry the dropdown is built from: names, abbreviations, and the file
+ * each translation's verse text is in. A test that leaves it out is an
+ * installation whose registry cannot be read, where the default translation is
+ * still on offer. */
+const REGISTRY = {
+  schemaVersion: 1,
+  translations: [
+    { name: 'New English Translation', abbreviation: 'NET', text: TEXT_FILE },
+    {
+      name: 'New Revised Standard Version Updated Edition',
+      abbreviation: 'NRSVUE',
+      text: NRSVUE_FILE
+    }
+  ]
+}
+
+/* A second translation, whose wording differs everywhere the first one's does,
+ * so which file was read is legible in the block that comes out. */
+const NRSVUE_TEXT_INDEX = {
+  schemaVersion: 2,
+  translation: { name: 'New Revised Standard Version Updated Edition', abbreviation: 'NRSVUE' },
+  books: {
+    John: {
+      3: {
+        verses: ['For God so loved the world, in this way:', 'Indeed, God did not send the Son.'],
+        numbers: [16, 17],
+        paragraphs: [16]
+      }
+    }
+  }
+}
 
 const TEXT_INDEX = {
+  schemaVersion: 2,
+  translation: { name: 'New English Translation', abbreviation: 'NET' },
   books: {
     John: {
       3: {
@@ -857,6 +895,8 @@ test('without the text index the reference and tags are still written, with a no
   )
   assert.equal(context.messages.length, 1)
   assert.match(context.messages[0].text, /build-bible-index/)
+  // Which translation has no index is the news, so the notice names it.
+  assert.match(context.messages[0].text, /New English Translation \(NET\)/)
 
   // The notice is a standing condition, not something to repeat per passage.
   context.parent.document.querySelector('textarea').value = ''
@@ -865,37 +905,118 @@ test('without the text index the reference and tags are still written, with a no
 })
 
 test('a settings change re-reads the text index and says again when there is none', async () => {
-  const { context } = await bibleContext({ bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } } })
+  const { context } = await bibleContext({
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [REGISTRY_FILE]: REGISTRY } }
+  })
 
   await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Ps 23')
   assert.equal(context.messages.length, 1)
+  assert.match(context.messages[0].text, /New English Translation \(NET\)/)
 
-  /* Naming a new path is a new read. The old read was remembered, and the
-   * notice with it, so both are dropped: the passage after the change is
-   * written from whatever the new path holds, and a path with nothing at the
-   * end of it says so again rather than failing silently. */
-  context.logseq.settings.biblePassageText = '/graph/bible.text.json'
+  /* Choosing another translation is a new read. The old read was remembered,
+   * and the notice with it, so both are dropped: the passage after the change
+   * is written from the newly selected index, and a translation with no index
+   * behind it says so again rather than failing silently. */
+  context.logseq.settings[TRANSLATION_SETTING] = NRSVUE_OPTION
   for (const handler of context.logseq.settingsListeners) handler(context.logseq.settings)
 
   context.parent.document.querySelector('textarea').value = ''
   await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Ps 24')
   assert.equal(context.messages.length, 2)
+  assert.match(context.messages[1].text, /\(NRSVUE\)/)
   assert.equal(context.logseq.Editor.updates.length, 2)
   assert.match(context.logseq.Editor.updates[1].content, /tags:: Ps\/24\ntype:: Passage/)
 })
 
-test('the settings schema offers the text-index path and nothing a theme owns', async () => {
-  const { context } = commandContext()
-  await Promise.resolve()
+test('the settings schema offers a translation dropdown and nothing a theme owns', async () => {
+  const { context } = await bibleContext({
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [REGISTRY_FILE]: REGISTRY } }
+  })
 
   // The schema crosses out of the vm realm, so it is compared as plain data.
-  assert.deepEqual(JSON.parse(JSON.stringify(context.logseq.schema.map(({ key }) => key))), [
-    'biblePassageText'
-  ])
-  assert.equal(context.logseq.schema[0].default, '')
+  const schema = JSON.parse(JSON.stringify(context.logseq.schema))
+  assert.deepEqual(schema.map(({ key }) => key), [TRANSLATION_SETTING])
+  const [translation] = schema
+  assert.equal(translation.type, 'enum')
+  assert.equal(translation.enumPicker, 'select')
+  // Every registered translation is an option, named and abbreviated.
+  assert.deepEqual(translation.enumChoices, [NET_OPTION, NRSVUE_OPTION])
+  assert.equal(translation.default, NET_OPTION)
+  assert.equal(context.logseq.settings[TRANSLATION_SETTING], NET_OPTION)
+  // A path is no longer part of the setup, so nothing asks for one.
+  assert.doesNotMatch(JSON.stringify(schema), /path/i)
+  assert.equal('biblePassageText' in context.logseq.settings, false)
   /* Property hiding is a theme's setting; a graph with both installed keeps two
    * separate settings files, and neither plugin writes the other's keys. */
   assert.equal('hiddenProperties' in context.logseq.settings, false)
+})
+
+test('the selected translation is the index that is read', async () => {
+  const { context } = await bibleContext({
+    bible: {
+      files: {
+        [MANIFEST_FILE]: BIBLE_MANIFEST,
+        [REGISTRY_FILE]: REGISTRY,
+        [TEXT_FILE]: TEXT_INDEX,
+        [NRSVUE_FILE]: NRSVUE_TEXT_INDEX
+      }
+    }
+  })
+
+  context.logseq.settings[TRANSLATION_SETTING] = NRSVUE_OPTION
+  for (const handler of context.logseq.settingsListeners) handler(context.logseq.settings)
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'John 3:16')
+
+  assert.match(context.logseq.Editor.updates[0].content, /so loved the world, in this way:/)
+  assert.deepEqual(context.messages, [])
+})
+
+test('an unreadable registry still leaves the default translation on offer', async () => {
+  // A Marketplace install ships the registry, but a graph that cannot read it
+  // keeps a working setting rather than an empty dropdown.
+  const { context } = await bibleContext({
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [TEXT_FILE]: TEXT_INDEX } }
+  })
+
+  const schema = JSON.parse(JSON.stringify(context.logseq.schema))
+  assert.deepEqual(schema[0].enumChoices, [NET_OPTION])
+  assert.equal(schema[0].default, NET_OPTION)
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'John 3:16')
+
+  assert.match(context.logseq.Editor.updates[0].content, /For God so loved the world\./)
+})
+
+test('a stored value naming no translation on offer falls back to the default', async () => {
+  const { context } = await bibleContext({
+    bible: {
+      files: {
+        [MANIFEST_FILE]: BIBLE_MANIFEST,
+        [REGISTRY_FILE]: REGISTRY,
+        [TEXT_FILE]: TEXT_INDEX,
+        [NRSVUE_FILE]: NRSVUE_TEXT_INDEX
+      }
+    }
+  })
+
+  /* A settings file carried over from an earlier version holds a path, and one
+   * edited by hand may hold a bare abbreviation. Neither is a reason to write
+   * no text: a path is not an option, so the default answers, and the
+   * abbreviation is honoured as the translation it names. */
+  for (const [stored, expected] of [
+    ['/graph/nrsvue.text.json', /For God so loved the world\./],
+    ['', /For God so loved the world\./],
+    ['nrsvue', /the world, in this way:/]
+  ]) {
+    context.logseq.settings[TRANSLATION_SETTING] = stored
+    for (const handler of context.logseq.settingsListeners) handler(context.logseq.settings)
+
+    const editor = context.parent.document.querySelector('textarea')
+    if (editor) editor.value = ''
+    await invoke(context, () => context.logseq.Editor.commands[0].action(), 'John 3:16')
+    assert.match(context.logseq.Editor.updates.at(-1).content, expected, stored)
+  }
 })
 
 test('with no Bible data at all the reference is written exactly as it was typed', async () => {
@@ -932,20 +1053,20 @@ test('the desktop route reads the Bible files through the host, not through fetc
   )
 })
 
-test('a configured text index is read from its own path, not from the plugin folder', async () => {
+test('a registry entry that states a path in full is read from there, not from the plugin folder', async () => {
   const host = node('body')
   host.appendChild(editingArea())
-  const context = load(
-    { [TEXT_SETTING]: '/graph/bible.text.json' },
-    {},
-    host,
-    { via: 'file', files: { [MANIFEST_FILE]: BIBLE_MANIFEST } }
-  )
-  // The host answers for the configured path alone: an absolute path is never
+  const elsewhere = {
+    schemaVersion: 1,
+    translations: [{ name: 'New English Translation', abbreviation: 'NET', text: '/graph/net.text.json' }]
+  }
+  const context = load({}, {}, host, { via: 'file', files: { [MANIFEST_FILE]: BIBLE_MANIFEST } })
+  // The host answers for the stated path alone: an absolute path is never
   // joined to the plugin root.
   context.parent.apis.doAction = async ([, path]) => {
-    if (path === '/graph/bible.text.json') return JSON.stringify(TEXT_INDEX)
+    if (path === '/graph/net.text.json') return JSON.stringify(TEXT_INDEX)
     if (path.endsWith(MANIFEST_FILE)) return JSON.stringify(BIBLE_MANIFEST)
+    if (path.endsWith(REGISTRY_FILE)) return JSON.stringify(elsewhere)
     throw new Error(`no such file: ${path}`)
   }
   await flush()
@@ -1072,6 +1193,8 @@ test('without the text index the options add nothing to an empty body', async ()
   )
   assert.equal(context.messages.length, 1)
   assert.match(context.messages[0].text, /build-bible-index/)
+  // Which translation has no index is the news, so the notice names it.
+  assert.match(context.messages[0].text, /New English Translation \(NET\)/)
 })
 
 test('Enter inserts and Escape cancels ahead of the host, wherever the key lands', async () => {

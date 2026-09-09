@@ -95,14 +95,49 @@ numbers, no section headings, a blank line between paragraphs, and poetry keeps
 its own lineation. A chapter boundary is a paragraph boundary, so it is
 separated the same way.
 
-This needs a local text index. Without one the command still writes the
-canonical reference and its chapter tags and leaves the text to you.
+The text comes from a verse index in the plugin's own `resources` folder. The
+**New English Translation (NET)** is bundled and selected by default, so an
+installation writes passage text with no further setup. Passage reads the file
+locally; it does not fetch or upload verse text.
 
-To build the index, put per-verse Bible data at
-`resources/nrsvue.index.json` and run:
+## Choosing a translation
+
+**Plugins → Passage → Settings → Translation** is a dropdown of the translations
+this installation has, each named and abbreviated —
+`New English Translation (NET)`. Choosing another one is the whole of the
+switch: the next passage is written from that translation's verse index.
+
+The list comes from `resources/translations.json`, a registry the index builder
+keeps beside the indexes themselves. It is kilobytes where an index is
+megabytes, which is what lets the dropdown be built at startup without reading a
+verse of text:
+
+```json
+{
+  "schemaVersion": 1,
+  "translations": [
+    { "name": "New English Translation", "abbreviation": "NET", "text": "resources/net.text.json" }
+  ]
+}
+```
+
+Selecting a translation whose index is not in the folder is not a failure: the
+command still writes the canonical reference and its chapter tags, and says
+which translation has no index behind it.
+
+> Reference resolution still runs against the single shared
+> `resources/bible.books.json`, which is built from the NRSVue canon. A
+> translation with a different canon — the NET's 66 books among them — accepts
+> references to books it does not contain and reports no text for them. Giving
+> each translation its own manifest is
+> [issue #44](https://github.com/handled57/logseq-dark-2026/issues/44).
+
+## Building another translation
+
+Put per-verse Bible data at `resources/<abbreviation>.index.json` and run:
 
 ```sh
-node scripts/build-bible-index.mjs
+node scripts/build-bible-index.mjs --input resources/nrsvue.index.json
 ```
 
 The source file uses Passage's compact translation-index schema. To convert an
@@ -114,18 +149,27 @@ node scripts/compact-bible-index.mjs \
   --output resources/nrsvue.index.json
 ```
 
-That writes two files. `resources/bible.books.json` is the manifest — book names,
-chapter counts, verse counts and verse-id offsets, no verse text — and it is
-committed and shipped, which is what makes references resolve with no further
-setup. `resources/nrsvue.text.json` is the verse text; it is read from the
-plugin's own folder unless the **Passage text index** setting names another
-path.
+A translation names itself. The source index may declare it, and
+`--name` and `--abbreviation` state or override it:
 
-For an already-built index stored elsewhere, enter its absolute
-`nrsvue.text.json` path under **Plugins → Passage → Settings → Passage text
-index**. A Marketplace installation has no package-local text file, so this
-setting is the usual setup. Passage reads the file locally; it does not fetch or
-upload verse text.
+```sh
+node scripts/build-bible-index.mjs \
+  --input resources/nrsvue.index.json \
+  --name "New Revised Standard Version Updated Edition" \
+  --abbreviation NRSVUE
+```
+
+That writes three files:
+
+| File | What it is |
+| --- | --- |
+| `resources/bible.books.json` | the manifest: book names, chapter counts, verse counts and verse-id offsets, no verse text. Committed and shipped, which is what makes references resolve with no further setup. |
+| `resources/<abbr>.text.json` | the verse text, under the lower-cased abbreviation, naming the translation inside. |
+| `resources/translations.json` | the registry the dropdown is built from. Building a translation adds it to the list rather than replacing the list. |
+
+The bundled NET index is committed. Any other translation's verse text stays
+local: it is not in the repository and not in the release archive, and it
+appears in the dropdown as soon as it has been built.
 
 ### Building an index from the NET Bible API
 
@@ -136,14 +180,17 @@ python3 scripts/build-net-index.py
 ```
 
 The script uses only Python's standard library and writes
-`resources/NET.index.json`. It requests one chapter at a time, retries transient
-failures, waits briefly between requests, and replaces the destination only
-after the complete index has been built. Convert that source index into
-Passage's runtime files with:
+`resources/net.index.json`, declaring the translation it holds. It requests one
+chapter at a time, retries transient failures, waits briefly between requests,
+and replaces the destination only after the complete index has been built.
+Convert that source index into Passage's runtime files with:
 
 ```sh
-node scripts/build-bible-index.mjs --input resources/NET.index.json
+node scripts/build-bible-index.mjs --input resources/net.index.json
 ```
+
+The index the plugin ships was built this way, and rebuilding it from the same
+source writes the same bytes.
 
 Use and distribution of text retrieved from the service must comply with the
 [NET Bible copyright and API terms](https://labs.bible.org/api_web_service).
@@ -154,12 +201,18 @@ Use and distribution of text retrieved from the service must comply with the
 
 ```text
 schemaVersion: 2
+translation: { name, abbreviation }
 stats: { books, chapters, paragraphs, verses }
 books[]: { bookId, shortName, longName, chapters[] }
 chapters[]: { chapterNum, paragraphs[] }
 paragraphs[]: { paragraphNum, verses[] }
 verses[]: { verseId, verseNum, text }
 ```
+
+`translation` names the translation the index holds — its full name and the
+abbreviation it is known by — so the builder needs no arguments to say what it
+is converting, and the generated `*.text.json` carries the same block under
+schema version 2.
 
 Each verse is stored exactly once, inside its paragraph. `chapterNum` and
 `paragraphNum` are the canonical field names; the old `chapter` and
@@ -212,12 +265,18 @@ that has no text would be metadata standing in for the passage.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| **Passage text index** (`biblePassageText`) | empty | Full path to a `nrsvue.text.json` you built. Empty reads the one in the plugin's own `resources` folder. |
+| **Translation** (`biblePassageTranslation`) | `New English Translation (NET)` | The translation the command writes, chosen from the verse indexes in the plugin's own `resources` folder. |
 
-If you used the Passage command in Dark High Contrast 1.x, that path was a theme
-setting. Settings do not move between packages: re-enter it once under
-**Plugins → Passage → Settings**. Passages already written to your graph are
-content and need no migration.
+Before 0.7.0 this setting was **Passage text index** (`biblePassageText`), a
+typed path to one `*.text.json` file. It is gone, and a path left in your
+settings file is ignored: choose the translation by name instead, and keep its
+index in the plugin's `resources` folder. A registry entry may still state a
+path in full if you keep an index elsewhere.
+
+If you used the Passage command in Dark High Contrast 1.x, its setting was a
+theme setting. Settings do not move between packages: set the translation once
+under **Plugins → Passage → Settings**. Passages already written to your graph
+are content and need no migration.
 
 ## Compatibility
 
@@ -271,8 +330,10 @@ archive against its exact file list.
 ## Attribution
 
 `resources/bible.books.json` carries book names, chapter counts, verse counts and
-verse-id offsets, and no verse text. See
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the vendored Logseq SDK.
+verse-id offsets, and no verse text. `resources/net.text.json` carries the NET
+Bible's verse text, retrieved through the NET Bible API. See
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for both that and the
+vendored Logseq SDK.
 
 ## License
 

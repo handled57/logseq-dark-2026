@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download the NET Bible into a Passage-compatible NET.index.json.
+"""Download the NET Bible into a Passage-compatible net.index.json.
 
 API documentation and copyright terms: https://labs.bible.org/api_web_service
 """
@@ -22,6 +22,10 @@ from urllib.request import Request, urlopen
 
 API_URL = "https://labs.bible.org/api/"
 USER_AGENT = "logseq-passage-net-index/1.0"
+
+# The translation this index holds. build-bible-index.mjs reads it from here, so
+# converting the source index needs no arguments to name what it is converting.
+TRANSLATION = {"name": "New English Translation", "abbreviation": "NET"}
 
 # API name, Passage short name, display name, number of chapters.
 BOOKS = (
@@ -151,6 +155,7 @@ def build_index(fetcher: Fetcher = fetch_chapter, *, timeout: float, retries: in
                       "longName": long_name, "chapters": chapters})
 
     return {"schemaVersion": 2,
+            "translation": dict(TRANSLATION),
             "stats": {"books": len(books), "chapters": chapter_total,
                       "paragraphs": paragraph_id - 1, "verses": verse_id - 1},
             "books": books}
@@ -176,7 +181,7 @@ def write_atomically(destination: Path, data: dict[str, Any]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path,
-                        default=Path(__file__).parents[1] / "resources/NET.index.json")
+                        default=Path(__file__).parents[1] / "resources/net.index.json")
     parser.add_argument("--timeout", type=float, default=30)
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument("--delay", type=float, default=0.1)

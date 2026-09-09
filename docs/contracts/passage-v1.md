@@ -107,8 +107,9 @@ content, not decoration: it survives either package being uninstalled.
   theme's own Passage command up to 1.10.1 are v1 blocks; nothing about the
   shape changed when the command moved packages.
 - **Settings do not move by themselves.** `hiddenProperties` stays a theme
-  setting and `biblePassageText` becomes a Passage setting; a reader who had
-  configured a text-index path re-enters it under Passage once.
+  setting, and choosing the translation is Passage's own setting; a reader who
+  had configured the theme's text-index path sets the translation under Passage
+  once. Neither setting changes the shape of a block.
 - A future `v2` would be a new document. A reader that cannot parse a block
   leaves it alone rather than guessing.
 
