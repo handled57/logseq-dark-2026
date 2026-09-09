@@ -118,6 +118,27 @@ index**. A Marketplace installation has no package-local text file, so this
 setting is the usual setup. Passage reads the file locally; it does not fetch or
 upload verse text.
 
+### Building an index from the NET Bible API
+
+To download the 66-book NET Bible into the same source-index shape, run:
+
+```sh
+python3 scripts/build-net-index.py
+```
+
+The script uses only Python's standard library and writes
+`resources/NET.index.json`. It requests one chapter at a time, retries transient
+failures, waits briefly between requests, and replaces the destination only
+after the complete index has been built. Convert that source index into
+Passage's runtime files with:
+
+```sh
+node scripts/build-bible-index.mjs --input resources/NET.index.json
+```
+
+Use and distribution of text retrieved from the service must comply with the
+[NET Bible copyright and API terms](https://labs.bible.org/api_web_service).
+
 ## Display options
 
 Three checkboxes under the reference field decide how that text is written. Each

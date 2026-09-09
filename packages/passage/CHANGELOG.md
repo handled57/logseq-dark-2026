@@ -2,6 +2,11 @@
 
 All notable changes to this package are documented here.
 
+## 0.5.0 - 2026-09-08
+
+- Add a standard-library Python generator that downloads the 66-book NET Bible
+  through the NET Bible API and writes a Passage-compatible `NET.index.json`.
+
 ## 0.4.0 - 2026-09-08
 
 - Rename the local Bible resource files the generator reads and writes —
