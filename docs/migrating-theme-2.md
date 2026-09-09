@@ -31,13 +31,14 @@ or supplying an index.
 ## Select the Bible JSON file
 
 Logseq settings are package-scoped, so the old theme setting cannot migrate
-itself into the new Passage package. If Dark High Contrast 1.x had a custom
-**Bible JSON file** (`biblePassageText`) configured:
+itself into the new Passage package. If Dark High Contrast 1.x had a path typed
+into its **Passage text index** (`biblePassageText`) setting:
 
-1. Before removing the old version, note which Bible JSON file its setting uses.
+1. Before removing the old version, note which file that path points at.
 2. Install Passage.
 3. Open **Plugins → Passage → Settings**.
 4. Choose that file under **Bible JSON file** and test one reference.
 
-Only the setting path moves. Do not copy `hiddenProperties` to Passage; it stays
-with Dark High Contrast. Do not rewrite existing passage blocks.
+Passage copies the file you choose into its own storage, so the original can
+stay wherever it already lives. Do not copy `hiddenProperties` to Passage; it
+stays with Dark High Contrast. Do not rewrite existing passage blocks.

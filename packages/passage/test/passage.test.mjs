@@ -35,7 +35,11 @@ function matchesSelector(target, selector) {
     return tokens.every((token) => {
       if (token.startsWith('.')) return target.classList.has(token.slice(1))
       if (token.startsWith('#')) return target.id === token.slice(1)
-      if (token.startsWith('[')) return target.attributes.has(token.slice(1, -1))
+      if (token.startsWith('[')) {
+        const [, name, value] = /^\[([\w-]+)(?:="([^"]*)")?\]$/.exec(token) ?? []
+        if (!name) return false
+        return value === undefined ? target.attributes.has(name) : target.attributes.get(name) === value
+      }
       return target.tagName === token.toUpperCase()
     })
   })
@@ -69,6 +73,9 @@ function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
     },
     addEventListener(type, handler) {
       self.listeners.set(type, [...(self.listeners.get(type) ?? []), handler])
+    },
+    removeEventListener(type, handler) {
+      self.listeners.set(type, (self.listeners.get(type) ?? []).filter((entry) => entry !== handler))
     },
     appendChild(child) {
       child.parentElement = self
@@ -197,6 +204,7 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
   /* A command is invoked from a block being edited, so the session is open
    * until something closes it. */
   let editing = true
+  const storage = new Map()
   const windowListeners = []
   const listeners = []
   const provided = []
@@ -267,6 +275,19 @@ function load(settings, storedBlocks = {}, host = node('body'), bible = null) {
     },
     logseq: {
       settings,
+      storage,
+      /* The plugin's own storage: `makeSandboxStorage` writes into the
+       * package's assets folder, and reads come back out of the same map. */
+      Assets: {
+        makeSandboxStorage: () => ({
+          async setItem(key, value) {
+            storage.set(key, value)
+          },
+          async getItem(key) {
+            return storage.get(key) ?? ''
+          }
+        })
+      },
       ...(routes.lsr ? { baseInfo: { lsr: routes.lsr } } : {}),
       provided,
       observers,
@@ -438,9 +459,10 @@ async function invoke(context, run, reference = 'John 3:16', options = []) {
   return dialog
 }
 
-function commandContext({ value = '', cursor, menu = null, bible = null } = {}) {
+function commandContext({ value = '', cursor, menu = null, panel = null, bible = null } = {}) {
   const host = node('body')
   if (menu) host.appendChild(menu)
+  if (panel) host.appendChild(panel)
   host.appendChild(editingArea({ value, cursor }))
   return { host, context: load({}, {}, host, bible) }
 }
@@ -735,6 +757,36 @@ const MANIFEST_FILE = 'resources/bible.books.json'
 const TEXT_FILE = 'resources/nrsvue.text.json'
 const TEXT_SETTING = 'biblePassageText'
 
+/* The host's own settings panel, as Logseq renders one `inputAs: 'file'`
+ * setting: the item carries the setting's key and holds a plain file input. */
+function settingsPanel(key = TEXT_SETTING) {
+  const item = node('div', {
+    classes: ['desc-item', 'as-input'],
+    attributes: { 'data-key': key }
+  })
+  item.appendChild(node('input', { attributes: { type: 'file' } }))
+  return item
+}
+
+/* What a file input hands over: a File with a name and its contents, and no
+ * path of any kind. */
+function chosenFile(name, data) {
+  return {
+    name,
+    async text() {
+      return typeof data === 'string' ? data : JSON.stringify(data)
+    }
+  }
+}
+
+function chooseIn(panel, file, event = {}) {
+  const input = panel.querySelector('input')
+  assert.ok(input, 'the settings panel has no file input')
+  input.files = [file]
+  input.dispatch('change', event)
+  return input
+}
+
 const TEXT_INDEX = {
   books: {
     John: {
@@ -902,6 +954,158 @@ test('the settings schema offers a Bible JSON file chooser and nothing a theme o
   /* Property hiding is a theme's setting; a graph with both installed keeps two
    * separate settings files, and neither plugin writes the other's keys. */
   assert.equal('hiddenProperties' in context.logseq.settings, false)
+})
+
+/* A file chooser is the one control Logseq offers that never reports a path:
+ * the HTML spec fixes an input's value at `C:\fakepath\<name>`, and Electron
+ * 32 removed the `File.path` that used to make up the difference. The contents
+ * are the whole of what the chooser gives, so Passage copies them. */
+test('choosing a Bible JSON file copies its contents into the plugin’s own storage', async () => {
+  const panel = settingsPanel()
+  const { context } = commandContext({ panel })
+  await flush()
+
+  let stopped = false
+  chooseIn(panel, chosenFile('net.text.json', TEXT_INDEX), {
+    stopPropagation() {
+      stopped = true
+    }
+  })
+  await flush()
+
+  // The setting keeps the name, which is the key the contents were stored under.
+  assert.equal(context.logseq.settings[TEXT_SETTING], 'net.text.json')
+  assert.deepEqual(JSON.parse(context.logseq.storage.get('net.text.json')), TEXT_INDEX)
+  /* Logseq's own handler stores the input's value. Left to run it would write
+   * `C:\fakepath\net.text.json` straight over the name above. */
+  assert.equal(stopped, true)
+})
+
+test('a passage is written from the file the chooser was given', async () => {
+  const panel = settingsPanel()
+  const { context } = await bibleContext({
+    panel,
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } }
+  })
+
+  chooseIn(panel, chosenFile('net.text.json', TEXT_INDEX))
+  await flush()
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'jn 3:16')
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    'tags:: John/3\ntype:: Passage\n' +
+      '#+BEGIN_PASSAGE\n**John 3:16**\n\nFor God so loved the world.\n#+END_PASSAGE'
+  )
+  assert.deepEqual(context.messages, [])
+})
+
+test('choosing a rebuilt file under the same name is read again rather than remembered', async () => {
+  const panel = settingsPanel()
+  const { context } = await bibleContext({
+    panel,
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } }
+  })
+
+  chooseIn(panel, chosenFile('net.text.json', TEXT_INDEX))
+  await flush()
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'jn 3:16')
+
+  /* The setting reads exactly as it did, so nothing wakes the settings
+   * listener; the remembered read has to be dropped by the chooser itself. */
+  const rebuilt = {
+    books: { John: { 3: { verses: ['Rebuilt.'], numbers: [16], paragraphs: [16] } } }
+  }
+  chooseIn(panel, chosenFile('net.text.json', rebuilt))
+  await flush()
+
+  context.parent.document.querySelector('textarea').value = ''
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'jn 3:16')
+
+  assert.match(context.logseq.Editor.updates[1].content, /\nRebuilt\.\n/)
+})
+
+test('a file that is not a text index is refused and the previous setting kept', async () => {
+  const panel = settingsPanel()
+  const { context } = commandContext({ panel })
+  await flush()
+  context.logseq.settings[TEXT_SETTING] = 'kept.text.json'
+
+  chooseIn(panel, chosenFile('notes.json', { notes: ['not a Bible'] }))
+  await flush()
+
+  assert.equal(context.logseq.settings[TEXT_SETTING], 'kept.text.json')
+  assert.equal(context.logseq.storage.has('notes.json'), false)
+  assert.equal(context.messages.length, 1)
+  assert.equal(context.messages[0].status, 'warning')
+})
+
+test('a file that is not JSON at all is refused rather than thrown', async () => {
+  const panel = settingsPanel()
+  const { context } = commandContext({ panel })
+  await flush()
+
+  chooseIn(panel, chosenFile('bible.text.json', 'not json'))
+  await flush()
+
+  assert.equal(context.logseq.settings[TEXT_SETTING], '')
+  assert.equal(context.logseq.storage.size, 0)
+  assert.equal(context.messages[0].status, 'warning')
+})
+
+test('a fake path a chooser wrote is read back as the file’s own name', async () => {
+  const { context } = await bibleContext({
+    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST } }
+  })
+
+  /* What Logseq stores if its own handler records the input's value — which is
+   * also every value the first released chooser wrote. */
+  context.logseq.settings[TEXT_SETTING] = 'C:\\fakepath\\net.text.json'
+  context.logseq.storage.set('net.text.json', JSON.stringify(TEXT_INDEX))
+  for (const handler of context.logseq.settingsListeners) handler(context.logseq.settings)
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'jn 3:16')
+
+  assert.match(context.logseq.Editor.updates[0].content, /For God so loved the world\./)
+})
+
+test('a storage that cannot be written leaves the setting as it was', async () => {
+  const panel = settingsPanel()
+  const { context } = commandContext({ panel })
+  await flush()
+  context.logseq.settings[TEXT_SETTING] = 'kept.text.json'
+  context.logseq.Assets.makeSandboxStorage = () => ({
+    async setItem() {
+      throw new Error('read-only')
+    }
+  })
+
+  chooseIn(panel, chosenFile('net.text.json', TEXT_INDEX))
+  await flush()
+
+  assert.equal(context.logseq.settings[TEXT_SETTING], 'kept.text.json')
+  assert.equal(context.messages[0].status, 'warning')
+})
+
+test('unloading releases the chooser in the host’s own settings panel', async () => {
+  const panel = settingsPanel()
+  const { context } = commandContext({ panel })
+  await flush()
+
+  const input = panel.querySelector('input')
+  assert.equal(input.getAttribute('data-passage-chooser'), 'passage')
+
+  for (const handler of context.logseq.unloads) await handler()
+
+  /* The panel belongs to the host and outlives the plugin, so the chooser is
+   * released rather than removed, and it stops answering. */
+  assert.equal(input.getAttribute('data-passage-chooser'), null)
+  chooseIn(panel, chosenFile('net.text.json', TEXT_INDEX))
+  await flush()
+
+  assert.equal(context.logseq.settings[TEXT_SETTING], '')
+  assert.equal(context.logseq.storage.size, 0)
 })
 
 test('with no Bible data at all the reference is written exactly as it was typed', async () => {

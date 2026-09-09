@@ -5,8 +5,17 @@ All notable changes to this package are documented here.
 ## 0.7.0 - 2026-09-09
 
 - Replace the typed Passage text-index path with a **Bible JSON file** chooser.
-  The setting no longer asks for a translation-specific filename; selecting a
-  compatible Bible text JSON file supplies passage text as before.
+  The setting no longer asks for a translation-specific filename or an absolute
+  path.
+- Copy the chosen file's contents into the plugin's own storage and read
+  passage text from there. Logseq's chooser reports a file's name but never its
+  location — the HTML standard fixes a file input's value at
+  `C:\fakepath\<name>`, and Electron removed the property that used to carry
+  the real path — so the contents are the only thing a plugin can be given.
+- Refuse a chosen file that is not a Bible text index, keeping the previous
+  setting rather than shadowing the packaged text with something unreadable.
+- Keep reading an absolute path configured by an earlier version, and read a
+  `C:\fakepath\…` value written by a chooser as the file's own name.
 
 ## 0.6.1 - 2026-09-09
 

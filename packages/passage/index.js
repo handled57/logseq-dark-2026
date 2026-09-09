@@ -41,6 +41,18 @@ const TEXT_SETTING = 'biblePassageText'
 const BIBLE_MANIFEST_PATH = 'resources/bible.books.json'
 const BIBLE_TEXT_PATH = 'resources/nrsvue.text.json'
 
+/* Logseq renders `inputAs: 'file'` as a plain `<input type="file">`, and the
+ * HTML spec fixes such an input's value at `C:\fakepath\<name>`: a chooser
+ * cannot tell a plugin where on disk the chosen file is, and Electron 32
+ * removed the `File.path` that used to fill that gap. What the chooser does
+ * hand over is the file itself, so Passage takes the contents — the chosen
+ * JSON is copied into this plugin's own storage under its filename, and the
+ * setting keeps that name, which is the key `readSource` reads back. */
+const CHOOSER_ITEM_SELECTOR = `[data-key="${TEXT_SETTING}"]`
+const CHOOSER_INPUT_SELECTOR = 'input[type="file"]'
+const CHOOSER_ATTR = 'data-passage-chooser'
+const FAKE_PATH = /^[a-z]:[\\/]fakepath[\\/]/i
+
 const settingsSchema = [
   {
     key: TEXT_SETTING,
@@ -49,8 +61,9 @@ const settingsSchema = [
     default: '',
     title: 'Bible JSON file',
     description:
-      'Choose the Bible JSON file to use for passage text. Leave empty to read the file in this ' +
-      'plugin’s own resources folder. Without it the Passage command still ' +
+      'Choose the Bible JSON file to read passage text from. Its contents are copied into this ' +
+      'plugin’s own storage, so the file itself can live anywhere. Leave empty to read the ' +
+      'file in this plugin’s resources folder. Without either the Passage command still ' +
       'writes the reference and its chapter tags, and leaves the text to you.'
   }
 ]
@@ -140,7 +153,12 @@ async function captureInvocation(trigger) {
 
 function settingPath(key) {
   const value = logseq.settings?.[key]
-  return typeof value === 'string' ? value.trim() : ''
+  const path = typeof value === 'string' ? value.trim() : ''
+  /* A chooser reports `C:\fakepath\<name>` and nothing else. The name is the
+   * whole of the information, and it is the key the chosen text was stored
+   * under, so it is what the routes below are given. Reading it back here also
+   * repairs a value written before the contents were copied. */
+  return path.replace(FAKE_PATH, '')
 }
 
 const ABSOLUTE_PATH = /^(?:[/\\]|[a-z]:[/\\])/i
@@ -217,8 +235,16 @@ function loadBibleText() {
 
 const MISSING_TEXT_NOTICE =
   'Passage wrote the reference and its chapter tags. The passage text needs a local index: run ' +
-  'scripts/build-bible-index.mjs and put nrsvue.text.json beside the plugin, or name it in the ' +
+  'scripts/build-bible-index.mjs and put the text JSON beside the plugin, or choose it in the ' +
   'plugin’s settings.'
+
+const CHOSEN_TEXT_REFUSED =
+  'That file is not a Bible text index: Passage expects the JSON that ' +
+  'scripts/build-bible-index.mjs writes, with a "books" object at the top. The previous setting ' +
+  'was kept.'
+
+const CHOSEN_TEXT_UNWRITABLE =
+  'Passage could not copy that file into its own storage, so the setting is unchanged.'
 
 async function passageBody(resolved, display) {
   if (!resolved.tags?.length) return ''
@@ -622,6 +648,69 @@ function angleInvocation() {
   return INVOCATIONS.angle.test(editor.value.slice(0, cursorIn(editor, editor.value)))
 }
 
+/* The File the chooser hands over lives only as long as the settings panel's
+ * own input, so it is read here and now. Anything that is not a text index is
+ * refused rather than stored: a stored file no passage can be written from
+ * would only shadow the packaged one. */
+async function adoptChosenText(file) {
+  const storage = logseq.Assets?.makeSandboxStorage?.()
+  if (!storage?.setItem) return false
+
+  let parsed = null
+  let text = ''
+  try {
+    text = await file.text()
+    parsed = JSON.parse(text)
+  } catch (error) {
+    parsed = null
+  }
+
+  if (!parsed?.books) {
+    logseq.UI?.showMsg?.(CHOSEN_TEXT_REFUSED, 'warning')
+    return false
+  }
+
+  try {
+    await storage.setItem(file.name, text)
+    await logseq.updateSettings?.({ [TEXT_SETTING]: file.name })
+  } catch (error) {
+    /* Nothing is left half-chosen: the setting still names whatever it named
+     * before, and a passage written next reads that. */
+    console.warn('Passage could not store the chosen Bible JSON file', error)
+    logseq.UI?.showMsg?.(CHOSEN_TEXT_UNWRITABLE, 'warning')
+    return false
+  }
+
+  /* Choosing a rebuilt file again leaves the setting reading exactly as it did,
+   * so the remembered read is dropped here rather than left to the settings
+   * listener, which that unchanged value would never wake. */
+  bibleTextRead = null
+  noticed = false
+  return true
+}
+
+async function onChooseText(event) {
+  /* Logseq's own handler stores the input's value, which the HTML spec fixes at
+   * `C:\fakepath\<name>`. Stopping the event keeps that out of settings.json;
+   * `settingPath` still normalizes it for a value written before this bridge
+   * existed. */
+  event.stopPropagation?.()
+
+  const file = event.target?.files?.[0]
+  if (file) await adoptChosenText(file)
+}
+
+/* The settings panel is the host's own and is rebuilt every time it opens, so
+ * the chooser is claimed on the same coalesced pass as the `<` picker and
+ * marked, which is what makes the next pass leave it alone. */
+function bridgeSettingsChooser() {
+  const input = doc.querySelector(CHOOSER_ITEM_SELECTOR)?.querySelector?.(CHOOSER_INPUT_SELECTOR)
+  if (!input || input.getAttribute?.(CHOOSER_ATTR)) return
+
+  input.setAttribute(CHOOSER_ATTR, 'passage')
+  input.addEventListener('change', onChooseText)
+}
+
 /* The `<` picker has no plugin API, so its entry is added to the host's own
  * popup. The bridge stays small deliberately: it runs from an rAF-coalesced
  * paint rather than on every mutation, writes at most one node, and recognizes
@@ -668,6 +757,7 @@ function repaint() {
   parent.requestAnimationFrame(() => {
     queued = false
     bridgeCommandMenu()
+    bridgeSettingsChooser()
   })
 }
 
@@ -678,6 +768,13 @@ function teardown() {
   observer?.disconnect()
   observer = null
   dismissDialog?.()
+
+  /* The settings panel is the host's, not this plugin's, so the chooser is
+   * released rather than removed. */
+  for (const input of doc.querySelectorAll(`[${CHOOSER_ATTR}]`)) {
+    input.removeEventListener?.('change', onChooseText)
+    input.removeAttribute(CHOOSER_ATTR)
+  }
 
   for (const node of doc.querySelectorAll(`[${COMMAND_ATTR}], [${DIALOG_ATTR}]`)) node.remove()
 }
@@ -705,7 +802,10 @@ function main() {
   /* childList/subtree only: the `<` picker appears and disappears as a subtree
    * of the host's own popup layer, and this observer must not see the attribute
    * it writes onto its own entry, or every pass would schedule another one. */
-  const container = doc.getElementById('app-container') ?? doc.body
+  /* `body`, not `#app-container`: the plugin settings panel the chooser is
+   * hung in is a modal layer Logseq portals outside it, which is the same
+   * reason the theme's own observer watches the common host. */
+  const container = doc.body
   observer = new MutationObserver(repaint)
   observer.observe(container, { childList: true, subtree: true })
 
