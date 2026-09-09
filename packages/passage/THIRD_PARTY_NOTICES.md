@@ -11,7 +11,10 @@ this plugin's own index. The text is copyright The NET Bible®,
 - Copyright and permissions: <https://netbible.com/copyright/>
 
 No other translation's verse text is committed to this repository or included in
-a release archive.
+a release archive. The `resources/*.books.json` manifests carry structural
+metadata only — book names and their chapter and verse counts — including
+`resources/nrsvue.books.json`, whose counts follow the New Revised Standard
+Version Updated Edition's canon. No verse of any translation is in them.
 
 ## Bundled dependency
 

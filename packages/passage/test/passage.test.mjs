@@ -23,8 +23,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
  * share one global scope; the context below is built the same way. */
 const parser = new vm.Script(await readFile(resolve(root, 'bible.js'), 'utf8'))
 const source = new vm.Script(await readFile(resolve(root, 'index.js'), 'utf8'))
+/* The default translation's own manifest: the books a reference is resolved
+ * against when nothing else is configured. */
 const BIBLE_MANIFEST = JSON.parse(
-  await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8')
+  await readFile(resolve(root, 'resources', 'net.books.json'), 'utf8')
 )
 
 function matchesSelector(target, selector) {
@@ -731,25 +733,32 @@ test('the plugin provides exactly one style, and it is its own dialog', async ()
 })
 
 /* The Bible files the loader reads, keyed by the paths `index.js` asks for. */
-const MANIFEST_FILE = 'resources/bible.books.json'
+const MANIFEST_FILE = 'resources/net.books.json'
 const REGISTRY_FILE = 'resources/translations.json'
 const TEXT_FILE = 'resources/net.text.json'
+const NRSVUE_MANIFEST_FILE = 'resources/nrsvue.books.json'
 const NRSVUE_FILE = 'resources/nrsvue.text.json'
 const TRANSLATION_SETTING = 'biblePassageTranslation'
 const NET_OPTION = 'New English Translation (NET)'
 const NRSVUE_OPTION = 'New Revised Standard Version Updated Edition (NRSVUE)'
 
-/* The registry the dropdown is built from: names, abbreviations, and the file
- * each translation's verse text is in. A test that leaves it out is an
- * installation whose registry cannot be read, where the default translation is
- * still on offer. */
+/* The registry the dropdown is built from: names, abbreviations, and both of
+ * the files each translation is. A test that leaves it out is an installation
+ * whose registry cannot be read, where the default translation is still on
+ * offer. */
 const REGISTRY = {
   schemaVersion: 1,
   translations: [
-    { name: 'New English Translation', abbreviation: 'NET', text: TEXT_FILE },
+    {
+      name: 'New English Translation',
+      abbreviation: 'NET',
+      books: MANIFEST_FILE,
+      text: TEXT_FILE
+    },
     {
       name: 'New Revised Standard Version Updated Edition',
       abbreviation: 'NRSVUE',
+      books: NRSVUE_MANIFEST_FILE,
       text: NRSVUE_FILE
     }
   ]
@@ -767,8 +776,45 @@ const NRSVUE_TEXT_INDEX = {
         numbers: [16, 17],
         paragraphs: [16]
       }
+    },
+    Sir: {
+      1: { verses: ['All wisdom is from the Lord.'], paragraphs: [1] }
     }
   }
+}
+
+/* The second translation's canon is not the first's: Sirach is in it, John 3
+ * ends four verses earlier than NET's does, and Genesis is absent altogether. A
+ * reference is resolved against the manifest of the translation that was
+ * chosen, so which manifest was read is legible in what the dialog accepts and
+ * what it refuses. */
+const NRSVUE_MANIFEST = {
+  schemaVersion: 2,
+  translation: { name: 'New Revised Standard Version Updated Edition', abbreviation: 'NRSVUE' },
+  stats: { books: 3, chapters: 26, verses: 177 },
+  books: [
+    {
+      bookId: 19,
+      shortName: 'Ps',
+      longName: 'Psalms',
+      fromVerseId: 1,
+      chapters: Array.from({ length: 24 }, (unused, index) => ({ chapter: index + 1, verses: 6 }))
+    },
+    {
+      bookId: 43,
+      shortName: 'John',
+      longName: 'John',
+      fromVerseId: 145,
+      chapters: [{ chapter: 3, verses: 32 }]
+    },
+    {
+      bookId: 62,
+      shortName: 'Sir',
+      longName: 'Sirach',
+      fromVerseId: 177,
+      chapters: [{ chapter: 1, verses: 1 }]
+    }
+  ]
 }
 
 const TEXT_INDEX = {
@@ -906,7 +952,13 @@ test('without the text index the reference and tags are still written, with a no
 
 test('a settings change re-reads the text index and says again when there is none', async () => {
   const { context } = await bibleContext({
-    bible: { files: { [MANIFEST_FILE]: BIBLE_MANIFEST, [REGISTRY_FILE]: REGISTRY } }
+    bible: {
+      files: {
+        [MANIFEST_FILE]: BIBLE_MANIFEST,
+        [NRSVUE_MANIFEST_FILE]: NRSVUE_MANIFEST,
+        [REGISTRY_FILE]: REGISTRY
+      }
+    }
   })
 
   await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Ps 23')
@@ -956,6 +1008,7 @@ test('the selected translation is the index that is read', async () => {
     bible: {
       files: {
         [MANIFEST_FILE]: BIBLE_MANIFEST,
+        [NRSVUE_MANIFEST_FILE]: NRSVUE_MANIFEST,
         [REGISTRY_FILE]: REGISTRY,
         [TEXT_FILE]: TEXT_INDEX,
         [NRSVUE_FILE]: NRSVUE_TEXT_INDEX
@@ -970,6 +1023,81 @@ test('the selected translation is the index that is read', async () => {
 
   assert.match(context.logseq.Editor.updates[0].content, /so loved the world, in this way:/)
   assert.deepEqual(context.messages, [])
+})
+
+test('the selected translation is also the canon a reference is resolved against', async () => {
+  const { context } = await bibleContext({
+    bible: {
+      files: {
+        [MANIFEST_FILE]: BIBLE_MANIFEST,
+        [NRSVUE_MANIFEST_FILE]: NRSVUE_MANIFEST,
+        [REGISTRY_FILE]: REGISTRY,
+        [TEXT_FILE]: TEXT_INDEX,
+        [NRSVUE_FILE]: NRSVUE_TEXT_INDEX
+      }
+    }
+  })
+
+  /* Each canon refuses exactly the book the other one contains: NET's 66 books
+   * have Genesis and no Sirach, and this NRSVue fixture has Sirach and no
+   * Genesis. So the book that resolves says which manifest was read, and the
+   * wording that follows it says which text index was. */
+  for (const [option, refused, accepted, written] of [
+    [NET_OPTION, 'Sirach 1', 'Genesis 1:1', 'tags:: Gen/1\ntype:: Passage'],
+    [NRSVUE_OPTION, 'Genesis 1:1', 'Sirach 1', 'tags:: Sir/1\ntype:: Passage']
+  ]) {
+    context.logseq.settings[TRANSLATION_SETTING] = option
+    for (const handler of context.logseq.settingsListeners) handler(context.logseq.settings)
+
+    const invocation = context.logseq.Editor.commands[0].action()
+    await flush()
+    const dialog = dialogOf(context)
+
+    fill(dialog, refused)
+    dialog.querySelector('form').dispatch('submit')
+    await flush()
+    assert.ok(dialogOf(context), `${refused} resolved under ${option}`)
+    assert.match(dialog.querySelector('p').textContent, /No book named/)
+
+    fill(dialog, accepted)
+    dialog.querySelector('form').dispatch('submit')
+    await invocation
+    await flush()
+
+    assert.ok(context.logseq.Editor.updates.at(-1).content.startsWith(written), option)
+    context.parent.document.querySelector('textarea').value = ''
+  }
+
+  const [first, second] = context.logseq.Editor.updates
+  assert.match(first.content, /In the beginning\./)
+  assert.match(second.content, /All wisdom is from the Lord\./)
+  assert.deepEqual(context.messages, [])
+})
+
+test('a manifest that names another translation is not read for this one', async () => {
+  /* The registry says this file is NET's manifest; the file at that path holds
+   * another translation's books. Resolving against it would accept references
+   * to books NET does not contain and refuse ones it does, so it is refused as
+   * though it were absent: the reference is written exactly as it was typed,
+   * and the notice names the translation whose manifest is missing. */
+  const { context } = await bibleContext({
+    bible: {
+      files: {
+        [MANIFEST_FILE]: NRSVUE_MANIFEST,
+        [REGISTRY_FILE]: REGISTRY,
+        [TEXT_FILE]: TEXT_INDEX
+      }
+    }
+  })
+
+  await invoke(context, () => context.logseq.Editor.commands[0].action(), 'Sirach 1')
+
+  assert.equal(
+    context.logseq.Editor.updates[0].content,
+    `${PASSAGE_PROPERTIES}\n#+BEGIN_PASSAGE\n**Sirach 1**\n\n#+END_PASSAGE`
+  )
+  assert.equal(context.messages.length, 1)
+  assert.match(context.messages[0].text, /no book manifest for New English Translation \(NET\)/)
 })
 
 test('an unreadable registry still leaves the default translation on offer', async () => {
@@ -993,6 +1121,7 @@ test('a stored value naming no translation on offer falls back to the default', 
     bible: {
       files: {
         [MANIFEST_FILE]: BIBLE_MANIFEST,
+        [NRSVUE_MANIFEST_FILE]: NRSVUE_MANIFEST,
         [REGISTRY_FILE]: REGISTRY,
         [TEXT_FILE]: TEXT_INDEX,
         [NRSVUE_FILE]: NRSVUE_TEXT_INDEX
@@ -1020,7 +1149,7 @@ test('a stored value naming no translation on offer falls back to the default', 
 })
 
 test('with no Bible data at all the reference is written exactly as it was typed', async () => {
-  // A Marketplace install carries the manifest, but a graph that cannot read it
+  // A Marketplace install carries a manifest, but a graph that cannot read one
   // still has a working command: the theme never depends on the Bible files.
   const { context } = await bibleContext({})
 
@@ -1030,7 +1159,11 @@ test('with no Bible data at all the reference is written exactly as it was typed
     context.logseq.Editor.updates[0].content,
     `${PASSAGE_PROPERTIES}\n#+BEGIN_PASSAGE\n**my own note**\n\n#+END_PASSAGE`
   )
-  assert.deepEqual(context.messages, [])
+  /* There are no tags because there is no manifest, which is worth saying once:
+   * without it the reference is whatever was typed, and nothing was refused. */
+  assert.equal(context.messages.length, 1)
+  assert.match(context.messages[0].text, /no book manifest for New English Translation \(NET\)/)
+  assert.match(context.messages[0].text, /build-bible-index/)
 })
 
 test('the desktop route reads the Bible files through the host, not through fetch', async () => {
@@ -1058,14 +1191,19 @@ test('a registry entry that states a path in full is read from there, not from t
   host.appendChild(editingArea())
   const elsewhere = {
     schemaVersion: 1,
-    translations: [{ name: 'New English Translation', abbreviation: 'NET', text: '/graph/net.text.json' }]
+    translations: [{
+      name: 'New English Translation',
+      abbreviation: 'NET',
+      books: '/graph/net.books.json',
+      text: '/graph/net.text.json'
+    }]
   }
-  const context = load({}, {}, host, { via: 'file', files: { [MANIFEST_FILE]: BIBLE_MANIFEST } })
+  const context = load({}, {}, host, { via: 'file', files: {} })
   // The host answers for the stated path alone: an absolute path is never
   // joined to the plugin root.
   context.parent.apis.doAction = async ([, path]) => {
+    if (path === '/graph/net.books.json') return JSON.stringify(BIBLE_MANIFEST)
     if (path === '/graph/net.text.json') return JSON.stringify(TEXT_INDEX)
-    if (path.endsWith(MANIFEST_FILE)) return JSON.stringify(BIBLE_MANIFEST)
     if (path.endsWith(REGISTRY_FILE)) return JSON.stringify(elsewhere)
     throw new Error(`no such file: ${path}`)
   }

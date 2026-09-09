@@ -3,22 +3,25 @@
  *   node scripts/build-bible-index.mjs [--input <file>] [--out <directory>]
  *     [--name <translation name>] [--abbreviation <abbreviation>]
  *
- * Three files come out of it:
+ * Three files come out of it, two of them named after the translation they hold:
  *
- *   resources/bible.books.json   the manifest: book names, chapter counts, verse
+ *   resources/<abbr>.books.json  the manifest: book names, chapter counts, verse
  *                                counts and verse-id offsets, and no verse text.
- *                                Committed, shipped in the package, and what the
- *                                reference parser resolves against.
- *   resources/<abbr>.text.json   the text index: the verse text itself, under the
- *                                lower-cased abbreviation of the translation it
- *                                holds, and naming that translation inside.
- *   resources/translations.json  the registry: one line-sized entry per built
- *                                translation. Committed and shipped, and small
- *                                enough for the plugin to read at startup to
- *                                build its Translation dropdown.
+ *                                What the reference parser resolves a reference
+ *                                against, so it belongs to one translation and
+ *                                names it inside.
+ *   resources/<abbr>.text.json   the text index: the verse text itself, naming
+ *                                the same translation.
+ *   resources/translations.json  the registry: one entry per built translation,
+ *                                naming both of that translation's files.
+ *                                Committed and shipped, and small enough for the
+ *                                plugin to read at startup to build its
+ *                                Translation dropdown.
  *
  * A translation names itself. The source index may declare a `translation`
- * block, and `--name` and `--abbreviation` state or override it.
+ * block, and `--name` and `--abbreviation` state or override it. Building one
+ * translation never writes another's files: the manifest and the text index are
+ * one pair, under one abbreviation, and the registry keeps them together.
  *
  * The schemaVersion 2 input keeps every verse once in its paragraph. The
  * NRSVue input carries four defects this script repairs; see REPAIRS below.
@@ -87,7 +90,10 @@ const SUPERSCRIPTION =
   /^(?:To the leader\b|Of [A-Z]|A (?:Psalm|Song|Maskil|Miktam|Prayer|prayer|Shiggaion|love song)\b|Praise\. )/
 const PSALMS = 19
 
-/* Schema 2 of the text index is schema 1 with the translation named in it. */
+/* Schema 2 of the manifest and of the text index is schema 1 with the
+ * translation named in it, so neither file can be read without knowing which
+ * Bible it describes. */
+const BOOKS_SCHEMA_VERSION = 2
 const TEXT_SCHEMA_VERSION = 2
 
 function headingLine(line) {
@@ -137,9 +143,10 @@ const input = JSON.parse(await readFile(inputPath, 'utf8'))
 const sourceIndex = new TranslationIndex(input)
 const problems = []
 
-/* The translation the text index holds, named in the index itself so no reader
- * of the file has to infer it from the filename. Either the source index
- * declares it or the command line does; the command line wins. */
+/* The translation both files hold, named inside each of them so no reader has
+ * to infer it from a filename, and so a manifest and a text index can be told
+ * apart from another translation's pair. Either the source index declares it or
+ * the command line does; the command line wins. */
 const declared = input.translation ?? {}
 const translation = {
   name: option('name', declared.name),
@@ -268,14 +275,17 @@ if (problems.length) {
 /* No timestamp: the manifest is committed, so regenerating it from the same
  * input has to produce the same bytes. */
 const manifest = {
-  schemaVersion: 1,
+  schemaVersion: BOOKS_SCHEMA_VERSION,
+  translation,
   stats: { books: books.length, chapters: chapterTotal, verses: verseTotal },
   books
 }
 
-const textFile = `${translation.abbreviation.toLowerCase()}.text.json`
+const abbreviation = translation.abbreviation.toLowerCase()
+const booksFile = `${abbreviation}.books.json`
+const textFile = `${abbreviation}.text.json`
 
-await writeFile(resolve(outDirectory, 'bible.books.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+await writeFile(resolve(outDirectory, booksFile), `${JSON.stringify(manifest, null, 2)}\n`)
 await writeFile(
   resolve(outDirectory, textFile),
   JSON.stringify({ schemaVersion: TEXT_SCHEMA_VERSION, translation, books: text })
@@ -292,7 +302,7 @@ const registered = await readFile(registryPath, 'utf8').then(
 )
 const translations = [
   ...registered.filter((entry) => entry.abbreviation !== translation.abbreviation),
-  { ...translation, text: `resources/${textFile}` }
+  { ...translation, books: `resources/${booksFile}`, text: `resources/${textFile}` }
 ].sort((first, second) => first.abbreviation.localeCompare(second.abbreviation))
 
 await writeFile(
@@ -301,7 +311,7 @@ await writeFile(
 )
 
 console.log(
-  `Wrote bible.books.json, ${textFile} and translations.json for ` +
+  `Wrote ${booksFile}, ${textFile} and translations.json for ` +
     `${translation.name} (${translation.abbreviation}): ${manifest.stats.books} books, ` +
     `${manifest.stats.chapters} chapters, ${manifest.stats.verses} verses`
 )

@@ -1,4 +1,5 @@
-# The NRSVue indexes are generated locally and stay out of the repository. The
-# structural manifest, the translation registry and the bundled NET indexes are
-# committed.
-resources/nrsvue*
+# The NRSVue verse text and its source indexes are generated locally and stay
+# out of the repository. Both translations' book manifests, which hold no verse
+# text, the translation registry and the bundled NET indexes are committed.
+resources/nrsvue.index*
+resources/nrsvue.text*

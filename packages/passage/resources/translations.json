@@ -4,11 +4,13 @@
     {
       "name": "New English Translation",
       "abbreviation": "NET",
+      "books": "resources/net.books.json",
       "text": "resources/net.text.json"
     },
     {
       "name": "New Revised Standard Version Updated Edition",
       "abbreviation": "NRSVUE",
+      "books": "resources/nrsvue.books.json",
       "text": "resources/nrsvue.text.json"
     }
   ]

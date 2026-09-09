@@ -17,9 +17,10 @@ another. Dark High Contrast styles any
 block that follows the [Passage v1 content contract](docs/contracts/passage-v1.md);
 Passage writes that ordinary Logseq markup readably with any theme, or none.
 
-Passage's release contains the book, chapter, and verse-count manifest needed to
-validate and canonicalize a reference, and the New English Translation's verse
-text, which it writes by default. Another translation is chosen from the
+Passage's release contains a book, chapter, and verse-count manifest for each
+translation it offers — enough to validate and canonicalize a reference against
+that translation's own canon — and the New English Translation's verse text,
+which it writes by default. Another translation is chosen from the
 **Translation** dropdown once its index has been built locally, as described in
 the [Passage setup guide](packages/passage/README.md#choosing-a-translation).
 
@@ -78,7 +79,7 @@ byte parity with canonical source files.
 | --- | --- |
 | Root | Workspace coordination, shared release tooling and tests, the license, vendored SDK, CI, and repository-wide documentation. |
 | `packages/dark-high-contrast/` | Theme CSS, property/classification runtime, theme metadata, tests, screenshots, changelog, and package README. |
-| `packages/passage/` | Passage command, reference parser, text-index manifest, plugin metadata, tests, changelog, and package README. |
+| `packages/passage/` | Passage command, reference parser, per-translation book manifests, plugin metadata, tests, changelog, and package README. |
 | `packages/anno/` | Anno's PDF import command, its prompt, plugin metadata, tests, changelog, and package README. |
 | `docs/contracts/` | Versioned, runtime-neutral agreements that more than one package consumes. |
 | `test/support/` | Reusable test fixtures; package-specific assertions stay in their workspace. |

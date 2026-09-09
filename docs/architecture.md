@@ -211,21 +211,24 @@ removes every control along with the attributes.
 
 `packages/passage/bible.js` is a classic browser script loaded before
 `index.js`. It deliberately avoids module imports or a build step and exposes
-the parser/formatter surface the entry consumes. The shipped
-`resources/bible.books.json` contains structural book and verse metadata only.
+the parser/formatter surface the entry consumes.
 
-Verse text lives in one `resources/<abbreviation>.text.json` per translation,
-each naming the translation it holds, and `resources/translations.json` is the
-registry the runtime reads at startup to build its **Translation** dropdown: it
-is kilobytes where an index is megabytes, so no verse is read to learn what is
-on offer. The default translation's index ships in the archive; every other one
-is ignored by Git and local to a developer's checkout, and the build may copy
-such a file into the already archived extracted folder for manual testing.
-Verification rejects missing or unexpected ZIP members.
+A translation is two files under one abbreviation:
+`resources/<abbreviation>.books.json`, which holds structural book and verse
+metadata only, and `resources/<abbreviation>.text.json`, which holds the verse
+text. Both name the translation inside, and `resources/translations.json` is the
+registry that names both of them per translation and that the runtime reads at
+startup to build its **Translation** dropdown: it is kilobytes where an index is
+megabytes, so no verse is read to learn what is on offer.
 
-Reference resolution still reads the single shared `bible.books.json` whichever
-translation is selected; pairing a manifest with its own translation is tracked
-separately.
+Selecting a translation selects the pair. The manifest read is keyed to the
+selection and starts again when it changes, so a reference is never resolved
+against one translation's canon and filled from another's text, and a file whose
+declared translation is not the selected one is refused as though absent. Every
+manifest ships in the archive; the default translation's verse index ships with
+them, and every other one is ignored by Git and local to a developer's checkout,
+where the build may copy such a file into the already archived extracted folder
+for manual testing. Verification rejects missing or unexpected ZIP members.
 
 ## Shared release infrastructure
 

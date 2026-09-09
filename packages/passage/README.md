@@ -105,7 +105,8 @@ locally; it does not fetch or upload verse text.
 **Plugins → Passage → Settings → Translation** is a dropdown of the translations
 this installation has, each named and abbreviated —
 `New English Translation (NET)`. Choosing another one is the whole of the
-switch: the next passage is written from that translation's verse index.
+switch: the next passage is resolved against that translation's book manifest
+and written from that translation's verse index.
 
 The list comes from `resources/translations.json`, a registry the index builder
 keeps beside the indexes themselves. It is kilobytes where an index is
@@ -116,21 +117,28 @@ verse of text:
 {
   "schemaVersion": 1,
   "translations": [
-    { "name": "New English Translation", "abbreviation": "NET", "text": "resources/net.text.json" }
+    {
+      "name": "New English Translation",
+      "abbreviation": "NET",
+      "books": "resources/net.books.json",
+      "text": "resources/net.text.json"
+    }
   ]
 }
 ```
 
+A translation is two files, and the registry names both: the manifest a
+reference is resolved against and the index its text is read from. Choosing a
+translation changes the pair together, so a reference is only ever accepted for
+a book the selected translation actually contains — the NET's 66 books do not
+include Sirach, and the NRSVue's 84 do — and the verses that follow it are that
+same translation's. Both files name the translation inside, so a manifest that
+belongs to another translation is refused rather than resolved against.
+
 Selecting a translation whose index is not in the folder is not a failure: the
 command still writes the canonical reference and its chapter tags, and says
-which translation has no index behind it.
-
-> Reference resolution still runs against the single shared
-> `resources/bible.books.json`, which is built from the NRSVue canon. A
-> translation with a different canon — the NET's 66 books among them — accepts
-> references to books it does not contain and reports no text for them. Giving
-> each translation its own manifest is
-> [issue #44](https://github.com/handled57/logseq-dark-2026/issues/44).
+which translation has no index behind it. With no manifest either, the
+reference is written exactly as it was typed, and the notice says that too.
 
 ## Building another translation
 
@@ -159,17 +167,20 @@ node scripts/build-bible-index.mjs \
   --abbreviation NRSVUE
 ```
 
-That writes three files:
+That writes three files, two of them named after the translation they hold:
 
 | File | What it is |
 | --- | --- |
-| `resources/bible.books.json` | the manifest: book names, chapter counts, verse counts and verse-id offsets, no verse text. Committed and shipped, which is what makes references resolve with no further setup. |
-| `resources/<abbr>.text.json` | the verse text, under the lower-cased abbreviation, naming the translation inside. |
-| `resources/translations.json` | the registry the dropdown is built from. Building a translation adds it to the list rather than replacing the list. |
+| `resources/<abbr>.books.json` | the manifest: book names, chapter counts, verse counts and verse-id offsets, no verse text. What a reference is resolved against, so it belongs to one translation and names it inside. |
+| `resources/<abbr>.text.json` | the verse text, naming the same translation. |
+| `resources/translations.json` | the registry the dropdown is built from, naming both of the translation's files. Building a translation adds it to the list rather than replacing the list. |
 
-The bundled NET index is committed. Any other translation's verse text stays
-local: it is not in the repository and not in the release archive, and it
-appears in the dropdown as soon as it has been built.
+Building one translation never writes another's files. Every manifest is
+committed and shipped — they hold no verse text — so a translation whose text
+you build locally already has the books that text was built from. The bundled
+NET index is committed too; any other translation's verse text stays local, out
+of the repository and out of the release archive, and appears in the dropdown as
+soon as it has been built.
 
 ### Building an index from the NET Bible API
 
@@ -265,13 +276,21 @@ that has no text would be metadata standing in for the passage.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| **Translation** (`biblePassageTranslation`) | `New English Translation (NET)` | The translation the command writes, chosen from the verse indexes in the plugin's own `resources` folder. |
+| **Translation** (`biblePassageTranslation`) | `New English Translation (NET)` | The translation the command writes, chosen from the book manifest and verse index pairs in the plugin's own `resources` folder. |
 
 Before 0.7.0 this setting was **Passage text index** (`biblePassageText`), a
 typed path to one `*.text.json` file. It is gone, and a path left in your
 settings file is ignored: choose the translation by name instead, and keep its
 index in the plugin's `resources` folder. A registry entry may still state a
-path in full if you keep an index elsewhere.
+path in full if you keep a translation's files elsewhere.
+
+Before 0.8.0 every translation resolved against one shared
+`resources/bible.books.json`, built from the NRSVue canon, so a translation with
+a different canon accepted references to books it does not contain. Each
+translation now has its own `resources/<abbreviation>.books.json`, and the
+shared file is gone: if you built an index before 0.8.0, run
+`scripts/build-bible-index.mjs` again to write the manifest beside it, and
+delete the leftover `resources/bible.books.json`.
 
 If you used the Passage command in Dark High Contrast 1.x, its setting was a
 theme setting. Settings do not move between packages: set the translation once
@@ -329,9 +348,9 @@ archive against its exact file list.
 
 ## Attribution
 
-`resources/bible.books.json` carries book names, chapter counts, verse counts and
-verse-id offsets, and no verse text. `resources/net.text.json` carries the NET
-Bible's verse text, retrieved through the NET Bible API. See
+Each `resources/<abbr>.books.json` carries book names, chapter counts, verse
+counts and verse-id offsets, and no verse text. `resources/net.text.json`
+carries the NET Bible's verse text, retrieved through the NET Bible API. See
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for both that and the
 vendored Logseq SDK.
 

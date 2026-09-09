@@ -18,7 +18,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const contract = resolve(root, '..', '..', 'docs', 'contracts', 'passage-v1.md')
 
 const parser = await classicScript(resolve(root, 'bible.js'))
-const manifest = JSON.parse(await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8'))
+const manifest = JSON.parse(await readFile(resolve(root, 'resources', 'net.books.json'), 'utf8'))
 
 function fixtures(document) {
   const start = document.indexOf('<!-- passage-v1-fixtures:start -->')
