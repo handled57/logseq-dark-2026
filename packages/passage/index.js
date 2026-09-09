@@ -49,22 +49,26 @@ const BIBLE_TEXT_PATH = 'resources/nrsvue.text.json'
  * JSON is copied into this plugin's own storage under its filename, and the
  * setting keeps that name, which is the key `readSource` reads back. */
 const CHOOSER_ITEM_SELECTOR = `[data-key="${TEXT_SETTING}"]`
-const CHOOSER_INPUT_SELECTOR = 'input[type="file"]'
+const CHOOSER_FIELD_SELECTOR = 'input.form-input'
 const CHOOSER_ATTR = 'data-passage-chooser'
+const CHOOSER_FILE_ATTR = 'data-passage-file'
+const CHOOSER_BUTTON_ATTR = 'data-passage-choose'
+const CHOOSER_LABEL = 'Choose Bible JSON file\u2026'
+const TEXT_ACCEPT = 'application/json,.json'
 const FAKE_PATH = /^[a-z]:[\\/]fakepath[\\/]/i
 
 const settingsSchema = [
   {
     key: TEXT_SETTING,
     type: 'string',
-    inputAs: 'file',
     default: '',
     title: 'Bible JSON file',
     description:
-      'Choose the Bible JSON file to read passage text from. Its contents are copied into this ' +
-      'plugin’s own storage, so the file itself can live anywhere. Leave empty to read the ' +
-      'file in this plugin’s resources folder. Without either the Passage command still ' +
-      'writes the reference and its chapter tags, and leaves the text to you.'
+      'The Bible JSON file to read passage text from. Use the <b>' + CHOOSER_LABEL + '</b> ' +
+      'button below: what you choose is copied into this plugin’s own storage, so the file ' +
+      'itself can live anywhere. Leave empty to read the file in this plugin’s resources ' +
+      'folder. Without either the Passage command still writes the reference and its chapter ' +
+      'tags, and leaves the text to you.'
   }
 ]
 
@@ -449,6 +453,37 @@ const DIALOG_STYLE = `
   border-color: var(--vscode-hc-disabled, #a0a0a0);
   cursor: default;
 }
+
+/* The settings chooser. The file input is never the control the reader uses —
+ * the system dialog opens from the button beside it — and the button is painted
+ * here rather than left to the host, because the settings panel is styled by
+ * whichever theme is installed. */
+[${CHOOSER_FILE_ATTR}] { display: none; }
+
+[${CHOOSER_BUTTON_ATTR}] {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 5px 14px;
+  font: inherit;
+  border: 1px solid var(--vscode-hc-border, #5b7e96);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+[${CHOOSER_BUTTON_ATTR}],
+[${CHOOSER_BUTTON_ATTR}]:hover,
+[${CHOOSER_BUTTON_ATTR}]:focus,
+[${CHOOSER_BUTTON_ATTR}]:focus-visible,
+[${CHOOSER_BUTTON_ATTR}]:active {
+  color: var(--vscode-hc-white, #ffffff) !important;
+  background: var(--vscode-hc-black, #000000) !important;
+}
+
+[${CHOOSER_BUTTON_ATTR}]:hover,
+[${CHOOSER_BUTTON_ATTR}]:focus,
+[${CHOOSER_BUTTON_ATTR}]:focus-visible {
+  border-color: var(--vscode-hc-focus, #f38518);
+}
 `
 
 /* The passage display options, in the order they are offered under the field.
@@ -689,26 +724,61 @@ async function adoptChosenText(file) {
   return true
 }
 
-async function onChooseText(event) {
-  /* Logseq's own handler stores the input's value, which the HTML spec fixes at
-   * `C:\fakepath\<name>`. Stopping the event keeps that out of settings.json;
-   * `settingPath` still normalizes it for a value written before this bridge
-   * existed. */
-  event.stopPropagation?.()
-
-  const file = event.target?.files?.[0]
-  if (file) await adoptChosenText(file)
+/* Logseq draws the settings field from its own state and will not redraw it for
+ * a value written from outside, so the chosen name is put there directly. The
+ * field is what tells a reader which file is in use — a file input can never
+ * show that, because it has no value to show. */
+function showChosenName(name) {
+  const field = doc.querySelector(CHOOSER_ITEM_SELECTOR)?.querySelector?.(CHOOSER_FIELD_SELECTOR)
+  if (field) field.value = name
 }
 
-/* The settings panel is the host's own and is rebuilt every time it opens, so
- * the chooser is claimed on the same coalesced pass as the `<` picker and
- * marked, which is what makes the next pass leave it alone. */
-function bridgeSettingsChooser() {
-  const input = doc.querySelector(CHOOSER_ITEM_SELECTOR)?.querySelector?.(CHOOSER_INPUT_SELECTOR)
-  if (!input || input.getAttribute?.(CHOOSER_ATTR)) return
+async function onChooseText(event) {
+  const file = event.target?.files?.[0]
+  if (!file) return
 
-  input.setAttribute(CHOOSER_ATTR, 'passage')
-  input.addEventListener('change', onChooseText)
+  if (await adoptChosenText(file)) showChosenName(file.name)
+}
+
+/* Logseq's own `inputAs: 'file'` control cannot be relied on to put a button in
+ * front of a reader, so Passage hangs its own chooser in the settings panel:
+ * a hidden file input and the button that opens it, beside the text field
+ * Logseq already draws. The field goes on showing which file is in use, and a
+ * path typed into it by hand still works, which is what an upgrade from an
+ * earlier version depends on. */
+function bridgeSettingsChooser() {
+  const item = doc.querySelector(CHOOSER_ITEM_SELECTOR)
+  if (!item || item.getAttribute?.(CHOOSER_ATTR)) return
+
+  item.setAttribute(CHOOSER_ATTR, 'passage')
+
+  const chooser = doc.createElement('input')
+  const button = doc.createElement('button')
+
+  chooser.setAttribute(CHOOSER_FILE_ATTR, '')
+  chooser.type = 'file'
+  chooser.accept = TEXT_ACCEPT
+  button.setAttribute(CHOOSER_BUTTON_ATTR, '')
+  /* Not a submit: the settings panel is the host's own form. */
+  button.type = 'button'
+  button.textContent = CHOOSER_LABEL
+
+  button.addEventListener('click', () => {
+    /* A host that refuses to open a file dialog for a script leaves the typed
+     * field behind, which is still a way to name a file. */
+    try {
+      chooser.click?.()
+    } catch (error) {
+      console.warn('Passage could not open the file chooser', error)
+    }
+  })
+  chooser.addEventListener('change', onChooseText)
+
+  /* Inside the setting's own label, so the button sits under the description
+   * with the field rather than beside the next setting. */
+  const row = item.querySelector('label') ?? item
+  row.appendChild(chooser)
+  row.appendChild(button)
 }
 
 /* The `<` picker has no plugin API, so its entry is added to the host's own
@@ -769,12 +839,12 @@ function teardown() {
   observer = null
   dismissDialog?.()
 
-  /* The settings panel is the host's, not this plugin's, so the chooser is
-   * released rather than removed. */
-  for (const input of doc.querySelectorAll(`[${CHOOSER_ATTR}]`)) {
-    input.removeEventListener?.('change', onChooseText)
-    input.removeAttribute(CHOOSER_ATTR)
+  /* The settings panel is the host's, not this plugin's: the controls Passage
+   * hung in it are removed, and the item itself is only released. */
+  for (const node of doc.querySelectorAll(`[${CHOOSER_FILE_ATTR}], [${CHOOSER_BUTTON_ATTR}]`)) {
+    node.remove()
   }
+  for (const item of doc.querySelectorAll(`[${CHOOSER_ATTR}]`)) item.removeAttribute(CHOOSER_ATTR)
 
   for (const node of doc.querySelectorAll(`[${COMMAND_ATTR}], [${DIALOG_ATTR}]`)) node.remove()
 }

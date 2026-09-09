@@ -121,17 +121,21 @@ setup. `resources/nrsvue.text.json` is the verse text; it is read from the
 plugin's own folder unless the **Bible JSON file** setting selects another
 file.
 
-For an already-built text index stored elsewhere, choose it under **Plugins →
-Passage → Settings → Bible JSON file**. A Marketplace installation has no
-package-local text file, so this setting is the usual setup.
+For an already-built text index stored elsewhere, open **Plugins → Passage →
+Settings** and press **Choose Bible JSON file…** under **Bible JSON file**. A
+Marketplace installation has no package-local text file, so this is the usual
+setup.
 
-Logseq's file chooser reports a file's name but never where it is: the HTML
-standard fixes a file input's value at `C:\fakepath\<name>`, and Electron
-removed the one property that used to carry the real path. So Passage takes the
-contents instead — the file you choose is copied into the plugin's own storage
-and read from there, and the setting keeps its name. Choosing a file you have
-since rebuilt copies it again. Everything happens locally; Passage does not
-fetch or upload verse text.
+The file you choose is copied into the plugin's own storage and read from there,
+and the setting keeps its name. That is not a detail Passage could avoid: a file
+chooser reports a file's name but never where it is — the HTML standard fixes a
+file input's value at `C:\fakepath\<name>`, and Electron removed the one
+property that used to carry the real path — so the contents are the only thing a
+plugin can be handed. Choosing a file you have since rebuilt copies it again.
+
+The field beside the button stays editable, so an absolute path typed or pasted
+into it is still read straight from disk. Everything happens locally; Passage
+does not fetch or upload verse text.
 
 ### Building an index from the NET Bible API
 
@@ -218,12 +222,11 @@ that has no text would be metadata standing in for the passage.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| **Bible JSON file** (`biblePassageText`) | empty | Choose the Bible JSON file that supplies passage text. Its contents are copied into the plugin's own storage, so the file itself can live anywhere. Empty reads the package-local file in the plugin's own `resources` folder. |
+| **Bible JSON file** (`biblePassageText`) | empty | The Bible JSON file that supplies passage text. **Choose Bible JSON file…** copies what you pick into the plugin's own storage, so the file itself can live anywhere; an absolute path typed into the field is read from disk instead. Empty reads the package-local file in the plugin's own `resources` folder. |
 
-A file chooser cannot be pre-filled, so it shows no file until you pick one; a
-path configured by an earlier version keeps working and is still read from disk.
-If you used the Passage command in Dark High Contrast 1.x, that path was a theme
-setting. Settings do not move between packages: choose the file once under
+A path configured by an earlier version keeps working and is still read from
+disk. If you used the Passage command in Dark High Contrast 1.x, that path was a
+theme setting. Settings do not move between packages: choose the file once under
 **Plugins → Passage → Settings**. Passages already written to your graph are
 content and need no migration.
 

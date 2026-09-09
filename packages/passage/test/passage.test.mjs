@@ -97,6 +97,10 @@ function node(tag, { id = '', classes = [], attributes = {}, ...rest } = {}) {
     focus() {
       self.focused = true
     },
+    click() {
+      self.clicks = (self.clicks ?? 0) + 1
+      self.dispatch('click')
+    },
     setSelectionRange(start, end) {
       self.selectionStart = start
       self.selectionEnd = end
@@ -757,16 +761,23 @@ const MANIFEST_FILE = 'resources/bible.books.json'
 const TEXT_FILE = 'resources/nrsvue.text.json'
 const TEXT_SETTING = 'biblePassageText'
 
-/* The host's own settings panel, as Logseq renders one `inputAs: 'file'`
- * setting: the item carries the setting's key and holds a plain file input. */
-function settingsPanel(key = TEXT_SETTING) {
+/* The host's own settings panel, as Logseq renders a `type: 'string'` setting:
+ * the item carries the setting's key, and the field sits inside its label. */
+function settingsPanel(key = TEXT_SETTING, value = '') {
   const item = node('div', {
     classes: ['desc-item', 'as-input'],
     attributes: { 'data-key': key }
   })
-  item.appendChild(node('input', { attributes: { type: 'file' } }))
+  const label = node('label', { classes: ['form-control'] })
+  label.appendChild(node('input', { classes: ['form-input'], attributes: { type: 'text' }, value }))
+  item.appendChild(label)
   return item
 }
+
+/* The controls Passage hangs in that panel. */
+const chooserIn = (panel) => panel.querySelector('[data-passage-file]')
+const chooseButtonIn = (panel) => panel.querySelector('[data-passage-choose]')
+const fieldIn = (panel) => panel.querySelector('input.form-input')
 
 /* What a file input hands over: a File with a name and its contents, and no
  * path of any kind. */
@@ -779,12 +790,15 @@ function chosenFile(name, data) {
   }
 }
 
-function chooseIn(panel, file, event = {}) {
-  const input = panel.querySelector('input')
-  assert.ok(input, 'the settings panel has no file input')
-  input.files = [file]
-  input.dispatch('change', event)
-  return input
+/* Choosing a file the way a reader does: the button opens the chooser, and the
+ * chooser reports what came back. */
+function chooseIn(panel, file) {
+  const chooser = chooserIn(panel)
+  assert.ok(chooser, 'Passage hung no file input in the settings panel')
+  chooseButtonIn(panel)?.dispatch('click')
+  chooser.files = [file]
+  chooser.dispatch('change')
+  return chooser
 }
 
 const TEXT_INDEX = {
@@ -946,39 +960,75 @@ test('the settings schema offers a Bible JSON file chooser and nothing a theme o
   ])
   const setting = context.logseq.schema[0]
   assert.equal(setting.type, 'string')
-  assert.equal(setting.inputAs, 'file')
+  /* Logseq's own `inputAs: 'file'` control is not what puts a chooser in front
+   * of the reader, so the setting stays an ordinary field and Passage hangs its
+   * own button beside it. */
+  assert.equal('inputAs' in setting, false)
   assert.equal(setting.default, '')
   assert.equal(setting.title, 'Bible JSON file')
-  assert.match(setting.description, /Bible JSON file/)
+  assert.match(setting.description, /Choose Bible JSON file/)
   assert.doesNotMatch(setting.description, /nrsvue\.text\.json/)
   /* Property hiding is a theme's setting; a graph with both installed keeps two
    * separate settings files, and neither plugin writes the other's keys. */
   assert.equal('hiddenProperties' in context.logseq.settings, false)
 })
 
-/* A file chooser is the one control Logseq offers that never reports a path:
- * the HTML spec fixes an input's value at `C:\fakepath\<name>`, and Electron
- * 32 removed the `File.path` that used to make up the difference. The contents
- * are the whole of what the chooser gives, so Passage copies them. */
-test('choosing a Bible JSON file copies its contents into the plugin’s own storage', async () => {
+/* Logseq's settings panel offers no dependable file control, so Passage hangs
+ * its own: a hidden input and the button that opens it. And a chooser never
+ * reports a path — the HTML spec fixes an input's value at `C:\fakepath\<name>`,
+ * and Electron 32 removed the `File.path` that used to make up the difference —
+ * so the contents are what Passage takes. */
+test('the settings panel is given a button that opens the file chooser', async () => {
+  const panel = settingsPanel()
+  commandContext({ panel })
+  await flush()
+
+  const button = chooseButtonIn(panel)
+  assert.ok(button, 'the settings panel has no chooser button')
+  assert.equal(button.textContent, 'Choose Bible JSON file\u2026')
+  // A submit would post the host's own settings form.
+  assert.equal(button.type, 'button')
+
+  const chooser = chooserIn(panel)
+  assert.equal(chooser.type, 'file')
+  assert.equal(chooser.accept, 'application/json,.json')
+
+  // The button is the control; the input behind it opens on being clicked.
+  button.dispatch('click')
+  assert.equal(chooser.clicks, 1)
+
+  /* Logseq's own field is left standing: it shows which file is in use, and a
+   * path typed into it by hand still works. */
+  assert.ok(fieldIn(panel))
+})
+
+test('the panel is furnished once however often it is repainted', async () => {
   const panel = settingsPanel()
   const { context } = commandContext({ panel })
   await flush()
 
-  let stopped = false
-  chooseIn(panel, chosenFile('net.text.json', TEXT_INDEX), {
-    stopPropagation() {
-      stopped = true
-    }
-  })
+  // A repaint runs on every host mutation; the chooser must not be hung twice.
+  context.parent.document.body.appendChild(node('div'))
+  await flush()
+
+  assert.equal(panel.querySelectorAll('[data-passage-file]').length, 1)
+  assert.equal(panel.querySelectorAll('[data-passage-choose]').length, 1)
+})
+
+test('choosing a Bible JSON file copies its contents into the plugin\u2019s own storage', async () => {
+  const panel = settingsPanel()
+  const { context } = commandContext({ panel })
+  await flush()
+
+  chooseIn(panel, chosenFile('net.text.json', TEXT_INDEX))
   await flush()
 
   // The setting keeps the name, which is the key the contents were stored under.
   assert.equal(context.logseq.settings[TEXT_SETTING], 'net.text.json')
   assert.deepEqual(JSON.parse(context.logseq.storage.get('net.text.json')), TEXT_INDEX)
-  /* Logseq's own handler stores the input's value. Left to run it would write
-   * `C:\fakepath\net.text.json` straight over the name above. */
-  assert.equal(stopped, true)
+  /* Logseq draws that field from its own state and would not redraw it for a
+   * value written from outside, so the name is put there directly. */
+  assert.equal(fieldIn(panel).value, 'net.text.json')
 })
 
 test('a passage is written from the file the chooser was given', async () => {
@@ -1088,22 +1138,23 @@ test('a storage that cannot be written leaves the setting as it was', async () =
   assert.equal(context.messages[0].status, 'warning')
 })
 
-test('unloading releases the chooser in the host’s own settings panel', async () => {
+test('unloading takes Passage\u2019s controls out of the host\u2019s settings panel', async () => {
   const panel = settingsPanel()
   const { context } = commandContext({ panel })
   await flush()
 
-  const input = panel.querySelector('input')
-  assert.equal(input.getAttribute('data-passage-chooser'), 'passage')
+  assert.ok(chooserIn(panel))
+  assert.equal(panel.getAttribute('data-passage-chooser'), 'passage')
 
   for (const handler of context.logseq.unloads) await handler()
 
-  /* The panel belongs to the host and outlives the plugin, so the chooser is
-   * released rather than removed, and it stops answering. */
-  assert.equal(input.getAttribute('data-passage-chooser'), null)
-  chooseIn(panel, chosenFile('net.text.json', TEXT_INDEX))
-  await flush()
-
+  /* The panel belongs to the host and outlives the plugin: what Passage hung
+   * there is removed, and the item itself is only released. */
+  assert.equal(chooserIn(panel), null)
+  assert.equal(chooseButtonIn(panel), null)
+  assert.equal(panel.getAttribute('data-passage-chooser'), null)
+  // Logseq's own field is the host's, and is left exactly as it was.
+  assert.ok(fieldIn(panel))
   assert.equal(context.logseq.settings[TEXT_SETTING], '')
   assert.equal(context.logseq.storage.size, 0)
 })

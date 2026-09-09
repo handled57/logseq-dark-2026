@@ -37,7 +37,8 @@ into its **Passage text index** (`biblePassageText`) setting:
 1. Before removing the old version, note which file that path points at.
 2. Install Passage.
 3. Open **Plugins → Passage → Settings**.
-4. Choose that file under **Bible JSON file** and test one reference.
+4. Press **Choose Bible JSON file…** under **Bible JSON file**, pick that
+   file, and test one reference.
 
 Passage copies the file you choose into its own storage, so the original can
 stay wherever it already lives. Do not copy `hiddenProperties` to Passage; it
