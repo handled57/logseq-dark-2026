@@ -2,6 +2,11 @@
 
 All notable changes to this package are documented here.
 
+## 0.6.1 - 2026-09-09
+
+- Run the NET source-index tests by file path so they work in clean Linux
+  release runners as well as local development environments.
+
 ## 0.6.0 - 2026-09-08
 
 - Replace the translation source-index schema with a compact hierarchy that
