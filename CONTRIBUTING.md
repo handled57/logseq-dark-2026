@@ -89,7 +89,7 @@ that Logseq rendered correctly.
    workspace, or network access.
 
 The built `dist/logseq-passage/` may contain a developer's ignored local
-`resources/bible.text.json` for manual testing. The ZIP is created before that
+`resources/nrsvue.text.json` for manual testing. The ZIP is created before that
 local file is copied, and archive verification rejects unexpected members.
 
 ## Repository delivery

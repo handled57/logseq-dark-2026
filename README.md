@@ -9,7 +9,7 @@ dependencies, compilation, remote imports, or runtime network access.
 | Marketplace package | npm workspace | Version | Install it when you want |
 | --- | --- | --- | --- |
 | **Dark High Contrast** | [`packages/dark-high-contrast`](packages/dark-high-contrast) | `2.1.0` | A pure-black, accessible theme for Logseq classic/file graphs. |
-| **Passage** | [`packages/passage`](packages/passage) | `0.3.0` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
+| **Passage** | [`packages/passage`](packages/passage) | `0.4.0` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
 | **Anno** | [`packages/anno`](packages/anno) | `0.1.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
 
 Install any one package by itself or install them together. None of them calls
@@ -17,7 +17,7 @@ another. Dark High Contrast styles any
 block that follows the [Passage v1 content contract](docs/contracts/passage-v1.md);
 Passage writes that ordinary Logseq markup readably with any theme, or none.
 
-Passage uses a local `bible.text.json` when one is available. Its release
+Passage uses a local `nrsvue.text.json` when one is available. Its release
 contains the book, chapter, and verse-count manifest needed to validate and
 canonicalize a reference. To insert text, build or supply a local index as
 described in the [Passage setup guide](packages/passage/README.md#passage-text).

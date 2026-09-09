@@ -99,7 +99,7 @@ This needs a local text index. Without one the command still writes the
 canonical reference and its chapter tags and leaves the text to you.
 
 To build the index, put per-verse Bible data at
-`resources/bible.index.json` and run:
+`resources/nrsvue.index.json` and run:
 
 ```sh
 node scripts/build-bible-index.mjs
@@ -108,12 +108,12 @@ node scripts/build-bible-index.mjs
 That writes two files. `resources/bible.books.json` is the manifest — book names,
 chapter counts, verse counts and verse-id offsets, no verse text — and it is
 committed and shipped, which is what makes references resolve with no further
-setup. `resources/bible.text.json` is the verse text; it is read from the
+setup. `resources/nrsvue.text.json` is the verse text; it is read from the
 plugin's own folder unless the **Passage text index** setting names another
 path.
 
 For an already-built index stored elsewhere, enter its absolute
-`bible.text.json` path under **Plugins → Passage → Settings → Passage text
+`nrsvue.text.json` path under **Plugins → Passage → Settings → Passage text
 index**. A Marketplace installation has no package-local text file, so this
 setting is the usual setup. Passage reads the file locally; it does not fetch or
 upload verse text.
@@ -155,7 +155,7 @@ that has no text would be metadata standing in for the passage.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| **Passage text index** (`biblePassageText`) | empty | Full path to a `bible.text.json` you built. Empty reads the one in the plugin's own `resources` folder. |
+| **Passage text index** (`biblePassageText`) | empty | Full path to a `nrsvue.text.json` you built. Empty reads the one in the plugin's own `resources` folder. |
 
 If you used the Passage command in Dark High Contrast 1.x, that path was a theme
 setting. Settings do not move between packages: re-enter it once under
@@ -202,7 +202,7 @@ npm run check --workspace packages/passage       # test, build and verify the ZI
 
 `npm run build` stages the release into the repository root's `dist/logseq-passage/` and zips it. That
 folder is also what you load as an unpacked plugin, so after the archive is
-closed the build copies your local `resources/bible.text.json` into it, if you
+closed the build copies your local `resources/nrsvue.text.json` into it, if you
 have one. The unpacked folder is then a complete working plugin — verses
 included — across rebuilds, while the ZIP stays exactly the file list
 the root `scripts/verify-release.mjs` asserts. A clean checkout and CI have no local index

@@ -214,7 +214,7 @@ removes every control along with the attributes.
 the parser/formatter surface the entry consumes. The shipped
 `resources/bible.books.json` contains structural book and verse metadata only.
 
-Text lives, if present, in ignored `resources/bible.text.json` or at the
+Text lives, if present, in ignored `resources/nrsvue.text.json` or at the
 absolute path in the `biblePassageText` setting. The build may copy the
 package-local file into the already archived extracted folder for manual
 testing. Verification rejects missing or unexpected ZIP members.
