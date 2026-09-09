@@ -39,7 +39,7 @@ const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
  * the command at a text index. */
 const TEXT_SETTING = 'biblePassageText'
 const BIBLE_MANIFEST_PATH = 'resources/bible.books.json'
-const BIBLE_TEXT_PATH = 'resources/bible.text.json'
+const BIBLE_TEXT_PATH = 'resources/nrsvue.text.json'
 
 const settingsSchema = [
   {
@@ -48,7 +48,7 @@ const settingsSchema = [
     default: '',
     title: 'Passage text index',
     description:
-      'Full path to a bible.text.json built by scripts/build-bible-index.mjs. Leave empty to read ' +
+      'Full path to a nrsvue.text.json built by scripts/build-bible-index.mjs. Leave empty to read ' +
       'the one in this plugin’s own resources folder. Without it the Passage command still ' +
       'writes the reference and its chapter tags, and leaves the text to you.'
   }
@@ -216,7 +216,7 @@ function loadBibleText() {
 
 const MISSING_TEXT_NOTICE =
   'Passage wrote the reference and its chapter tags. The passage text needs a local index: run ' +
-  'scripts/build-bible-index.mjs and put bible.text.json beside the plugin, or name it in the ' +
+  'scripts/build-bible-index.mjs and put nrsvue.text.json beside the plugin, or name it in the ' +
   'plugin’s settings.'
 
 async function passageBody(resolved, display) {

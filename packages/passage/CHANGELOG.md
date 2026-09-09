@@ -2,6 +2,15 @@
 
 All notable changes to this package are documented here.
 
+## 0.4.0 - 2026-09-08
+
+- Rename the local Bible resource files the generator reads and writes —
+  `bible.index.json` to `nrsvue.index.json`, and `bible.text.json` to
+  `nrsvue.text.json` — to name the translation the shipped index is built
+  from. The committed manifest, `bible.books.json`, is unchanged. A
+  previously built `bible.text.json` is no longer picked up automatically;
+  rename it or rebuild it under the new name.
+
 ## 0.3.0 - 2026-09-07
 
 - Add **Passage: Insert a passage** to Logseq's global command palette, available

@@ -143,8 +143,8 @@ test('the build stages a local verse index only after the archive is closed', as
 
   /* The text index is copied into the unpacked folder after archiving so a
    * developer's install keeps working across rebuilds. */
-  assert.doesNotMatch(JSON.stringify(pkg.release.files), /bible\.text\.json/, 'the local text index is in the fixed release file list')
-  assert.deepEqual(pkg.release.unpackedLocalFiles, ['resources/bible.text.json'])
+  assert.doesNotMatch(JSON.stringify(pkg.release.files), /nrsvue\.text\.json/, 'the local text index is in the fixed release file list')
+  assert.deepEqual(pkg.release.unpackedLocalFiles, ['resources/nrsvue.text.json'])
 
   const archived = build.indexOf('zipped?.status')
   const staged = build.indexOf('unpackedLocalFiles')

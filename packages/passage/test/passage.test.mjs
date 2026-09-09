@@ -732,7 +732,7 @@ test('the plugin provides exactly one style, and it is its own dialog', async ()
 
 /* The Bible files the loader reads, keyed by the paths `index.js` asks for. */
 const MANIFEST_FILE = 'resources/bible.books.json'
-const TEXT_FILE = 'resources/bible.text.json'
+const TEXT_FILE = 'resources/nrsvue.text.json'
 const TEXT_SETTING = 'biblePassageText'
 
 const TEXT_INDEX = {

@@ -8,7 +8,7 @@
  *                               counts and verse-id offsets, and no verse text.
  *                               Committed, shipped in the package, and what the
  *                               reference parser resolves against.
- *   resources/bible.text.json   the text index: the verse text itself.
+ *   resources/nrsvue.text.json  the text index: the verse text itself.
  *
  * The input carries four defects this script repairs; see REPAIRS below.
  */
@@ -24,7 +24,7 @@ function option(name, fallback) {
   return index === -1 ? fallback : process.argv[index + 1]
 }
 
-const inputPath = resolve(root, option('input', 'resources/bible.index.json'))
+const inputPath = resolve(root, option('input', 'resources/nrsvue.index.json'))
 const outDirectory = resolve(root, option('out', 'resources'))
 
 /* Book names the input states wrongly. `Bah` is a typo; `Psalm` is the
@@ -241,11 +241,11 @@ const manifest = {
 
 await writeFile(resolve(outDirectory, 'bible.books.json'), `${JSON.stringify(manifest, null, 2)}\n`)
 await writeFile(
-  resolve(outDirectory, 'bible.text.json'),
+  resolve(outDirectory, 'nrsvue.text.json'),
   JSON.stringify({ schemaVersion: 1, books: text })
 )
 
 console.log(
-  `Wrote bible.books.json and bible.text.json: ${manifest.stats.books} books, ` +
+  `Wrote bible.books.json and nrsvue.text.json: ${manifest.stats.books} books, ` +
     `${manifest.stats.chapters} chapters, ${manifest.stats.verses} verses`
 )
