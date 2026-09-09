@@ -89,20 +89,40 @@ test('the package ships no stylesheet and no icon a theme owns', async () => {
   assert.equal(pkg.logseq.icon, './icon.svg')
 })
 
-test('the package ships the reference manifest', async () => {
+test('the package ships a book manifest for every translation it offers', async () => {
   const parser = await readFile(resolve(root, 'bible.js'), 'utf8')
-  const books = JSON.parse(await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8'))
+  const books = JSON.parse(await readFile(resolve(root, 'resources', 'nrsvue.books.json'), 'utf8'))
+  const net = JSON.parse(await readFile(resolve(root, 'resources', 'net.books.json'), 'utf8'))
   const ignored = await readFile(resolve(root, '.gitignore'), 'utf8')
 
   assert.ok(pkg.files.includes('bible.js'))
-  assert.ok(pkg.files.includes('resources/bible.books.json'))
-  // The manifest carries structural data; the optional text index is local.
+  /* The manifests and the registry carry structural data, and the default
+   * translation's verse text ships with them so an install writes passages
+   * with no further setup. Every other translation's text is local. */
   assert.deepEqual(
     pkg.files.filter((file) => file.startsWith('resources')),
-    ['resources/bible.books.json']
+    [
+      'resources/net.books.json',
+      'resources/nrsvue.books.json',
+      'resources/translations.json',
+      'resources/net.text.json'
+    ]
   )
-  assert.match(ignored, /^resources\/\*$/m)
-  assert.match(ignored, /^!resources\/bible\.books\.json$/m)
+  /* The NRSVue verse text and its source indexes are the local files; its
+   * manifest holds no verse text and ships, so the ignore names the files it
+   * means rather than the translation. */
+  assert.match(ignored, /^resources\/nrsvue\.index\*$/m)
+  assert.match(ignored, /^resources\/nrsvue\.text\*$/m)
+  // A blanket ignore would keep a shipped manifest out of the package.
+  assert.doesNotMatch(ignored, /^resources\/(?:\*|nrsvue\*)$/m)
+
+  /* Two canons, and neither is the other: the deuterocanonical books are in
+   * one manifest and not in the other, which is the whole reason a translation
+   * resolves against its own. */
+  assert.deepEqual(net.stats, { books: 66, chapters: 1189, verses: 31086 })
+  const named = (manifest) => manifest.books.map(({ shortName }) => shortName)
+  assert.ok(named(books).includes('Sir'))
+  assert.equal(named(net).includes('Sir'), false)
 
   assert.deepEqual(books.stats, { books: 84, chapters: 1398, verses: 37758 })
   // Names, counts and offsets, and nothing else.
@@ -127,13 +147,86 @@ test('the package ships the reference manifest', async () => {
   assert.doesNotMatch(code, /parent\.|document|fetch\(|logseq\./)
 })
 
-test('generated text indexes remain local', async () => {
+test('locally built text indexes stay local', async () => {
   const shipped = await readdir(resolve(root, 'resources'))
-  // Whatever a local build has left in the working tree, the manifest remains
-  // the tracked resource.
-  assert.ok(shipped.includes('bible.books.json'))
+  // Whatever a local build has left in the working tree, the manifests, the
+  // registry and the default translation remain the tracked resources.
+  for (const file of [
+    'net.books.json',
+    'nrsvue.books.json',
+    'translations.json',
+    'net.text.json'
+  ]) {
+    assert.ok(shipped.includes(file), file)
+  }
   const ignored = await readFile(resolve(root, '.gitignore'), 'utf8')
-  assert.match(ignored, /bible\.text\.json|resources\/\*/)
+  assert.match(ignored, /^resources\/nrsvue\.text\*$/m)
+})
+
+test('the registry names both of every translation\'s files, and one of their indexes ships', async () => {
+  const registry = JSON.parse(await readFile(resolve(root, 'resources', 'translations.json'), 'utf8'))
+
+  assert.equal(registry.schemaVersion, 1)
+  assert.ok(registry.translations.length >= 1)
+  /* A translation is a manifest and a text index under one abbreviation, so an
+   * entry names both and neither can be paired with another translation's. */
+  for (const entry of registry.translations) {
+    assert.deepEqual(
+      Object.keys(entry),
+      ['name', 'abbreviation', 'books', 'text'],
+      entry.abbreviation
+    )
+    const abbreviation = entry.abbreviation.toLowerCase()
+    assert.equal(entry.books, `resources/${abbreviation}.books.json`)
+    assert.equal(entry.text, `resources/${abbreviation}.text.json`)
+  }
+  // Sorted by abbreviation, so the same set of translations writes the same file.
+  assert.deepEqual(
+    registry.translations.map(({ abbreviation }) => abbreviation),
+    [...registry.translations.map(({ abbreviation }) => abbreviation)].sort()
+  )
+
+  /* Whichever of a translation's files is present, it names the translation it
+   * holds, and names the same one the registry does: an option in the dropdown,
+   * the books it resolves against and the text behind them are one data set. */
+  for (const entry of registry.translations) {
+    for (const file of [entry.books, entry.text]) {
+      const path = resolve(root, file)
+      if (!(await access(path, constants.R_OK).then(() => true, () => false))) continue
+      const index = JSON.parse(await readFile(path, 'utf8'))
+      assert.equal(index.schemaVersion, 2, file)
+      assert.deepEqual(
+        index.translation,
+        { name: entry.name, abbreviation: entry.abbreviation },
+        file
+      )
+      assert.ok(Object.keys(index.books).length > 0, file)
+    }
+  }
+
+  // NET is the default translation, and the only verse text in the archive.
+  const net = registry.translations.find(({ abbreviation }) => abbreviation === 'NET')
+  assert.deepEqual(net, {
+    name: 'New English Translation',
+    abbreviation: 'NET',
+    books: 'resources/net.books.json',
+    text: 'resources/net.text.json'
+  })
+  assert.deepEqual(
+    pkg.release.files.filter((file) => file.endsWith('.text.json')),
+    ['resources/net.text.json']
+  )
+  /* Every manifest ships, so a translation whose text a reader builds locally
+   * still has the books that text was built from. */
+  assert.deepEqual(
+    pkg.release.files.filter((file) => file.endsWith('.books.json')),
+    registry.translations.map(({ books }) => books).sort()
+  )
+  assert.ok(pkg.release.files.includes('resources/translations.json'))
+
+  // The runtime builds its dropdown from the registry, not from a verse index.
+  assert.match(script, /resources\/translations\.json/)
+  assert.match(script, /enumChoices/)
 })
 
 test('the build stages a local verse index only after the archive is closed', async () => {

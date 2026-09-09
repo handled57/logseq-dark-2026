@@ -17,10 +17,12 @@ another. Dark High Contrast styles any
 block that follows the [Passage v1 content contract](docs/contracts/passage-v1.md);
 Passage writes that ordinary Logseq markup readably with any theme, or none.
 
-Passage uses a local `nrsvue.text.json` when one is available. Its release
-contains the book, chapter, and verse-count manifest needed to validate and
-canonicalize a reference. To insert text, build or supply a local index as
-described in the [Passage setup guide](packages/passage/README.md#passage-text).
+Passage's release contains a book, chapter, and verse-count manifest for each
+translation it offers — enough to validate and canonicalize a reference against
+that translation's own canon — and the New English Translation's verse text,
+which it writes by default. Another translation is chosen from the
+**Translation** dropdown once its index has been built locally, as described in
+the [Passage setup guide](packages/passage/README.md#choosing-a-translation).
 
 Anno needs nothing beyond an open file graph. It imports a PDF into that graph's
 `assets/` folder under the page title you give it, which is what puts Logseq's
@@ -77,7 +79,7 @@ byte parity with canonical source files.
 | --- | --- |
 | Root | Workspace coordination, shared release tooling and tests, the license, vendored SDK, CI, and repository-wide documentation. |
 | `packages/dark-high-contrast/` | Theme CSS, property/classification runtime, theme metadata, tests, screenshots, changelog, and package README. |
-| `packages/passage/` | Passage command, reference parser, text-index manifest, plugin metadata, tests, changelog, and package README. |
+| `packages/passage/` | Passage command, reference parser, per-translation book manifests, plugin metadata, tests, changelog, and package README. |
 | `packages/anno/` | Anno's PDF import command, its prompt, plugin metadata, tests, changelog, and package README. |
 | `docs/contracts/` | Versioned, runtime-neutral agreements that more than one package consumes. |
 | `test/support/` | Reusable test fixtures; package-specific assertions stay in their workspace. |

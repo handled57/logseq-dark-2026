@@ -1,3 +1,5 @@
-# Generated Bible indexes remain local. The structural manifest is committed.
-resources/nrsvue*
-!resources/bible.books.json
+# The NRSVue verse text and its source indexes are generated locally and stay
+# out of the repository. Both translations' book manifests, which hold no verse
+# text, the translation registry and the bundled NET indexes are committed.
+resources/nrsvue.index*
+resources/nrsvue.text*

@@ -1,5 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "translation": {
+    "name": "New English Translation",
+    "abbreviation": "NET"
+  },
   "books": {
     "Gen": {
       "1": {

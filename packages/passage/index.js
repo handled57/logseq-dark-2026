@@ -35,24 +35,59 @@ const COMMAND_ITEM_SELECTOR = '.menu-link, a, li'
 const EDITOR_SELECTOR = 'textarea.block-editor, textarea'
 const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 
-/* The manifest ships with the plugin. This setting is where a reader points
- * the command at a text index. */
-const TEXT_SETTING = 'biblePassageText'
-const BIBLE_MANIFEST_PATH = 'resources/bible.books.json'
-const BIBLE_TEXT_PATH = 'resources/net.text.json'
+/* This setting is where a reader chooses which translation the command writes,
+ * and a translation is a pair of files: the manifest a reference is resolved
+ * against and the index its text is read from. */
+const TRANSLATION_SETTING = 'biblePassageTranslation'
+const TRANSLATIONS_PATH = 'resources/translations.json'
 
-const settingsSchema = [
-  {
-    key: TEXT_SETTING,
-    type: 'string',
-    default: '',
-    title: 'Passage text index',
-    description:
-      'Full path to a nrsvue.text.json built by scripts/build-bible-index.mjs. Leave empty to read ' +
-      'the one in this plugin’s own resources folder. Without it the Passage command still ' +
-      'writes the reference and its chapter tags, and leaves the text to you.'
-  }
-]
+/* Both of a translation's files name the translation inside, and the registry
+ * beside them lists those names: it is kilobytes where an index is megabytes,
+ * so the dropdown is built from it at startup without reading a verse of text.
+ * The default translation is also the fallback registry, so a graph that cannot
+ * read the file keeps a working setting rather than an empty one. */
+const DEFAULT_TRANSLATION = {
+  name: 'New English Translation',
+  abbreviation: 'NET',
+  books: 'resources/net.books.json',
+  text: 'resources/net.text.json'
+}
+
+let translations = [DEFAULT_TRANSLATION]
+
+/* The abbreviation is what a reader knows the translation by, and the name is
+ * what says which one it is; the option carries both. */
+function translationLabel({ name, abbreviation }) {
+  return `${name} (${abbreviation})`
+}
+
+function defaultTranslation() {
+  return (
+    translations.find(({ abbreviation }) => abbreviation === DEFAULT_TRANSLATION.abbreviation) ??
+    translations[0] ??
+    DEFAULT_TRANSLATION
+  )
+}
+
+/* Registered once the registry read has landed, so the choices are the
+ * translations this installation actually has. */
+function settingsSchema() {
+  return [
+    {
+      key: TRANSLATION_SETTING,
+      type: 'enum',
+      enumChoices: translations.map(translationLabel),
+      enumPicker: 'select',
+      default: translationLabel(defaultTranslation()),
+      title: 'Translation',
+      description:
+        'The translation the Passage command writes. Each choice is a book manifest and a ' +
+        'verse index in this plugin’s own resources folder, built together by ' +
+        'scripts/build-bible-index.mjs. Without the index the command still writes the ' +
+        'reference and its chapter tags, and leaves the text to you.'
+    }
+  ]
+}
 
 const PROPERTY_LINE = /^[\w.-]+::(?:\s|$)/
 
@@ -123,30 +158,26 @@ async function captureInvocation(trigger) {
 
 /* Reading the Bible data.
  *
- * Two files, and neither one is required. `resources/bible.books.json` is the
- * manifest — book names, chapter counts and verse-id offsets, no verse text —
- * and it ships with the plugin, so references resolve out of the box. The verse
- * text index is read from the plugin's own resources folder or from wherever
- * the setting points.
+ * `resources/translations.json` is the registry, and it names two files for
+ * every translation: a manifest — book names, chapter counts and verse-id
+ * offsets, no verse text — and the verse index itself. Both are read from the
+ * plugin's own resources folder, and both belong to the selected translation:
+ * a reference resolved against one Bible's books must not be filled from
+ * another's text, so choosing a translation changes the pair together.
  *
- * Every read route below is optional and guarded. A route that is missing or
- * refuses is simply the next one's turn, and when all of them fail the command
- * degrades a step at a time: no text index means the reference and its tags
- * with the body left to the reader, and no manifest at all means the reference
- * exactly as it was typed. The plugin stays fully usable installed from the
- * Marketplace with no Bible data present.
+ * None of the files is required. Every read route below is optional and
+ * guarded: a route that is missing or refuses is simply the next one's turn,
+ * and when all of them fail the command degrades a step at a time: no text
+ * index means the reference and its tags with the body left to the reader, and
+ * no manifest means the reference exactly as it was typed. The plugin stays
+ * fully usable installed from the Marketplace with no Bible data present.
  */
-
-function settingPath(key) {
-  const value = logseq.settings?.[key]
-  return typeof value === 'string' ? value.trim() : ''
-}
 
 const ABSOLUTE_PATH = /^(?:[/\\]|[a-z]:[/\\])/i
 
 /* `logseq.baseInfo.lsr` is the plugin's own root as a URL, so a path packaged
- * with the plugin becomes a filesystem path through it. A path the reader
- * configured is already one. */
+ * with the plugin becomes a filesystem path through it. A path the registry
+ * states in full is already one. */
 function pluginPath(path) {
   if (ABSOLUTE_PATH.test(path)) return path
 
@@ -189,45 +220,119 @@ async function readSource(path) {
 }
 
 let bibleManifest = null
+let manifestRead = null
 let bibleTextRead = null
 let noticed = false
 
-async function loadBibleManifest() {
-  bibleManifest = await readSource(BIBLE_MANIFEST_PATH)
-  return bibleManifest
+/* The registry is small enough to read at startup, and the dropdown cannot be
+ * offered until it has been read. An entry has to name a translation and both
+ * of its files to be an option at all; anything less is skipped rather than
+ * shown as a choice that resolves against one Bible and reads another. */
+async function loadTranslations() {
+  const registry = await readSource(TRANSLATIONS_PATH)
+  const listed = (Array.isArray(registry?.translations) ? registry.translations : []).filter(
+    (entry) => entry?.name && entry?.abbreviation && entry?.books && entry?.text
+  )
+
+  if (listed.length) translations = listed
+  return translations
+}
+
+/* The stored value is the option as it reads in the dropdown. A bare
+ * abbreviation is honoured too, because a settings file edited by hand is
+ * easier to write that way, and a value naming no translation this
+ * installation has falls back to the default rather than to nothing. */
+function selectedTranslation() {
+  const stored = logseq.settings?.[TRANSLATION_SETTING]
+  const chosen = typeof stored === 'string' ? stored.trim().toLowerCase() : ''
+
+  return (
+    translations.find(
+      (entry) =>
+        translationLabel(entry).toLowerCase() === chosen ||
+        entry.abbreviation.toLowerCase() === chosen
+    ) ?? defaultTranslation()
+  )
+}
+
+/* The manifest is the selected translation's own, and a manifest that names
+ * another translation is no use here: it would accept references to books this
+ * Bible does not contain and refuse ones it does. Every read is remembered
+ * against the selection and starts again when the selection changes. */
+function loadBibleManifest() {
+  if (!manifestRead) {
+    const translation = selectedTranslation()
+    manifestRead = (async () => {
+      const loaded = await readSource(translation.books)
+      bibleManifest = matchesTranslation(loaded, translation) ? loaded : null
+      return bibleManifest
+    })()
+  }
+
+  return manifestRead
 }
 
 /* The text index is several megabytes, so it is read on the first passage
  * rather than at startup, and the read is remembered either way. */
 function loadBibleText() {
   if (!bibleTextRead) {
-    const configured = settingPath(TEXT_SETTING)
+    const translation = selectedTranslation()
     bibleTextRead = (async () => {
-      for (const path of configured ? [configured, BIBLE_TEXT_PATH] : [BIBLE_TEXT_PATH]) {
-        const loaded = await readSource(path)
-        if (loaded?.books) return loaded
-      }
-      return null
+      const loaded = await readSource(translation.text)
+      return matchesTranslation(loaded, translation) ? loaded : null
     })()
   }
 
   return bibleTextRead
 }
 
-const MISSING_TEXT_NOTICE =
-  'Passage wrote the reference and its chapter tags. The passage text needs a local index: run ' +
-  'scripts/build-bible-index.mjs and put nrsvue.text.json beside the plugin, or name it in the ' +
-  'plugin’s settings.'
+/* Both files carry the translation they were built from, so a pair that does
+ * not belong together can be refused rather than mixed. A file built before
+ * the translation was named carries none, and is taken at the registry's
+ * word. */
+function matchesTranslation(loaded, { abbreviation }) {
+  if (!loaded?.books) return false
+
+  const named = loaded.translation?.abbreviation
+  return !named || named.toLowerCase() === abbreviation.toLowerCase()
+}
+
+/* Which translation the missing file belongs to is the whole of the news, so
+ * both notices name it rather than the path it would have been read from, and
+ * both name the one script that writes the pair. */
+function missingFileNotice(translation, missing, written) {
+  return (
+    `Passage wrote ${written}. There is no ${missing} for ${translationLabel(translation)} in ` +
+    'this plugin’s resources folder: build one with scripts/build-bible-index.mjs, or choose ' +
+    'another translation in the plugin’s settings.'
+  )
+}
+
+function missingTextNotice(translation) {
+  return missingFileNotice(translation, 'verse index', 'the reference and its chapter tags')
+}
+
+/* No tags means no manifest: the parser tags every reference it resolves. */
+function missingManifestNotice(translation) {
+  return missingFileNotice(translation, 'book manifest', 'the reference exactly as you typed it')
+}
+
+function notice(text) {
+  if (noticed) return
+
+  noticed = true
+  logseq.UI?.showMsg?.(text, 'warning')
+}
 
 async function passageBody(resolved, display) {
-  if (!resolved.tags?.length) return ''
+  if (!resolved.tags?.length) {
+    notice(missingManifestNotice(selectedTranslation()))
+    return ''
+  }
 
   const body = composePassageText(resolved, await loadBibleText(), display)
 
-  if (!body && !noticed) {
-    noticed = true
-    logseq.UI?.showMsg?.(MISSING_TEXT_NOTICE, 'warning')
-  }
+  if (!body) notice(missingTextNotice(selectedTranslation()))
 
   return body
 }
@@ -591,6 +696,11 @@ async function insertPassage(trigger) {
     const target = await captureInvocation(trigger)
     if (!target) return
 
+    /* The dialog resolves what is typed into it as it is typed, so the
+     * selected translation's manifest has to be in hand before it opens. The
+     * read is remembered, so this waits once per selection. */
+    await loadBibleManifest()
+
     const choice = await askForReference()
     if (!choice) return
 
@@ -682,22 +792,35 @@ function teardown() {
 }
 
 function main() {
-  logseq.useSettingsSchema(settingsSchema)
-  /* The manifest is small and every reference needs it, so the read starts
-   * here; nothing waits on it, and a passage typed before it lands is written
-   * as it was typed. */
-  void loadBibleManifest().catch(() => null)
+  /* The dropdown offers what the registry lists, so the schema is registered
+   * once that read has landed. Nothing waits on it: a passage written before it
+   * lands is written from the default translation. */
+  /* The manifest belongs to the selected translation, so its read waits for the
+   * registry and for the setting the schema registers; it is small, and warming
+   * it here means the first reference has it in hand. */
+  void loadTranslations()
+    .catch(() => translations)
+    .then(() => {
+      logseq.useSettingsSchema(settingsSchema())
+      return loadBibleManifest()
+    })
+    .catch(() => null)
   logseq.provideStyle({ key: DIALOG_STYLE_KEY, style: DIALOG_STYLE })
   logseq.Editor?.registerSlashCommand?.(COMMAND_LABEL, () => insertPassage('slash'))
   logseq.App?.registerCommandPalette?.(
     { key: COMMAND_PALETTE_KEY, label: COMMAND_LABEL },
     () => insertPassage('palette')
   )
-  /* A new text-index path is a new read, and a reason to say again that there
-   * is nothing at the end of it. */
+  /* A newly selected translation is a new pair of reads, and a reason to say
+   * again that there is nothing at the end of one of them. The manifest is
+   * dropped with the text index, so a reference is never resolved against the
+   * translation that was selected a moment ago. */
   logseq.onSettingsChanged(() => {
+    bibleManifest = null
+    manifestRead = null
     bibleTextRead = null
     noticed = false
+    void loadBibleManifest().catch(() => null)
   })
   logseq.beforeunload?.(async () => teardown())
 

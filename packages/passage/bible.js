@@ -1,7 +1,8 @@
 /* Reference half of the Passage command.
  *
- * Everything here is pure: it takes the manifest (`resources/bible.books.json`)
- * and, when there is one, the text index, and turns a typed reference such as
+ * Everything here is pure: it takes one translation's manifest
+ * (`resources/<abbreviation>.books.json`) and, when there is one, the same
+ * translation's text index, and turns a typed reference such as
  * `Gen 50 - Ex 2` into a canonical reference, the chapter tags that belong on
  * the block, and the passage text. Nothing in this file touches the host
  * document, the plugin API, or the network, which is what lets the tests drive

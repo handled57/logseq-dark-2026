@@ -20,8 +20,9 @@ behavior lives in one package:
 
 - Theme behavior: `packages/dark-high-contrast/theme.css` and `index.js`.
 - Passage behavior: `packages/passage/index.js` and classic script
-  `bible.js`; its distributable structural manifest is
-  `resources/bible.books.json`.
+  `bible.js`; its distributable structural manifests are one
+  `resources/<abbreviation>.books.json` per translation, listed with their verse
+  indexes in `resources/translations.json`.
 - Anno behavior: `packages/anno/index.js`, which owns both the import prompt
   and the asset-naming rule that decides which page Logseq collects a PDF's
   highlights on.
@@ -89,8 +90,9 @@ that Logseq rendered correctly.
    workspace, or network access.
 
 The built `dist/logseq-passage/` may contain a developer's ignored local
-`resources/nrsvue.text.json` for manual testing. The ZIP is created before that
-local file is copied, and archive verification rejects unexpected members.
+`resources/nrsvue.text.json` for manual testing alongside the NET index the
+package ships. The ZIP is created before that local file is copied, and archive
+verification rejects unexpected members.
 
 ## Repository delivery
 

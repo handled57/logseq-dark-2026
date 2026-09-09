@@ -23,21 +23,25 @@ picker entry. Install the **Passage** plugin (`logseq-passage`) separately if
 you want to create new passage blocks. The theme works without it; Passage also
 works with another theme or with no theme selected.
 
-Passage can validate references and write the reference and chapter tags
-immediately, but a local text index is required to insert verse text. Follow
-the [Passage text setup](../packages/passage/README.md#passage-text) for building
-or supplying an index.
+Passage validates references and writes the reference and chapter tags
+immediately, and from 0.7.0 it ships the New English Translation, so verse text
+is written with no further setup. Another translation is built locally and
+chosen by name; see
+[Choosing a translation](../packages/passage/README.md#choosing-a-translation).
 
-## Copy the text-index path manually
+## Choose the translation instead of a path
 
 Logseq settings are package-scoped, so the old theme setting cannot migrate
-itself into the new Passage package. If Dark High Contrast 1.x had a custom
-**Passage text index** (`biblePassageText`) path:
+itself into the new Passage package — and there is no longer a path to migrate.
+Dark High Contrast 1.x had a **Passage text index** (`biblePassageText`) path;
+Passage 0.7.0 replaced it with a **Translation** dropdown and ignores any path
+left in a settings file.
 
-1. Before removing the old version, copy the complete path from its setting.
-2. Install Passage.
-3. Open **Plugins → Passage → Settings**.
-4. Paste the path into **Passage text index** and test one reference.
+1. Install Passage.
+2. Open **Plugins → Passage → Settings**.
+3. Choose the translation and test one reference.
 
-Only the setting path moves. Do not copy `hiddenProperties` to Passage; it stays
-with Dark High Contrast. Do not rewrite existing passage blocks.
+If you kept a text index of your own, build it into Passage's `resources` folder
+under the translation's abbreviation rather than pointing at it. Do not copy
+`hiddenProperties` to Passage; it stays with Dark High Contrast. Do not rewrite
+existing passage blocks.

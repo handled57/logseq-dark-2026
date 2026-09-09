@@ -2,6 +2,68 @@
 
 All notable changes to this package are documented here.
 
+## 0.8.0 - 2026-09-09
+
+- Give every translation its own book manifest, and resolve a reference against
+  the manifest of the translation that is selected. `resources/bible.books.json`
+  is renamed `resources/nrsvue.books.json` and joined by
+  `resources/net.books.json`: a translation is now a pair of files under one
+  abbreviation, and choosing a translation changes the pair together. A
+  reference is therefore only accepted for a book the selected translation
+  actually contains — this closes
+  [issue #44](https://github.com/handled57/logseq-dark-2026/issues/44), where
+  every translation resolved against the NRSVue canon and the NET's 66 books
+  accepted references to the 18 they do not include.
+- Name the translation inside the manifest as well. `*.books.json` files use
+  schema version 2, which is schema 1 with the same `translation` block the
+  verse indexes carry, and `resources/translations.json` names both of a
+  translation's files. A manifest or index whose declared translation is not the
+  selected one is refused rather than read, so a mismatched pair cannot be
+  resolved against.
+- Say so when there is no manifest. A translation with no manifest behind it
+  writes the reference exactly as it was typed, with no chapter tags, and the
+  notice now names that translation and the script that builds the pair.
+- Ship every manifest in the release archive — they hold no verse text — so a
+  translation whose verse index you build locally already has the books that
+  index was built from. The NET verse text remains the only one committed or
+  released.
+- **Breaking:** `scripts/build-bible-index.mjs` no longer writes
+  `resources/bible.books.json`. An index built before this release has no
+  manifest of its own: run the builder again to write one beside it, and delete
+  the leftover shared file.
+
+## 0.7.0 - 2026-09-09
+
+- Choose the translation from a dropdown. **Plugins → Passage → Settings →
+  Translation** lists the translations this installation has, each named and
+  abbreviated — `New English Translation (NET)` — and the next passage is
+  written from the selected one.
+- Bundle the New English Translation and select it by default, so an
+  installation writes passage text with no further setup. The NET Bible's
+  copyright and API terms are recorded in `THIRD_PARTY_NOTICES.md`; no other
+  translation's verse text is committed or released.
+- Name the translation inside every index. `*.text.json` files use schema
+  version 2, which is schema 1 with a `translation` block holding the
+  translation's full name and abbreviation, and `*.index.json` source files
+  declare the same block. `scripts/build-bible-index.mjs` reads it from the
+  source index or from `--name` and `--abbreviation`, writes the verse text as
+  `resources/<abbreviation>.text.json`, and records the translation in a new
+  `resources/translations.json` registry that the dropdown is built from.
+  Building a translation adds it to that registry rather than replacing it.
+- **Breaking:** the **Passage text index** setting (`biblePassageText`) is
+  gone. A path left in a settings file is ignored. Choose the translation by
+  name instead and keep its index in the plugin's own `resources` folder; a
+  registry entry may state a path in full for an index kept elsewhere.
+- A translation with no index behind it still writes the canonical reference
+  and its chapter tags, and the notice now names the translation it could not
+  read.
+
+Reference resolution still runs against the single shared
+`resources/bible.books.json`, built from the NRSVue canon, so a translation
+with a different canon accepts references to books it does not contain and
+reports no text for them. That pairing is
+[issue #44](https://github.com/handled57/logseq-dark-2026/issues/44).
+
 ## 0.6.1 - 2026-09-09
 
 - Run the NET source-index tests by file path so they work in clean Linux

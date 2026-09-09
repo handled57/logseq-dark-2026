@@ -2,8 +2,9 @@
  *
  * `bible.js` is a classic script like `index.js`, so it is run in a `vm`
  * context and its top-level declarations are read off that context's global.
- * Everything here resolves against the manifest the plugin actually ships,
- * because the counts and names in that file are half of what is being tested.
+ * Everything here resolves against the NRSVue manifest the plugin ships,
+ * because the counts and names in that file — the widest canon of the
+ * translations on offer — are half of what is being tested.
  */
 
 import assert from 'node:assert/strict'
@@ -18,7 +19,7 @@ const context = { console }
 vm.createContext(context)
 new vm.Script(await readFile(resolve(root, 'bible.js'), 'utf8')).runInContext(context)
 
-const manifest = JSON.parse(await readFile(resolve(root, 'resources', 'bible.books.json'), 'utf8'))
+const manifest = JSON.parse(await readFile(resolve(root, 'resources', 'nrsvue.books.json'), 'utf8'))
 const { parsePassageReference, composePassageText } = context
 
 const parse = (reference) => parsePassageReference(reference, manifest)
