@@ -10,12 +10,14 @@
  *                               reference parser resolves against.
  *   resources/nrsvue.text.json  the text index: the verse text itself.
  *
- * The input carries four defects this script repairs; see REPAIRS below.
+ * The schemaVersion 2 input keeps every verse once in its paragraph. The
+ * NRSVue input carries four defects this script repairs; see REPAIRS below.
  */
 
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { TranslationIndex } from './translation-index.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -118,12 +120,15 @@ function splitTrailingMatter(text, { psalm, last }) {
   return { text: lines.join('\n').trim(), heading: trailing.join(' ') }
 }
 
-function versesOf(chapter) {
-  return chapter.verses ?? chapter.paragraphs.flatMap((paragraph) => paragraph.verses)
-}
-
 const input = JSON.parse(await readFile(inputPath, 'utf8'))
+const sourceIndex = new TranslationIndex(input)
 const problems = []
+
+function versesOf(chapter) {
+  return chapter.paragraphs.flatMap((paragraph) =>
+    paragraph.verses.map((verse) => sourceIndex.verse(verse.verseId))
+  )
+}
 
 const books = []
 const text = {}
@@ -133,6 +138,7 @@ let verseTotal = 0
 
 for (const book of input.books) {
   const repair = REPAIRS[book.bookId] ?? {}
+  const sourceBook = sourceIndex.book(book.bookId)
   const shortName = repair.shortName ?? book.shortName
   const longName = repair.longName ?? book.longName
 
@@ -142,8 +148,8 @@ for (const book of input.books) {
     )
   }
 
-  if (book.fromVerseId !== expectedVerseId) {
-    problems.push(`${shortName} starts at verseId ${book.fromVerseId}, expected ${expectedVerseId}`)
+  if (sourceBook.fromVerseId !== expectedVerseId) {
+    problems.push(`${shortName} starts at verseId ${sourceBook.fromVerseId}, expected ${expectedVerseId}`)
   }
 
   const outline = []
@@ -151,7 +157,7 @@ for (const book of input.books) {
   let previousChapter = -Infinity
 
   for (const chapter of book.chapters) {
-    const number = repair.renumber?.[chapter.chapter] ?? chapter.chapter
+    const number = repair.renumber?.[chapter.chapterNum] ?? chapter.chapterNum
     if (number <= previousChapter) {
       problems.push(`${shortName} chapter ${number} does not follow chapter ${previousChapter}`)
     }
@@ -188,7 +194,7 @@ for (const book of input.books) {
 
       rendered.push(split.text)
       if (split.heading) headings[verse.verseNum] = split.heading
-      if (position === 0 || verse.paragraphId !== verses[position - 1].paragraphId) {
+      if (position === 0 || verse.paragraphNum !== verses[position - 1].paragraphNum) {
         paragraphs.push(verse.verseNum)
       }
     }
@@ -215,7 +221,7 @@ for (const book of input.books) {
     bookId: book.bookId,
     shortName,
     longName,
-    fromVerseId: book.fromVerseId,
+    fromVerseId: sourceBook.fromVerseId,
     chapters: outline
   })
   text[shortName] = chapters

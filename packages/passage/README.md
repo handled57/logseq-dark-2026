@@ -105,6 +105,15 @@ To build the index, put per-verse Bible data at
 node scripts/build-bible-index.mjs
 ```
 
+The source file uses Passage's compact translation-index schema. To convert an
+older source index once, without overwriting it while conversion is in flight:
+
+```sh
+node scripts/compact-bible-index.mjs \
+  --input resources/nrsvue.index.v1.json \
+  --output resources/nrsvue.index.json
+```
+
 That writes two files. `resources/bible.books.json` is the manifest — book names,
 chapter counts, verse counts and verse-id offsets, no verse text — and it is
 committed and shipped, which is what makes references resolve with no further
@@ -117,6 +126,54 @@ For an already-built index stored elsewhere, enter its absolute
 index**. A Marketplace installation has no package-local text file, so this
 setting is the usual setup. Passage reads the file locally; it does not fetch or
 upload verse text.
+
+### Building an index from the NET Bible API
+
+To download the 66-book NET Bible into the same source-index shape, run:
+
+```sh
+python3 scripts/build-net-index.py
+```
+
+The script uses only Python's standard library and writes
+`resources/NET.index.json`. It requests one chapter at a time, retries transient
+failures, waits briefly between requests, and replaces the destination only
+after the complete index has been built. Convert that source index into
+Passage's runtime files with:
+
+```sh
+node scripts/build-bible-index.mjs --input resources/NET.index.json
+```
+
+Use and distribution of text retrieved from the service must comply with the
+[NET Bible copyright and API terms](https://labs.bible.org/api_web_service).
+
+### Translation source-index schema
+
+`*.index.json` files use schema version 2. Their stored shape is:
+
+```text
+schemaVersion: 2
+stats: { books, chapters, paragraphs, verses }
+books[]: { bookId, shortName, longName, chapters[] }
+chapters[]: { chapterNum, paragraphs[] }
+paragraphs[]: { paragraphNum, verses[] }
+verses[]: { verseId, verseNum, text }
+```
+
+Each verse is stored exactly once, inside its paragraph. `chapterNum` and
+`paragraphNum` are the canonical field names; the old `chapter` and
+`paragraphId` aliases are not stored. Paragraph numbers remain globally
+ordered and stable. Newline characters inside `text` preserve poetry
+lineation, while paragraph membership is expressed by the containing paragraph.
+
+The lookup helper in `scripts/translation-index.mjs` builds maps in memory. A
+verse reference is `shortName/chapterNum/verseNum` (for example
+`John/3/16`), and a book reference is its `shortName` (for example `John`). It
+derives book and chapter metadata, paragraph membership, references, and book
+verse bounds from the hierarchy. Serialized source files therefore contain no
+`indexes` section, timestamps, duplicated verse objects, or stored reference
+and range fields. The same input bytes always generate the same output bytes.
 
 ## Display options
 
