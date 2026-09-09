@@ -39,7 +39,7 @@ const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
  * the command at a text index. */
 const TEXT_SETTING = 'biblePassageText'
 const BIBLE_MANIFEST_PATH = 'resources/bible.books.json'
-const BIBLE_TEXT_PATH = 'resources/nrsvue.text.json'
+const BIBLE_TEXT_PATH = 'resources/net.text.json'
 
 const settingsSchema = [
   {
