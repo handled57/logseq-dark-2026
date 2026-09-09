@@ -121,18 +121,15 @@ Fetcher = Callable[[str, float, int], list[dict[str, Any]]]
 def build_index(fetcher: Fetcher = fetch_chapter, *, timeout: float, retries: int,
                 delay: float) -> dict[str, Any]:
     books: list[dict[str, Any]] = []
-    indexes: dict[str, dict[str, Any]] = {
-        "versesByRef": {}, "refsByVerseId": {}, "chaptersByRef": {}, "booksByShortName": {}
-    }
     verse_id, paragraph_id, chapter_total = 1, 1, 0
 
     for book_id, (api_name, short_name, long_name, chapter_count) in enumerate(BOOKS, 1):
-        book_start, chapters, chapter_refs = verse_id, [], []
+        chapters = []
         for chapter_number in range(1, chapter_count + 1):
             if delay and verse_id > 1:
                 time.sleep(delay)
             rows = fetcher(f"{api_name} {chapter_number}", timeout, retries)
-            verses, paragraphs, current, seen = [], [], None, set()
+            paragraphs, current, seen = [], None, set()
             for row in rows:
                 number, returned_chapter = int(row["verse"]), int(row["chapter"])
                 if returned_chapter != chapter_number or number in seen:
@@ -140,45 +137,23 @@ def build_index(fetcher: Fetcher = fetch_chapter, *, timeout: float, retries: in
                 seen.add(number)
                 text, starts_paragraph = parse_markup(str(row["text"]))
                 if current is None or starts_paragraph:
-                    current = {"paragraphId": paragraph_id, "fromVerseId": verse_id,
-                               "toVerseId": verse_id, "verses": []}
+                    current = {"paragraphNum": paragraph_id, "verses": []}
                     paragraph_id += 1
                     paragraphs.append(current)
-                reference = f"{short_name}/{chapter_number}/{number}"
-                verse = {"verseId": verse_id, "ref": reference, "shortName": short_name,
-                         "longName": long_name, "bookId": book_id, "chapter": chapter_number,
-                         "verseNum": number, "paragraphId": current["paragraphId"], "text": text}
-                verses.append(verse)
+                verse = {"verseId": verse_id, "verseNum": number, "text": text}
                 current["verses"].append(verse)
-                current["toVerseId"] = verse_id
-                indexes["versesByRef"][reference] = verse_id
-                indexes["refsByVerseId"][str(verse_id)] = reference
                 verse_id += 1
 
-            chapter_ref = f"{short_name}/{chapter_number}"
-            chapter = {"chapter": chapter_number, "chapterRef": chapter_ref,
-                       "fromVerseId": verses[0]["verseId"], "toVerseId": verses[-1]["verseId"],
-                       "paragraphs": paragraphs, "verses": verses}
-            chapters.append(chapter)
-            chapter_refs.append(chapter_ref)
-            indexes["chaptersByRef"][chapter_ref] = {
-                "bookId": book_id, "shortName": short_name, "longName": long_name,
-                "chapter": chapter_number, "fromVerseId": chapter["fromVerseId"],
-                "toVerseId": chapter["toVerseId"],
-                "paragraphIds": [item["paragraphId"] for item in paragraphs],
-                "verseIds": [item["verseId"] for item in verses]}
+            chapters.append({"chapterNum": chapter_number, "paragraphs": paragraphs})
             chapter_total += 1
 
-        books.append({"bookId": book_id, "shortName": short_name, "longName": long_name,
-                      "fromVerseId": book_start, "toVerseId": verse_id - 1, "chapters": chapters})
-        indexes["booksByShortName"][short_name] = {
-            "bookId": book_id, "shortName": short_name, "longName": long_name,
-            "fromVerseId": book_start, "toVerseId": verse_id - 1, "chapters": chapter_refs}
+        books.append({"bookId": book_id, "shortName": short_name,
+                      "longName": long_name, "chapters": chapters})
 
-    return {"schemaVersion": 1, "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    return {"schemaVersion": 2,
             "stats": {"books": len(books), "chapters": chapter_total,
                       "paragraphs": paragraph_id - 1, "verses": verse_id - 1},
-            "books": books, "indexes": indexes}
+            "books": books}
 
 
 def write_atomically(destination: Path, data: dict[str, Any]) -> None:

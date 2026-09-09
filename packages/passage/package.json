@@ -1,6 +1,6 @@
 {
   "name": "logseq-passage",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Insert a Bible passage into a Logseq block, with a canonical reference, per-chapter tags and text from a local index.",
   "author": "Peter Cole",
   "license": "MIT",
@@ -18,7 +18,7 @@
     "reference"
   ],
   "scripts": {
-    "test": "node --test test/package.test.mjs test/bible.test.mjs test/passage.test.mjs test/contract.test.mjs && python3 -m unittest test/net_index_test.py",
+    "test": "node --test test/package.test.mjs test/bible.test.mjs test/passage.test.mjs test/contract.test.mjs test/translation-index.test.mjs && python3 -m unittest test/net_index_test.py",
     "build": "node ../../scripts/build-release.mjs",
     "verify:release": "node ../../scripts/verify-release.mjs",
     "check": "npm test && npm run build && npm run verify:release"

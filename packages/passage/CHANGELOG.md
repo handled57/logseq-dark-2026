@@ -2,6 +2,19 @@
 
 All notable changes to this package are documented here.
 
+## 0.6.0 - 2026-09-08
+
+- Replace the translation source-index schema with a compact hierarchy that
+  stores each verse once and derives references, book bounds, book and chapter
+  metadata, and paragraph membership during lookup. NRSVue and NET now share
+  schema version 2, with canonical `chapterNum` and `paragraphNum` names and no
+  serialized reverse indexes or generation timestamp.
+- Add a source-index lookup helper and a one-time converter for older NRSVue
+  indexes. Verse lookup works by reference or stable verse ID, book lookup
+  returns its derived bounds and canonical reference, poetry lineation and
+  numbering gaps are preserved, and the existing Passage runtime artifacts are
+  generated without changing their supported content.
+
 ## 0.5.0 - 2026-09-08
 
 - Add a standard-library Python generator that downloads the 66-book NET Bible
