@@ -884,7 +884,7 @@ test('a settings change re-reads the text index and says again when there is non
   assert.match(context.logseq.Editor.updates[1].content, /tags:: Ps\/24\ntype:: Passage/)
 })
 
-test('the settings schema offers the text-index path and nothing a theme owns', async () => {
+test('the settings schema offers a Bible JSON file chooser and nothing a theme owns', async () => {
   const { context } = commandContext()
   await Promise.resolve()
 
@@ -892,7 +892,13 @@ test('the settings schema offers the text-index path and nothing a theme owns', 
   assert.deepEqual(JSON.parse(JSON.stringify(context.logseq.schema.map(({ key }) => key))), [
     'biblePassageText'
   ])
-  assert.equal(context.logseq.schema[0].default, '')
+  const setting = context.logseq.schema[0]
+  assert.equal(setting.type, 'string')
+  assert.equal(setting.inputAs, 'file')
+  assert.equal(setting.default, '')
+  assert.equal(setting.title, 'Bible JSON file')
+  assert.match(setting.description, /Bible JSON file/)
+  assert.doesNotMatch(setting.description, /nrsvue\.text\.json/)
   /* Property hiding is a theme's setting; a graph with both installed keeps two
    * separate settings files, and neither plugin writes the other's keys. */
   assert.equal('hiddenProperties' in context.logseq.settings, false)

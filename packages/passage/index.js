@@ -45,11 +45,12 @@ const settingsSchema = [
   {
     key: TEXT_SETTING,
     type: 'string',
+    inputAs: 'file',
     default: '',
-    title: 'Passage text index',
+    title: 'Bible JSON file',
     description:
-      'Full path to a nrsvue.text.json built by scripts/build-bible-index.mjs. Leave empty to read ' +
-      'the one in this plugin’s own resources folder. Without it the Passage command still ' +
+      'Choose the Bible JSON file to use for passage text. Leave empty to read the file in this ' +
+      'plugin’s own resources folder. Without it the Passage command still ' +
       'writes the reference and its chapter tags, and leaves the text to you.'
   }
 ]

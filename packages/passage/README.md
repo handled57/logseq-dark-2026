@@ -118,14 +118,13 @@ That writes two files. `resources/bible.books.json` is the manifest — book nam
 chapter counts, verse counts and verse-id offsets, no verse text — and it is
 committed and shipped, which is what makes references resolve with no further
 setup. `resources/nrsvue.text.json` is the verse text; it is read from the
-plugin's own folder unless the **Passage text index** setting names another
-path.
+plugin's own folder unless the **Bible JSON file** setting selects another
+file.
 
-For an already-built index stored elsewhere, enter its absolute
-`nrsvue.text.json` path under **Plugins → Passage → Settings → Passage text
-index**. A Marketplace installation has no package-local text file, so this
-setting is the usual setup. Passage reads the file locally; it does not fetch or
-upload verse text.
+For an already-built text index stored elsewhere, choose the Bible JSON file
+under **Plugins → Passage → Settings → Bible JSON file**. A Marketplace
+installation has no package-local text file, so this setting is the usual setup.
+Passage reads the file locally; it does not fetch or upload verse text.
 
 ### Building an index from the NET Bible API
 
@@ -212,7 +211,7 @@ that has no text would be metadata standing in for the passage.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| **Passage text index** (`biblePassageText`) | empty | Full path to a `nrsvue.text.json` you built. Empty reads the one in the plugin's own `resources` folder. |
+| **Bible JSON file** (`biblePassageText`) | empty | Choose the Bible JSON file that supplies passage text. Empty reads the package-local file in the plugin's own `resources` folder. |
 
 If you used the Passage command in Dark High Contrast 1.x, that path was a theme
 setting. Settings do not move between packages: re-enter it once under

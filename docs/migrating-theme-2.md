@@ -28,16 +28,16 @@ immediately, but a local text index is required to insert verse text. Follow
 the [Passage text setup](../packages/passage/README.md#passage-text) for building
 or supplying an index.
 
-## Copy the text-index path manually
+## Select the Bible JSON file
 
 Logseq settings are package-scoped, so the old theme setting cannot migrate
 itself into the new Passage package. If Dark High Contrast 1.x had a custom
-**Passage text index** (`biblePassageText`) path:
+**Bible JSON file** (`biblePassageText`) configured:
 
-1. Before removing the old version, copy the complete path from its setting.
+1. Before removing the old version, note which Bible JSON file its setting uses.
 2. Install Passage.
 3. Open **Plugins → Passage → Settings**.
-4. Paste the path into **Passage text index** and test one reference.
+4. Choose that file under **Bible JSON file** and test one reference.
 
 Only the setting path moves. Do not copy `hiddenProperties` to Passage; it stays
 with Dark High Contrast. Do not rewrite existing passage blocks.

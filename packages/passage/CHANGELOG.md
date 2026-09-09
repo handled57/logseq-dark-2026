@@ -2,6 +2,12 @@
 
 All notable changes to this package are documented here.
 
+## 0.7.0 - 2026-09-09
+
+- Replace the typed Passage text-index path with a **Bible JSON file** chooser.
+  The setting no longer asks for a translation-specific filename; selecting a
+  compatible Bible text JSON file supplies passage text as before.
+
 ## 0.6.1 - 2026-09-09
 
 - Run the NET source-index tests by file path so they work in clean Linux
