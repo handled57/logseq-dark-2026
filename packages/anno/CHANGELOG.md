@@ -13,6 +13,8 @@ All notable changes to this package are documented here.
 - Added an **Annotation/highlight template** dropdown. A selected template is
   added beneath each newly created PDF annotation block without changing its
   native highlight text or properties; existing annotations remain untouched.
+- Fixed highlight detection to recognize Logseq's camel-cased annotation
+  properties when applying that template.
 
 ## 0.1.0 - 2026-09-06
 

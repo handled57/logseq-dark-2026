@@ -116,7 +116,12 @@ async function templateNewHighlights({ blocks = [], txMeta = {} } = {}) {
   if (!template || !INSERT_BLOCK_OPS.has(operation)) return
 
   for (const block of blocks) {
-    if (block?.properties?.['ls-type'] !== 'annotation' || !block.uuid) continue
+    /* Datascript spells the property `ls-type`, while the JavaScript SDK
+     * camel-cases that same key to `lsType` on entities delivered to
+     * `DB.onChanged`. Accept both representations so the live callback sees
+     * the annotation block Logseq just created. */
+    const type = block?.properties?.lsType ?? block?.properties?.['ls-type']
+    if (type !== 'annotation' || !block.uuid) continue
 
     let target = null
     try {

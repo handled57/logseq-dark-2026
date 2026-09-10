@@ -365,7 +365,9 @@ test('a selected highlight template is nested under each new PDF annotation bloc
       {
         uuid: 'highlight-1',
         content: 'Call me Ishmael.',
-        properties: { 'ls-type': 'annotation', 'hl-page': 1, 'hl-color': 'yellow' }
+        /* Logseq camel-cases property keys on entities returned through its
+         * JavaScript API, including blocks passed to DB.onChanged. */
+        properties: { lsType: 'annotation', hlPage: 1, hlColor: 'yellow' }
       }
     ],
     txMeta: { outlinerOp: 'insert-blocks' }
