@@ -126,7 +126,14 @@ async function templateNewHighlights({ blocks = [], txMeta = {} } = {}) {
     let target = null
     try {
       target = await logseq.Editor.insertBlock(block.uuid, '', { sibling: false })
-      if (target?.uuid) await logseq.Editor.insertTemplate(target.uuid, template[0])
+      if (target?.uuid) {
+        await logseq.Editor.insertTemplate(target.uuid, template[0])
+        /* On an annotation page Logseq inserts the expanded template beside
+         * this empty target rather than replacing it. The target is only a
+         * temporary anchor, so remove it once the template exists. */
+        await logseq.Editor.deleteBlock?.(target.uuid)
+        target = null
+      }
     } catch (error) {
       if (target?.uuid) await logseq.Editor.deleteBlock?.(target.uuid)
       console.warn('Anno could not apply the annotation/highlight template', error)

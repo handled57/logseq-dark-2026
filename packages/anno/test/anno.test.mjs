@@ -384,7 +384,11 @@ test('a selected highlight template is nested under each new PDF annotation bloc
   assert.deepEqual(context.inserted, [
     { block: 'child-highlight-1', name: 'Note prompt' }
   ])
-  assert.deepEqual(context.deleted, [])
+  assert.deepEqual(
+    context.deleted,
+    ['child-highlight-1'],
+    'the temporary empty child remained beside the expanded template'
+  )
 })
 
 test('highlight templates ignore old annotations, ordinary blocks and No template', async () => {

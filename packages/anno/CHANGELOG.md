@@ -15,6 +15,8 @@ All notable changes to this package are documented here.
   native highlight text or properties; existing annotations remain untouched.
 - Fixed highlight detection to recognize Logseq's camel-cased annotation
   properties when applying that template.
+- Removes the temporary empty child after Logseq expands a highlight template
+  beside it.
 
 ## 0.1.0 - 2026-09-06
 
