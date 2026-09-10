@@ -2,6 +2,23 @@
 
 All notable changes to this package are documented here.
 
+## 0.2.0 - 2026-09-10
+
+- Added an **Annotation page template** dropdown populated from blocks and
+  pages with a `template` property in the current graph.
+- A selected template is applied when Anno creates an annotation page; existing
+  pages remain untouched, and **No template** preserves the original behavior.
+- New templated pages receive any `file` and `file-path` PDF properties the
+  template does not already provide. Template-supplied values are preserved.
+- Added an **Annotation/highlight template** dropdown. A selected template's
+  properties are copied directly onto each newly created PDF annotation block
+  without changing its native highlight text or existing properties; existing
+  annotations remain untouched.
+- Fixed highlight detection to recognize Logseq's camel-cased annotation
+  properties when applying that template.
+- Highlight templates add no child or placeholder blocks, and their `template`
+  marker is not copied onto annotations.
+
 ## 0.1.0 - 2026-09-06
 
 - First release. **Anno: Import PDF** imports a PDF into the graph and opens

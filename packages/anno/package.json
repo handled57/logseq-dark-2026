@@ -1,6 +1,6 @@
 {
   "name": "logseq-anno",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Import a PDF into a Logseq graph and open the page that carries its annotations and highlights.",
   "author": "Peter Cole",
   "license": "MIT",

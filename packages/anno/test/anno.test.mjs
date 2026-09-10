@@ -29,12 +29,21 @@ const GRAPH = { url: 'logseq_local_/graphs/notes', name: 'notes', path: '/graphs
 const PDF_BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46]).buffer
 
 const flush = () => new Promise((resolve) => setImmediate(resolve))
+const plain = (value) => JSON.parse(JSON.stringify(value))
 
 function pdf(name, bytes = PDF_BYTES) {
   return { name, type: 'application/pdf', async arrayBuffer() { return bytes } }
 }
 
-function load({ graph = GRAPH, onDisk = [], pages = {}, writable = true } = {}) {
+function load({
+  graph = GRAPH,
+  onDisk = [],
+  pages = {},
+  templates = {},
+  setting = 'No template',
+  highlightSetting = 'No template',
+  writable = true
+} = {}) {
   const host = node('body')
   const windowListeners = []
   const listeners = []
@@ -46,6 +55,12 @@ function load({ graph = GRAPH, onDisk = [], pages = {}, writable = true } = {}) 
   const actions = []
   const created = []
   const appended = []
+  const inserted = []
+  const nested = []
+  const deleted = []
+  const upserted = []
+  const changed = []
+  const schemas = []
   const files = new Map(onDisk.map((path) => [path, PDF_BYTES.byteLength]))
   const blocks = { ...pages }
 
@@ -106,14 +121,37 @@ function load({ graph = GRAPH, onDisk = [], pages = {}, writable = true } = {}) 
     logseq: {
       provided,
       unloads,
+      settings: {
+        annotationPageTemplate: setting,
+        annotationHighlightTemplate: highlightSetting
+      },
+      useSettingsSchema(schema) {
+        schemas.push(schema)
+      },
+      DB: {
+        onChanged(handler) {
+          changed.push(handler)
+        },
+        async datascriptQuery() {
+          return Object.entries(templates).map(([name, properties]) => [name, properties])
+        }
+      },
       Editor: {
         commands,
         registerSlashCommand(label, action) {
           commands.push({ label, action })
         },
+        async getPage(title) {
+          return blocks[title] ? { uuid: `page-${title}`, name: title.toLowerCase() } : null
+        },
         async createPage(title, properties, options) {
           created.push({ title, properties, options })
-          blocks[title] ??= []
+          if (!blocks[title]) {
+            const propertyLines = Object.entries(properties).map(([key, value]) => `${key}:: ${value}`)
+            blocks[title] = options.createFirstBlock
+              ? [{ uuid: `first-${title}`, content: propertyLines.join('\n') }]
+              : []
+          }
           return { uuid: `page-${title}`, name: title.toLowerCase(), originalName: title }
         },
         async getPageBlocksTree(page) {
@@ -124,6 +162,25 @@ function load({ graph = GRAPH, onDisk = [], pages = {}, writable = true } = {}) 
           const title = String(page).replace(/^page-/, '')
           appended.push({ page: title, content })
           blocks[title] = [...(blocks[title] ?? []), { content }]
+        },
+        async insertBlock(parent, content, options) {
+          const block = { uuid: `child-${parent}`, content }
+          nested.push({ parent, content, options, block })
+          return block
+        },
+        async deleteBlock(block) {
+          deleted.push(block)
+        },
+        async upsertBlockProperty(block, key, value) {
+          upserted.push({ block, key, value })
+        },
+        async insertTemplate(block, name) {
+          inserted.push({ block, name })
+          if (!String(block).startsWith('first-')) return
+          const title = String(block).replace(/^first-/, '')
+          const properties = templates[name] ?? {}
+          const propertyLines = Object.entries(properties).map(([key, value]) => `${key}:: ${value}`)
+          blocks[title][0].content = [blocks[title][0].content, ...propertyLines].filter(Boolean).join('\n')
         }
       },
       App: {
@@ -187,9 +244,19 @@ function load({ graph = GRAPH, onDisk = [], pages = {}, writable = true } = {}) 
     actions,
     created,
     appended,
+    inserted,
+    nested,
+    deleted,
+    upserted,
+    schemas,
     messages,
     files,
     blocks,
+    change: async (event) => {
+      for (const handler of changed) handler(event)
+      await flush()
+      await flush()
+    },
     writes: () => actions.filter((entry) => entry.action === 'writeFile'),
     slash: () => commands[0],
     command: () => palette[0]
@@ -253,6 +320,119 @@ test('both entry points invoke the same import under one label', async () => {
   assert.equal(context.command().label, 'Anno: Import PDF')
   assert.equal(context.command().key, 'anno-import-pdf')
   assert.deepEqual(context.logseq.provided.map((style) => style.key), ['anno-dialog'])
+})
+
+test('the settings dropdown lists block and page templates in name order', async () => {
+  const context = load({
+    templates: {
+      Source: { template: 'Source' },
+      Book: { template: 'Book' }
+    }
+  })
+  await flush()
+
+  assert.equal(context.schemas.length, 1)
+  assert.deepEqual(plain(context.schemas[0]), [
+    {
+      key: 'annotationPageTemplate',
+      type: 'enum',
+      enumChoices: ['No template', 'Book', 'Source'],
+      enumPicker: 'select',
+      default: 'No template',
+      title: 'Annotation page template',
+      description:
+        'Template to apply when Anno creates a page. Choices come from blocks and pages ' +
+        'with a template property; existing pages are left as they are.'
+    },
+    {
+      key: 'annotationHighlightTemplate',
+      type: 'enum',
+      enumChoices: ['No template', 'Book', 'Source'],
+      enumPicker: 'select',
+      default: 'No template',
+      title: 'Annotation/highlight template',
+      description:
+        'Template properties to add to each new PDF annotation or highlight block. Choices come ' +
+        'from blocks and pages with a template property; existing highlights are left alone.'
+    }
+  ])
+})
+
+test('a selected highlight template adds properties directly to each new PDF annotation block', async () => {
+  const context = load({
+    highlightSetting: 'Note prompt',
+    templates: {
+      'Note prompt': { template: 'Note prompt', author: 'Herman Melville', type: 'source' }
+    }
+  })
+  await flush()
+
+  await context.change({
+    blocks: [
+      {
+        uuid: 'highlight-1',
+        content: 'Call me Ishmael.',
+        /* Logseq camel-cases property keys on entities returned through its
+         * JavaScript API, including blocks passed to DB.onChanged. */
+        properties: { lsType: 'annotation', hlPage: 1, hlColor: 'yellow' }
+      }
+    ],
+    txMeta: { outlinerOp: 'insert-blocks' }
+  })
+
+  assert.deepEqual(context.upserted, [
+    { block: 'highlight-1', key: 'author', value: 'Herman Melville' },
+    { block: 'highlight-1', key: 'type', value: 'source' }
+  ])
+  assert.deepEqual(context.nested, [])
+  assert.deepEqual(context.inserted, [])
+  assert.deepEqual(context.deleted, [])
+})
+
+test('highlight templates preserve native properties with equivalent camel-cased keys', async () => {
+  const context = load({
+    highlightSetting: 'Note prompt',
+    templates: { 'Note prompt': { template: 'Note prompt', 'hl-page': 99, status: 'read' } }
+  })
+  await flush()
+
+  await context.change({
+    blocks: [
+      { uuid: 'highlight-1', properties: { lsType: 'annotation', hlPage: 1 } }
+    ],
+    txMeta: { outlinerOp: 'insert-blocks' }
+  })
+
+  assert.deepEqual(context.upserted, [
+    { block: 'highlight-1', key: 'status', value: 'read' }
+  ])
+})
+
+test('highlight templates ignore old annotations, ordinary blocks and No template', async () => {
+  const context = load({
+    highlightSetting: 'Note prompt',
+    templates: { 'Note prompt': { template: 'Note prompt' } }
+  })
+  await flush()
+
+  await context.change({
+    blocks: [{ uuid: 'old-highlight', properties: { 'ls-type': 'annotation' } }],
+    txMeta: { outlinerOp: 'save-block' }
+  })
+  await context.change({
+    blocks: [{ uuid: 'ordinary', properties: {} }],
+    txMeta: { outlinerOp: 'insert-blocks' }
+  })
+
+  const disabled = load({ templates: { 'Note prompt': { template: 'Note prompt' } } })
+  await flush()
+  await disabled.change({
+    blocks: [{ uuid: 'new-highlight', properties: { 'ls-type': 'annotation' } }],
+    txMeta: { outlinerOp: 'insert-blocks' }
+  })
+
+  assert.deepEqual(context.nested, [])
+  assert.deepEqual(disabled.nested, [])
 })
 
 test('the prompt opens the file chooser with it, and the button reopens it', async () => {
@@ -325,6 +505,7 @@ test('importing writes the asset, then opens the page linked to it', async () =>
   assert.equal(context.created[0].title, 'Moby Dick')
   assert.equal(context.created[0].options.redirect, true)
   assert.equal(context.created[0].options.createFirstBlock, false)
+  assert.deepEqual(plain(context.created[0].properties), {})
   assert.deepEqual(context.appended, [
     { page: 'Moby Dick', content: '![Moby Dick](../assets/Moby Dick.pdf)' }
   ])
@@ -335,6 +516,42 @@ test('importing writes the asset, then opens the page linked to it', async () =>
   const [notice] = context.messages
   assert.equal(notice.status, 'success')
   assert.match(notice.text, /hls__Moby Dick/)
+})
+
+test('a selected template is applied to a new page with missing PDF properties added', async () => {
+  const context = load({
+    setting: 'Source',
+    templates: { Source: { template: 'Source', type: 'book' } }
+  })
+  await flush()
+
+  await importPdf(context)
+
+  assert.deepEqual(plain(context.created[0].properties), {
+    file: '![Moby Dick](../assets/Moby Dick.pdf)',
+    'file-path': '../assets/Moby Dick.pdf'
+  })
+  assert.equal(context.created[0].options.createFirstBlock, true)
+  assert.deepEqual(context.inserted, [{ block: 'first-Moby Dick', name: 'Source' }])
+  assert.equal(context.appended.length, 0, 'the PDF property was followed by a duplicate link block')
+})
+
+test('a template keeps its file properties and Anno adds only the missing one', async () => {
+  const context = load({
+    setting: 'Source',
+    templates: {
+      Source: { template: 'Source', file: 'Template supplied file' }
+    }
+  })
+  await flush()
+
+  await importPdf(context)
+
+  assert.deepEqual(plain(context.created[0].properties), {
+    'file-path': '../assets/Moby Dick.pdf'
+  })
+  assert.deepEqual(context.inserted, [{ block: 'first-Moby Dick', name: 'Source' }])
+  assert.deepEqual(context.appended, [], 'the template file property was followed by another link')
 })
 
 test('a character no filename can hold becomes a space in the asset name', async () => {
@@ -431,7 +648,9 @@ test('a write the host will not make leaves no page pointing at nothing', async 
 
 test('an existing page is used rather than replaced, and its link not doubled', async () => {
   const context = load({
-    pages: { 'Moby Dick': [{ content: 'Started this on the ferry.' }] }
+    pages: { 'Moby Dick': [{ content: 'Started this on the ferry.' }] },
+    setting: 'Source',
+    templates: { Source: { template: 'Source' } }
   })
   await flush()
 
@@ -440,6 +659,8 @@ test('an existing page is used rather than replaced, and its link not doubled', 
     { page: 'Moby Dick', content: '![Moby Dick](../assets/Moby Dick.pdf)' }
   ])
   assert.equal(context.blocks['Moby Dick'].length, 2, 'the page lost what was already on it')
+  assert.deepEqual(plain(context.created[0].properties), {})
+  assert.deepEqual(context.inserted, [], 'an existing page was templated')
 
   /* The same PDF imported again onto the page it is already linked from adds
    * no second link. */

@@ -177,6 +177,16 @@ instead: a stat counts only when it carries a numeric `size`, and the asset is
 stat-ed again after the write and must come back at the length that was sent
 before a page is allowed to link it.
 
+Anno discovers classic-graph templates once at startup and exposes the same
+sorted choices in two settings. The page setting applies its template only to
+the empty first block of a page Anno is creating. The highlight setting listens
+to Logseq's database transaction hook for newly inserted blocks carrying
+`ls-type:: annotation`; it creates an empty child beneath each one and expands
+the selected template into that child. The native annotation block remains the
+owner of its quoted text, UUID, colour and PDF-page properties. Transactions
+that edit an existing annotation do not qualify, so changing the setting is not
+retroactive.
+
 ## Host-DOM annotation and cleanup
 
 Each runtime owns a namespace. Passage writes `data-passage-*`, element ids

@@ -106,6 +106,9 @@ test('the command script offers both entry points and reaches the host itself', 
   assert.match(script, /logseq\.ready\(main\)/)
   assert.match(script, /registerSlashCommand/)
   assert.match(script, /registerCommandPalette/)
+  assert.match(script, /useSettingsSchema/)
+  assert.match(script, /enumPicker:\s*'select'/)
+  assert.match(script, /DB\?\.onChanged/)
   // The asset write has no plugin API; the host's own IPC bridge is the route.
   assert.match(code, /parent\.apis/)
   assert.match(code, /'writeFile'/)
