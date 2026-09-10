@@ -429,6 +429,106 @@ test('block hover outlines without painting a background', () => {
   )
 })
 
+/* The outline stands off the text it encloses. Logseq lays a block's content
+ * box out border-box and sizes it itself, so the room has to be taken outside
+ * that box: an outline offset and the spread of the fill's shadow, never
+ * padding, which would rewrap the block's text under the pointer. */
+test('the block outline stands off the text on a padding of its own', () => {
+  const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)]
+    .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
+
+  assert.match(
+    css,
+    /--hc-block-outline-pad:\s*\d+px;/,
+    'the padding is a variable a graph can retune'
+  )
+
+  const outline = rules.find(([selector]) =>
+    selector.includes('.ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper')
+  )
+  assert.match(
+    outline[1],
+    /outline-offset:\s*var\(--hc-block-outline-pad\)/,
+    'the outline is offset by that padding rather than hugging the text'
+  )
+
+  const fill = rules.find(
+    ([selector, body]) =>
+      selector.includes('.ls-block.selected > .flex > .block-content-wrapper') &&
+      /background:\s*var\(--ls-block-highlight-color\)/.test(body)
+  )
+  assert.match(
+    fill[1],
+    /box-shadow:\s*0 0 0 var\(--hc-block-outline-pad\) var\(--ls-block-highlight-color\)/,
+    'the raised fill reaches the outline it is drawn inside'
+  )
+
+  /* Padding would come out of the width Logseq gives the box, so the text
+   * would rewrap the moment the pointer arrived. */
+  for (const [selector, body] of rules) {
+    if (!selector.includes('.block-content-wrapper')) continue
+    if (!/:hover|\.selected|\.block-highlight/.test(selector)) continue
+    assert.ok(
+      !/(?:^|[;{\s])(?:padding|margin)(?:-[\w-]+)?\s*:/.test(body),
+      `${selector} must not resize the block's box to make room for its outline`
+    )
+  }
+
+  /* Two blocks selected one after the other would otherwise draw their
+   * outlines through each other. */
+  const gap = rules.find(([selector]) => selector === '.ls-block')
+  assert.match(
+    gap[1],
+    /margin-bottom:\s*var\(--hc-block-gap\)/,
+    'blocks are spaced by the gap variable'
+  )
+  assert.match(
+    css,
+    /--hc-block-gap:\s*calc\(4px \+ 2 \* var\(--hc-block-outline-pad\)\);/,
+    'the gap clears two of the paddings'
+  )
+
+  /* The block being edited wears the same border in the same place: the orange
+   * is an outline standing off on the same padding, not a border cutting into
+   * the textarea's own box. */
+  const editing = rules.find(([selector]) => selector.includes('textarea.block-editor:focus'))
+  assert.match(
+    editing[1],
+    /outline:\s*1px solid var\(--vscode-hc-focus\) !important/,
+    'the editing border is an outline of the same weight as the hover outline'
+  )
+  assert.match(
+    editing[1],
+    /outline-offset:\s*var\(--hc-block-outline-pad\) !important/,
+    'the editing outline stands off on the same padding'
+  )
+  assert.doesNotMatch(
+    editing[1],
+    /border:\s*\d/,
+    'the editing border would come out of the text box'
+  )
+
+  /* A child hangs inside its parent rather than following it, so the margin
+   * above never falls between the two: the nested group opens on the gap
+   * instead. */
+  const nested = rules.find(([selector]) => selector === '.block-children')
+  assert.match(
+    nested[1],
+    /padding-top:\s*calc\(var\(--hc-block-gap\) \+ 2px\)/,
+    'a nested group opens on the same space two siblings keep'
+  )
+
+  /* The rail's line bridges the space between two rows by reaching down from
+   * each of them to the top of the next. That reach is the gap itself, so the
+   * rail cannot break however far apart a padding widens the blocks. */
+  const flat = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').replace(/\{ /g, '{')
+  assert.match(
+    flat,
+    /\.block-control-wrap::after \{[^}]*bottom: calc\(-1 \* var\(--hc-block-gap\)\)/,
+    'each row paints its stretch of rail down to the top of the next'
+  )
+})
+
 /* The bullet rail: every block in the page's own tree hangs its bullet on one
  * vertical line. cascade.test.mjs checks the arithmetic that places it; these
  * are the rules about where the rail is allowed to reach and what it shows. */
@@ -522,7 +622,10 @@ test('interactive chrome stays black with one-pixel orange borders', () => {
   assert.match(css, /#search-button,[\s\S]*?border-color:\s*transparent\s*!important/)
   assert.match(css, /#search-button:hover,[\s\S]*?border-color:\s*var\(--vscode-hc-focus\)\s*!important/)
   assert.match(css, /\.left-sidebar-inner a\.item:hover,[\s\S]*?border-color:\s*var\(--vscode-hc-focus\)/)
-  assert.match(css, /textarea\.block-editor:focus\s*\{[\s\S]*?border:\s*1px solid var\(--vscode-hc-focus\)\s*!important[\s\S]*?box-shadow:\s*none\s*!important/)
+  // The block editor's own orange is an outline rather than a border, so that
+  // it lands where the hover and selection outlines do; the weight is the same
+  // single pixel the rest of the chrome is drawn with.
+  assert.match(css, /textarea\.block-editor:focus\s*\{[\s\S]*?outline:\s*1px solid var\(--vscode-hc-focus\)\s*!important[\s\S]*?box-shadow:\s*none\s*!important/)
   assert.match(css, /th\s*\{[\s\S]*?background:\s*var\(--vscode-hc-black\)\s*!important/)
   assert.match(css, /kbd\s*\{[\s\S]*?background:\s*var\(--vscode-hc-black\)/)
 })

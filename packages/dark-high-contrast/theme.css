@@ -79,6 +79,19 @@ html[data-theme][data-color]:root body,
    * the root element would never reach a block. */
   --hc-rail-default-color: var(--vscode-hc-border);
 
+  /* How far the outline a block takes on hover, on selection and under
+   * Logseq's own highlight stands off the text it encloses, so the block reads
+   * as a bordered card rather than as a line ruled through its paragraph.
+   * Logseq sizes a block's content box itself and lays it out border-box, so
+   * the room is taken outside that box — as an outline offset, and as the
+   * spread of the shadow that carries a selected block's fill out to meet it —
+   * and nothing the block holds moves or rewraps when it is hovered.
+   * `--hc-block-gap` is the space left between two blocks: it clears two of
+   * those paddings, so two blocks selected one after the other keep their
+   * outlines apart. */
+  --hc-block-outline-pad: 6px;
+  --hc-block-gap: calc(4px + 2 * var(--hc-block-outline-pad));
+
   /* Collapsible rich content: the box the control is drawn in, and the height
    * a folded shell keeps — one line, the same 1.75rem an admonition sets its
    * first line in. */
@@ -524,7 +537,20 @@ hr {
 
 /* Editor blocks and references */
 .ls-block {
-  margin-bottom: 4px;
+  margin-bottom: var(--hc-block-gap);
+}
+
+/* A child is nested inside its parent rather than laid out after it, so the gap
+ * two siblings keep between them never falls between a parent and its first
+ * child: Logseq opens a nested group on 2px, far less room than the outline
+ * needs, and the child's border would be drawn through its parent's. The group
+ * opens on the gap instead. Two siblings stand `--hc-block-gap` apart plus the
+ * 2px Logseq pads the foot of one row and the head of the next with; only the
+ * head of the child's row is padded here, so the group carries that odd 2px
+ * itself and a parent and its first child end up exactly as far apart as two
+ * siblings are. */
+.block-children {
+  padding-top: calc(var(--hc-block-gap) + 2px);
 }
 
 .ls-block:focus-visible {
@@ -533,17 +559,20 @@ hr {
 
 /* Selection and Logseq's own highlight are deliberate, persistent states, so
  * they carry the raised fill. Hover is transient and only outlines the block
- * the pointer is over; filling it too made scanning a page flash gray. */
+ * the pointer is over; filling it too made scanning a page flash gray. The
+ * shadow is the same fill spread out over the padding the outline stands off
+ * by, so a selected block is filled to its border rather than to its text. */
 .ls-block.selected > .flex > .block-content-wrapper,
 .block-highlight {
   background: var(--ls-block-highlight-color);
+  box-shadow: 0 0 0 var(--hc-block-outline-pad) var(--ls-block-highlight-color);
 }
 
 .ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper,
 .ls-block.selected > .flex > .block-content-wrapper,
 .block-highlight {
   outline: 1px solid var(--vscode-hc-border);
-  outline-offset: 1px;
+  outline-offset: var(--hc-block-outline-pad);
 }
 
 .block-control-wrap .bullet-container .bullet,
@@ -978,7 +1007,9 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 
 /* The line. Each block paints the stretch of rail its own row is responsible
  * for: up from the gap above the row to the center of its bullet, and down from
- * that center to the foot of the row, where the next block's segment starts.
+ * that center across the whole gap below it, to the top of the next row, where
+ * the next block's segment starts. The downward reach is the gap itself, so the
+ * rail stays unbroken however far apart the blocks are spaced.
  * Every stretch is drawn in `--hc-rail-default-color`, the one color the theme
  * lets a reader set, so the rail runs the page in a single color however deep
  * the tree goes; the hierarchy is left to the bullets hanging on it. Painted
@@ -1005,7 +1036,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::after {
   top: var(--hc-rail-bullet-y);
-  bottom: -8px;
+  bottom: calc(-1 * var(--hc-block-gap));
 }
 
 /* A page's properties are its front matter rather than a block of its text, so
@@ -1692,12 +1723,18 @@ select:focus {
   box-shadow: 0 0 0 1px var(--vscode-hc-focus) !important;
 }
 
-/* A block editor uses one orange border, matching the rest of the workbench. */
+/* A block editor uses one orange border, matching the rest of the workbench,
+ * and stands it off the text on the same padding the hover and selection
+ * outlines take, so a block wears the same border in the same place whether it
+ * is being read or written. It is an outline rather than a border for the same
+ * reason those are: a border comes out of the textarea's own box, which would
+ * narrow the text by a pixel the moment the block opened for editing. */
 .editor-inner textarea:focus,
 textarea.block-editor:focus {
-  border: 1px solid var(--vscode-hc-focus) !important;
+  border-color: transparent !important;
+  outline: 1px solid var(--vscode-hc-focus) !important;
+  outline-offset: var(--hc-block-outline-pad) !important;
   box-shadow: none !important;
-  outline: none !important;
 }
 
 .ui__toggle-background-on,

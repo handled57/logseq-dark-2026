@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here.
 
+## 2.8.0 - 2026-09-09
+
+- Give the outline a block takes on hover, on selection and under Logseq's own
+  highlight room around the text it encloses. It stood one pixel off the
+  block's own box, which read as a line ruled through the paragraph rather than
+  a border around a block; it now stands off by `--hc-block-outline-pad`, 6px
+  by default, and a selected block's raised fill reaches that border with it.
+  Logseq sizes a block's content box itself and lays it out border-box, so the
+  room is taken outside that box rather than as padding: nothing the block
+  holds moves or rewraps when the pointer arrives, and every bullet stays on
+  the middle of its block's first line. Blocks are spaced by `--hc-block-gap`,
+  the padding twice over plus the 4px they had, so two blocks selected one
+  after the other keep their outlines apart. Each row now paints its stretch of
+  the rail down the whole gap below it, to the top of the next row, rather than
+  a fixed 8px past its own foot, so the line stays unbroken however far apart
+  the blocks are spaced. A child block is nested inside its parent rather than
+  laid out after it, so that gap never fell between a parent and its first
+  child, whose border was drawn through its parent's; every nested group now
+  opens on the gap too, counted so a parent and its first child stand exactly
+  as far apart as two siblings. The orange border a block wears while it is
+  being edited moves out to that same padding, so a block keeps its border in
+  one place whether it is being read or written; it is an outline now rather
+  than a border on the editor's own box, which had been narrowing the text by a
+  pixel as the block opened. Both variables can be retuned from `custom.css`.
+
 ## 2.7.1 - 2026-09-09
 
 - Stop a table's narrow columns collapsing until their headings break mid-word.
