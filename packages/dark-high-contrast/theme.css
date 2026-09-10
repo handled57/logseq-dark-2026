@@ -410,7 +410,7 @@ h6,
  *
  * `min-height` is upstream's, in the heading's own `em`, so it follows. */
 :root {
-  --hc-heading-scale: 0.7;
+  --hc-heading-scale: 0.8;
 }
 
 .editor-inner .h1.uniline-block,
