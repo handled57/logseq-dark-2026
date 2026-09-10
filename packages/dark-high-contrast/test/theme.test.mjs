@@ -263,8 +263,8 @@ test('the rail hierarchy is the eight colors, in order, and stays legible on bla
     assert.equal(cssValue(token), hex, `${token} is not ${hex}`)
     assert.equal(literal(depth), hex, `${depth} does not resolve to ${hex}`)
 
-    // A bullet and a hairline are non-text user interface components, so 3:1
-    // against the black canvas is the threshold every one of them clears.
+    // A bullet is a non-text user interface component, so 3:1 against the
+    // black canvas is the threshold every one of them clears.
     assert.ok(
       contrast(hex, '#000000') >= 3,
       `${name} (${hex}) is ${contrast(hex, '#000000').toFixed(2)}:1 on the canvas`
@@ -294,19 +294,20 @@ test('the rail hierarchy is the eight colors, in order, and stays legible on bla
   )
 })
 
-test('the base rail line is the structural border, and the setting writes over it', () => {
-  // The line a block with no hierarchy color of its own paints: the same border
-  // the editor, the left menu and the sidebars are drawn with.
+test('the rail line is the structural border, and the setting writes over it', () => {
+  // The line every block paints, at every depth: the same border the editor,
+  // the left menu and the sidebars are drawn with.
   assert.equal(cssValue('--hc-rail-default-color'), 'var(--vscode-hc-border)')
   assert.equal(literal('--hc-rail-default-color').toLowerCase(), '#5b7e96')
 
-  // Ordinary prose reads the line through that one variable, so changing it
-  // changes nothing else the rail draws.
+  // The line reads that one variable and no depth color, so the whole rail is
+  // the color the setting names and changing it changes nothing else.
   assert.match(
     css,
-    /--hc-rail-line-color: var\(--hc-rail-default-color\);/,
+    /background-color: var\(--hc-rail-default-color\);/,
     'the rail line no longer reads the default rail color'
   )
+  assert.doesNotMatch(css, /--hc-rail-line-color/, 'the line still takes a color from a block\'s depth')
 
   // The setting is declared with the same default and applied as an inline
   // custom property, so it out-ranks the stylesheet whatever order the theme
@@ -320,7 +321,7 @@ test('the base rail line is the structural border, and the setting writes over i
   assert.match(script, /const DEFAULT_RAIL_COLOR = '#5B7E96'/)
   assert.match(script, /const RAIL_COLOR_PROPERTY = '--hc-rail-default-color'/)
   assert.match(script, /inputAs: 'color'/)
-  assert.match(script, /title: 'Default rail color'/)
+  assert.match(script, /title: 'Rail color'/)
 })
 
 test('classic and ShUI theme contracts cover every planned surface', () => {

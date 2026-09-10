@@ -12,7 +12,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Compact workbench treatment for the header, sidebars, command palette, menus, dialogs, and settings.
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
 - Every block in the main editor hangs its bullet on one vertical rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at the size of that line, with the content column keeping its usual nesting.
-- Headings and blocks with children are colored by how deep they sit: red at the top level, then orange, yellow, green, blue, indigo and violet, each block painting its own bullet and its own stretch of the rail. Ordinary leaf prose keeps its white bullet on the cyan line.
+- The rail's line is one color the whole way down the page, the one the **Rail color** setting names. The bullets hanging on it carry the hierarchy: a heading or a block with children takes the color of its own depth — magenta at the top level, then orange, brown, amber, teal, blue, indigo and violet — and ordinary leaf prose keeps a white bullet.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../passage) plugin's job, and the theme does not require it.
@@ -57,12 +57,12 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 
 ### Bullet-rail hierarchy colors
 
-Every heading, and every block with children, takes the color of its own depth
-on the rail; the same color paints that block's bullet and the stretch of line
-it is responsible for. Depth 1 is a top-level block. The eight colors repeat
-below the eighth level — depth 9 is magenta again — and a block deeper than
-depth 13, the twelfth level below the top and the last one the rail places,
-hangs from that level's rail position and keeps its color.
+Every heading, and every block with children, draws its bullet in the color of
+its own depth. Depth 1 is a top-level block. The eight colors repeat below the
+eighth level — depth 9 is magenta again — and a block deeper than depth 13, the
+twelfth level below the top and the last one the rail places, hangs from that
+level's rail position and keeps its color. The line itself takes none of these:
+it is one color the whole way down the page.
 
 | Depth | Color | Tokens |
 | --- | --- | --- |
@@ -75,17 +75,19 @@ hangs from that level's rail position and keeps its color.
 | 7 | `#b180d7` indigo | `--hc-rail-depth-7`, `--hc-rail-indigo` |
 | 8 | `#b66dff` violet | `--hc-rail-depth-8`, `--hc-rail-violet` |
 
-These eight are the rail's own colors rather than the VS Code palette above:
+These eight are the bullets' own colors rather than the VS Code palette above:
 they are chosen to stay apart from one another for a reader with a common color
 vision deficiency, which a literal red-to-violet sweep does not. No text is ever
-set in them — a bullet and a hairline are non-text interface components, so each
-one clears the 3:1 that asks for; seven of the eight clear 4.5:1 as well, and
-the brown, at 3.47:1, is used only as a bullet and a line.
+set in them — a bullet is a non-text interface component, so each one clears
+the 3:1 that asks for; seven of the eight clear 4.5:1 as well, and the brown, at
+3.47:1, is used only as a bullet.
 
 Blocks that carry no hierarchy of their own — ordinary prose without children —
-keep a white bullet, and paint their stretch of rail in the **Default rail
-color** setting instead. That defaults to `#5b7e96`, the same
-`--vscode-hc-border` the editor, the left menu and the sidebars are drawn with.
+keep a white bullet.
+
+The line every bullet hangs on is the **Rail color** setting, one color at
+every depth. That defaults to `#5b7e96`, the same `--vscode-hc-border` the
+editor, the left menu and the sidebars are drawn with.
 
 A bullet also says whether anything is folded away underneath it: a block whose
 children are showing is drawn as an empty ring, while a collapsed block and a
@@ -230,7 +232,7 @@ The emoji is not moved, copied or replaced. It is still the first character of t
 - The space between the emoji and the text is not part of the icon. The gutter is one emoji and the single space that ordinarily follows it, so the text begins in the block's own column. Several literal spaces are still rendered as they are written, exactly as Logseq renders them without this feature — the theme adds no indent of its own.
 - An emoji anywhere else in the line stays inline, and a block that opens with anything else is untouched.
 - A block that renders as something with an icon or a layout of its own — an admonition, a passage, a code block, a query, an embed, a piece of media — keeps that structure; a leading emoji never overrides it.
-- The bullet on the rail is Logseq's own and is left alone. Folding, hovering, clicking, dragging and the hierarchy colors all behave as they did.
+- The bullet on the rail is Logseq's own and is left alone. Folding, hovering, clicking, dragging and the bullets' hierarchy colors all behave as they did.
 
 Turn it off in **Plugins → Dark High Contrast → Settings** under **Leading emoji as a block icon**, and every emoji goes back into its line. The gutter is `--hc-block-icon-gutter`, `1.5em` by default, so a graph that sets its notes in a face with a wider or narrower emoji can retune it from `custom.css`.
 
@@ -347,8 +349,9 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 - A bullet sits on the middle of its block's first line of text, wherever that line begins. A heading's bullet drops by 1.75 times the size Logseq gives that heading level, both in view and while the heading is being typed; a quote, a passage, an admonition, a code block and a table drop their bullet into the box the block opens with. A block whose first line is a picture keeps its bullet at the top of the block.
 - A bullet is drawn at the size of the line it hangs beside. Ordinary prose is the baseline, and a first line set larger than that takes a proportionally larger bullet: a heading's bullet — halo, dot and rings alike — is drawn at the multiple Logseq sets that heading level in, so an `h1` bullet is twice an ordinary one and an `h6` bullet three quarters of it. The bullet grows around the rail rather than off it, so its centre stays on the line, and a block whose first line is ordinary text — including one opening with a quote, a passage, an admonition, a code block or a table — keeps exactly the bullet it had.
 - A bullet folds and unfolds its block on a left click, so the rail reads as a control column rather than a set of links; navigating into a block moves to **Open** on the bullet's context menu. Whiteboard bullets keep Logseq's own gestures.
-- A block that carries the hierarchy — one whose first line is a heading, or one with children of its own — takes the color of its depth for its bullet and for its own stretch of the rail: red at the top level, then orange, yellow, green, blue, indigo and violet, repeating below the seventh level. A child's segment is always the child's color, never its parent's, and a folded parent keeps its color while its children are out of the DOM. Ordinary leaf prose keeps the white bullet on the cyan line it has always had. The full mapping is in [Bullet-rail hierarchy colors](#bullet-rail-hierarchy-colors).
-- Hovering a block lights its own bullet in the color that block paints the rail with — cyan for ordinary prose, its own depth's color for a heading or a parent. An ancestor holding the hovered block keeps its bullet plain, the way the block highlight already behaves.
+- The line is one color from the first bullet to the last block, whatever the depth of the blocks beside it: the **Rail color** setting, `#5b7e96` by default. Set it in **Plugins → Dark High Contrast → Settings**, or leave it empty to keep that default.
+- A block that carries the hierarchy — one whose first line is a heading, or one with children of its own — draws its bullet in the color of its depth: magenta at the top level, then orange, brown, amber, teal, blue, indigo and violet, repeating below the eighth level. A child's bullet is always the child's color, never its parent's, and a folded parent keeps its color while its children are out of the DOM. Ordinary leaf prose keeps the white bullet it has always had. The full mapping is in [Bullet-rail hierarchy colors](#bullet-rail-hierarchy-colors).
+- Hovering a block lights its own bullet in that bullet's own color — white for ordinary prose, its own depth's color for a heading or a parent. An ancestor holding the hovered block keeps its bullet plain, the way the block highlight already behaves.
 - How far left the rail stands is one number, `--hc-rail-offset`. It defaults to 80px, drops to 48px on a window narrower than 1100px, and to 24px on the full-width route, where the only space left of the tree is the scroll container's own padding. A graph that wants the rail nearer its text can set it in `custom.css`.
 - The rail is the page's own tree in the main editor. Sidebars, whiteboards, dialogs and linked references keep Logseq's layout, as do embedded and queried trees rendered inside a block. Document mode and Logseq's right-hand fold button both re-measure indentation, so the rail steps aside for them and bullets render as Logseq draws them.
 - Outside the rail, bullets follow the older rule: untyped bullets are visible for ordinary prose blocks, while empty, property-only, heading, reference, embed, command/macro, query, media, code (including `src`), `center`, `verse`, `passage`, namespace, math, ClojureScript-eval, slide, flashcard, Zotero, quote, and other advanced `<`-menu blocks remain bulletless.
@@ -358,7 +361,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 - A block nested deeper than twelve levels hangs from the twelfth level's position rather than its own.
 - An admonition centres a short text against its icon, so its bullet marks the head of its box rather than that first line.
 - A folded rendered box hides what it holds outright rather than scrolling it, so nothing of it overflows the box and no space is left standing for it. A code block's editor is hidden rather than removed from the layout, because one measured while it was out of the layout comes back blank.
-- A block icon's gutter is carved out of the block's own text column rather than the margin left of it: the text is indented by the gutter and the first line hangs back out of it. Nothing of the icon reaches the rail, so the bullet, the fold arrow and the hierarchy color are exactly where they were, at every nesting depth and on the full-width route.
+- A block icon's gutter is carved out of the block's own text column rather than the margin left of it: the text is indented by the gutter and the first line hangs back out of it. Nothing of the icon reaches the rail, so the bullet, the fold arrow and the bullet's hierarchy color are exactly where they were, at every nesting depth and on the full-width route.
 
 ## Development
 

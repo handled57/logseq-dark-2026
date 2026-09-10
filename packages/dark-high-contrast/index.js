@@ -121,12 +121,12 @@ const settingsSchema = [
     type: 'string',
     inputAs: 'color',
     default: DEFAULT_RAIL_COLOR,
-    title: 'Default rail color',
+    title: 'Rail color',
     description:
-      'The color of the bullet rail beside blocks that carry no hierarchy of their own — ' +
-      'ordinary prose, rather than a heading or a block with children. Defaults to the border ' +
-      'color used around the editor, the left menu and the sidebars. Leave empty to keep that ' +
-      'border color. The eight colors the hierarchy itself cycles through are unaffected.'
+      'The color of the bullet rail beside a page\'s blocks. The whole line is drawn in it, at ' +
+      'every nesting level. Defaults to the border color used around the editor, the left menu ' +
+      'and the sidebars. Leave empty to keep that border color. The eight colors the bullets ' +
+      'carry the hierarchy in are unaffected.'
   },
   {
     key: BLOCK_ICONS_SETTING,

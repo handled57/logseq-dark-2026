@@ -61,17 +61,18 @@ defaults to `1`, so every surface the rail does not reach is untouched. These nu
 upstream declarations; change arithmetic, selectors, and cascade tests
 together.
 
-The rail also carries the hierarchy. `--hc-rail-depth-color` is declared once
-per nesting level beside that level's `--hc-rail-indent`, cycling the eight
+The rail's bullets carry the hierarchy; its line does not. The line's two
+pseudo-elements paint in `--hc-rail-default-color` at every depth, so the whole
+rail is the one color a reader configures. `--hc-rail-depth-color` is declared
+once per nesting level beside that level's `--hc-rail-indent`, cycling the eight
 ROYGBIV tokens `--hc-rail-depth-1`…`--hc-rail-depth-8` so adjacent levels never
 share a hue and the cycle starts again below the eighth — depth 9 is depth 1's
 magenta. A row that carries the hierarchy — Logseq's own `haschild="true"`,
 which holds while a block is folded, or a first line that renders or is being
-typed as a heading — copies that color into `--hc-rail-line-color` and
-`--hc-rail-bullet-color`; every other row keeps `--hc-rail-default-color` and a
-white bullet. Both variables are declared on a block's own control column, which
-no descendant block sits inside, so a child's segment always takes the child's
-depth rather than its parent's. All eight hues are the rail's own additions to
+typed as a heading — copies that color into `--hc-rail-bullet-color`; every
+other row keeps a white bullet. That variable is declared on a block's own
+control column, which no descendant block sits inside, so a child's bullet
+always takes the child's depth rather than its parent's. All eight hues are the rail's own additions to
 the VS Code palette, chosen to stay apart under the common color vision
 deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
 pins each literal, its position in the cycle, and the 3:1 a non-text interface
@@ -87,16 +88,16 @@ upstream repaints a hovered bullet's inside from `.bullet-link-wrap:hover` with
 an important declaration of its own; the halo and the scale it adds are left
 alone.
 
-`--hc-rail-default-color` is the base line, and the only part of the rail a
-reader configures. theme.css declares it as `--vscode-hc-border`, the structural
+`--hc-rail-default-color` is the line, and the only part of the rail a reader
+configures. theme.css declares it as `--vscode-hc-border`, the structural
 border the editor, the left menu and the sidebars are drawn with, and `index.js`
-writes the **Default rail color** setting over it as an inline custom property,
+writes the **Rail color** setting over it as an inline custom property,
 so it out-ranks the stylesheet without depending on the order the theme and its
 entry are loaded in. That inline style goes on `body`, not on the root element:
 the palette's selector list includes `html[data-theme][data-color]:root body`,
 so on a graph with an accent set the body re-declares every palette variable and
-a value inherited from `html` never reaches a block. The eight depth colors are
-not the setting's to change.
+a value inherited from `html` never reaches a block. The eight depth colors the
+bullets carry are not the setting's to change.
 
 The rail is the page's own tree and nothing above it. Logseq renders a page's
 properties as its first block, marked `pre-block` in view and while they are

@@ -472,7 +472,7 @@ test('the rail color setting is offered with the structural border as its defaul
   assert.ok(setting, 'the theme offers no rail color setting')
   assert.equal(setting.type, 'string')
   assert.equal(setting.inputAs, 'color')
-  assert.equal(setting.title, 'Default rail color')
+  assert.equal(setting.title, 'Rail color')
   assert.equal(setting.default, '#5B7E96')
 
   // An unconfigured graph takes that default and paints the rail with it.

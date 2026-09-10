@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## 2.6.0 - 2026-09-09
+
+- Draw the bullet rail's line in one color the whole way down the page. The
+  line no longer changes hue with nesting depth: every block paints its stretch
+  in the color the settings name, so a deep tree reads as one rail rather than
+  a ladder of eight colors. The bullets are unchanged and still carry the
+  hierarchy — a heading or a block with children takes the color of its own
+  depth, ordinary prose keeps a white bullet, an open block is still a ring —
+  and hovering a block now lights its bullet in that bullet's own color rather
+  than the line's.
+- Rename the **Default rail color** setting to **Rail color**: it now sets the
+  whole rail rather than the stretches no hierarchy color reached. Values
+  already configured are kept.
+
 ## 2.5.0 - 2026-09-08
 
 - Set the emoji a block opens with in a gutter of its own, left of the block's

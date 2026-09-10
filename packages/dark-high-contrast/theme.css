@@ -41,14 +41,14 @@ html[data-theme][data-color]:root body,
   --vscode-hc-panel: #0c0c0c;
   --vscode-hc-elevated: #151515;
 
-  /* Eight hues the bullet rail's hierarchy is drawn in. The VS Code palette
+  /* Eight hues the rail's bullets carry the hierarchy in. The VS Code palette
    * above carries none of them at this weight: these are chosen to stay apart
    * from one another for a reader with any of the common color vision
    * deficiencies, which the spectrum's own red-to-green sweep does not. They
-   * are rail colors only and no text is ever set in them — a bullet and a
-   * hairline are non-text user interface components, so 3:1 against the black
-   * canvas is the threshold they are held to, and seven of the eight clear the
-   * 4.5:1 a word would need as well. */
+   * are bullet colors only and no text is ever set in them — a bullet is a
+   * non-text user interface component, so 3:1 against the black canvas is the
+   * threshold they are held to, and seven of the eight clear the 4.5:1 a word
+   * would need as well. */
   --hc-rail-magenta: #dc267f;
   --hc-rail-orange: #ea5c00;
   --hc-rail-brown: #994f00;
@@ -58,7 +58,7 @@ html[data-theme][data-color]:root body,
   --hc-rail-indigo: #b180d7;
   --hc-rail-violet: #b66dff;
 
-  /* The rail's hierarchy colors in ROYGBIV order, one hue per nesting level,
+  /* The bullets' hierarchy colors in ROYGBIV order, one hue per nesting level,
    * magenta for a top-level block. The eight repeat below the eighth level —
    * the ninth is magenta again — so no two adjacent levels ever share a hue. */
   --hc-rail-depth-1: var(--hc-rail-magenta);
@@ -70,10 +70,10 @@ html[data-theme][data-color]:root body,
   --hc-rail-depth-7: var(--hc-rail-indigo);
   --hc-rail-depth-8: var(--hc-rail-violet);
 
-  /* The base rail line: what a block with no depth color of its own paints its
-   * stretch with. It is the structural border the editor, the left menu and the
-   * sidebars are drawn with, so an ordinary leaf reads as part of the frame
-   * rather than as another level of hierarchy. `index.js` writes the theme's
+  /* The rail line: the color every block paints its stretch of rail with, at
+   * every depth. It is the structural border the editor, the left menu and the
+   * sidebars are drawn with, so the rail reads as part of the frame rather
+   * than as another level of hierarchy. `index.js` writes the theme's
    * `Default rail color` setting over this inline on the host's body — the
    * selector list above declares the palette on `body` too, so a value set on
    * the root element would never reach a block. */
@@ -703,15 +703,15 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 
   --hc-rail-indent: var(--hc-rail-offset);
 
-  /* What this block's own depth is colored in, what it paints its stretch of
-   * line with, what its bullet is drawn in, and what fills the inside of that
-   * bullet. A block that carries the hierarchy — a heading, or a block with
-   * children — takes its depth's color for the line and the bullet; every
-   * other block keeps the base rail line and a white bullet. The fill follows
-   * the bullet's own color, so the two only part where a block's children are
-   * showing and its bullet is hollowed into a ring. */
+  /* What this block's own depth is colored in, what its bullet is drawn in,
+   * and what fills the inside of that bullet. A block that carries the
+   * hierarchy — a heading, or a block with children — takes its depth's color
+   * for its bullet; every other block keeps a white one. The fill follows the
+   * bullet's own color, so the two only part where a block's children are
+   * showing and its bullet is hollowed into a ring. The line itself is not
+   * here: every stretch of it paints in `--hc-rail-default-color`, whatever
+   * the block's depth, so the rail is one color the reader chose. */
   --hc-rail-depth-color: var(--hc-rail-depth-1);
-  --hc-rail-line-color: var(--hc-rail-default-color);
   --hc-rail-bullet-color: var(--vscode-hc-white);
   --hc-rail-bullet-fill: var(--hc-rail-bullet-color);
 }
@@ -895,20 +895,19 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   --hc-rail-depth-color: var(--hc-rail-depth-5);
 }
 
-/* The blocks that carry the hierarchy take their depth's color, for their
- * bullet and for the stretch of line they paint: a block that opens with a
- * heading, and a block with children of its own, which is Logseq's own
- * `haschild` and so stays true while the block is folded. Ordinary leaf prose
- * keeps its white bullet on the base rail line. A block reads its
- * own depth here, never its parent's: both variables are declared on the
- * block's own control column, which no descendant block sits inside. */
+/* The blocks that carry the hierarchy take their depth's color for their
+ * bullet: a block that opens with a heading, and a block with children of its
+ * own, which is Logseq's own `haschild` and so stays true while the block is
+ * folded. Ordinary leaf prose keeps its white bullet. The line under both is
+ * the same either way. A block reads its own depth here, never its parent's:
+ * the variable is declared on the block's own control column, which no
+ * descendant block sits inside. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap,
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper :is(h1, h2, h3, h4, h5, h6):not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)) > .block-control-wrap,
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper :is(.h1, .h2, .h3, .h4, .h5, .h6)) > .block-control-wrap {
-  --hc-rail-line-color: var(--hc-rail-depth-color);
   --hc-rail-bullet-color: var(--hc-rail-depth-color);
 }
 
@@ -928,7 +927,10 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 /* The line. Each block paints the stretch of rail its own row is responsible
  * for: up from the gap above the row to the center of its bullet, and down from
  * that center to the foot of the row, where the next block's segment starts.
- * Painted behind the bullets, and never in front of a click. */
+ * Every stretch is drawn in `--hc-rail-default-color`, the one color the theme
+ * lets a reader set, so the rail runs the page in a single color however deep
+ * the tree goes; the hierarchy is left to the bullets hanging on it. Painted
+ * behind the bullets, and never in front of a click. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::before,
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -938,7 +940,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   left: 30px;
   width: 1px;
   z-index: -1;
-  background-color: var(--hc-rail-line-color);
+  background-color: var(--hc-rail-default-color);
   pointer-events: none;
 }
 
@@ -993,23 +995,23 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   bottom: 0;
 }
 
-/* Hovering a block lights its own bullet in the color that block paints the
- * rail with — the base rail line for ordinary prose, its own depth's hue for a
- * heading or a parent — so the block under the pointer is easy to find out in
- * the margin at every level. The block the pointer is actually over is the
- * innermost hovered one; an ancestor holding it keeps its bullet plain. */
+/* Hovering a block lights its own bullet in that bullet's own color — white
+ * for ordinary prose, its own depth's hue for a heading or a parent — so the
+ * block under the pointer is easy to find out in the margin at every level.
+ * The block the pointer is actually over is the innermost hovered one; an
+ * ancestor holding it keeps its bullet plain. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *):hover:not(:has(.ls-block:hover))
   > .block-main-container > .block-control-wrap .bullet-container .bullet {
   box-shadow: 0 0 0 calc(1px * var(--hc-rail-bullet-scale)) var(--vscode-hc-black),
     0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--hc-rail-bullet-color),
-    0 0 0 calc(5px * var(--hc-rail-bullet-scale)) color-mix(in srgb, var(--hc-rail-line-color) 30%, transparent);
+    0 0 0 calc(5px * var(--hc-rail-bullet-scale)) color-mix(in srgb, var(--hc-rail-bullet-color) 30%, transparent);
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *):hover:not(:has(.ls-block:hover))
   > .block-main-container > .block-control-wrap .bullet-container {
-  background-color: color-mix(in srgb, var(--hc-rail-line-color) 30%, transparent);
+  background-color: color-mix(in srgb, var(--hc-rail-bullet-color) 30%, transparent);
 }
 
 .page-reference,
