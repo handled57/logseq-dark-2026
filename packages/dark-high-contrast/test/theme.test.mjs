@@ -947,10 +947,11 @@ test('the collapse control is visible, focusable and in the theme palette', () =
   assert.doesNotMatch(css, /\[data-hc-collapse[^\]]*\][^{]*\{[^}]*(?:transition|animation):/)
 })
 
-test('the property toggle is a stable, accessible cyan rail control', () => {
+test('the property toggle is a stable cyan rail control revealed by hover or focus', () => {
   assert.match(css, /\[data-hc-property-toggle\] \{[\s\S]*?position:\s*absolute;[\s\S]*?width:\s*20px;[\s\S]*?height:\s*20px;[\s\S]*?color:\s*var\(--vscode-hc-cyan\);[\s\S]*?background:\s*transparent;/)
-  assert.match(css, /\[data-hc-property-toggle\]::before \{[\s\S]*?width:\s*8px;[\s\S]*?height:\s*8px;[\s\S]*?border-radius:\s*50%;[\s\S]*?background:\s*currentColor;/)
-  assert.match(css, /\[data-hc-property-toggle\]:hover::before \{[\s\S]*?box-shadow:/)
+  assert.match(css, /\[data-hc-property-toggle\]::before \{[\s\S]*?width:\s*8px;[\s\S]*?height:\s*8px;[\s\S]*?border-radius:\s*50%;[\s\S]*?background:\s*currentColor;[\s\S]*?opacity:\s*0;/)
+  assert.match(css, /\.ls-block:not\(\.block-content-wrapper \*\):hover:not\(:has\(\.ls-block:hover\)\)[\s\S]*?\[data-hc-property-toggle\]::before,[\s\S]*?\[data-hc-property-toggle\]:focus-visible::before \{\s*opacity:\s*1;/)
+  assert.match(css, /\.ls-block:not\(\.block-content-wrapper \*\):hover:not\(:has\(\.ls-block:hover\)\)[\s\S]*?\[data-hc-property-toggle\]:hover::before \{[\s\S]*?box-shadow:/)
   assert.match(css, /\[data-hc-property-toggle\]:focus-visible \{[\s\S]*?outline:\s*2px solid var\(--vscode-hc-focus\);/)
   assert.match(css, /forced-colors:\s*active\)\s*\{[\s\S]*?\[data-hc-property-toggle\] \{[\s\S]*?color:\s*ButtonText;/)
   assert.doesNotMatch(css, /\[data-hc-property-toggle[^\]]*\][^{]*\{[^}]*(?:transition|animation):/)

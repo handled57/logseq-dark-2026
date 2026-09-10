@@ -969,6 +969,7 @@ test('the property toggle rides beside the bullet without changing rail geometry
   assert.equal(value(control, 'top'), 'calc(var(--hc-rail-bullet-y) - 10px)')
   assert.equal(px(dot, 'width'), 8)
   assert.equal(px(dot, 'height'), 8)
+  assert.equal(Number(value(dot, 'opacity')), 0)
   assert.ok(px(control, 'left') > 30, 'the property control is not right of the rail line')
 })
 
