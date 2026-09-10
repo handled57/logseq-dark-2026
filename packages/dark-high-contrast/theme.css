@@ -656,7 +656,6 @@ hr {
 :root {
   --hc-rail-branch-step: 29px;
   --hc-rail-branch-height: calc(var(--hc-block-gap) + 16px);
-  --hc-rail-branch-tail: calc(var(--hc-block-gap) - 5px);
   --hc-rail-branch-in: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 32' preserveAspectRatio='none'%3E%3Cpath d='M.5 0 C.5 16 29.5 16 29.5 32' fill='none' stroke='black' stroke-width='1' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
   --hc-rail-branch-out: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 32' preserveAspectRatio='none'%3E%3Cpath d='M29.5 0 C29.5 16 .5 16 .5 32' fill='none' stroke='black' stroke-width='1' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
 }
@@ -1137,7 +1136,7 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   > .block-children-container > .block-children {
   position: relative;
   padding-top: var(--hc-rail-branch-height);
-  padding-bottom: calc(var(--hc-rail-branch-height) + var(--hc-rail-branch-tail));
+  padding-bottom: var(--hc-rail-branch-height);
 }
 
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
@@ -1174,8 +1173,24 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
   > .block-children-container > .block-children::after {
   bottom: 0;
-  height: calc(var(--hc-rail-branch-height) + var(--hc-rail-branch-tail));
   mask-image: var(--hc-rail-branch-out);
+}
+
+/* A return whose parent has another sibling at the same level owns the handoff
+ * to that sibling. Its curve remains the same height, then a one-pixel mask
+ * continues vertically across Logseq's inter-block gap until the following
+ * row's incoming segment takes over. A final child has no such tail: it ends
+ * inside its group and hands off directly to the ancestor's return, which is
+ * what keeps nested turns sequential instead of forked. */
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed)):has(~ .ls-block)
+  > .block-children-container > .block-children::after {
+  bottom: calc(-1 * var(--hc-block-gap));
+  height: calc(var(--hc-rail-branch-height) + var(--hc-block-gap));
+  mask-image: var(--hc-rail-branch-out), linear-gradient(black, black);
+  mask-position: center top, left bottom;
+  mask-size: 100% var(--hc-rail-branch-height), 1px var(--hc-block-gap);
 }
 
 /* The generic end-of-page rule stops the final leaf at its row. A nested final

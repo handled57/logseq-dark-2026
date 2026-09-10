@@ -466,6 +466,8 @@ const branchedScope = `body[data-hc-rail-layout="branched"] ${scope}`
 const branchedOpen =
   `${branchedScope} .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))`
 const branchedGroup = `${branchedOpen} > .block-children-container > .block-children`
+const branchedSiblingGroup =
+  `${branchedOpen}:has(~ .ls-block) > .block-children-container > .block-children`
 
 /* The two rows that open the rail: the page's first block, and the block under
  * a page-properties block, which is the first one the reader wrote. */
@@ -592,7 +594,6 @@ test('branched layout keeps Logseq nesting while Flat remains the default geomet
   const step = css.match(/--hc-rail-branch-step:\s*([\d.]+)px;/)
   assert.ok(step, 'branched layout declares no horizontal step')
   assert.equal(Number.parseFloat(step[1]), rail.indent)
-  assert.match(css, /--hc-rail-branch-tail:\s*calc\(var\(--hc-block-gap\) - 5px\);/)
 })
 
 test('expanded branched groups turn smoothly into and out of their child rail', () => {
@@ -601,13 +602,10 @@ test('expanded branched groups turn smoothly into and out of their child rail', 
   const inbound = rule(`${branchedGroup}::before`)
   const outbound = rule(`${branchedGroup}::after`)
 
-  // One tail per group makes nested closures occur one after another instead
-  // of drawing several return curves in the same pixels.
+  // One bounded return per group makes nested closures occur one after another
+  // instead of drawing several return curves in the same pixels.
   assert.equal(value(group, 'padding-top'), 'var(--hc-rail-branch-height)')
-  assert.equal(
-    value(group, 'padding-bottom'),
-    'calc(var(--hc-rail-branch-height) + var(--hc-rail-branch-tail))'
-  )
+  assert.equal(value(group, 'padding-bottom'), 'var(--hc-rail-branch-height)')
   assert.equal(value(turns, 'height'), 'var(--hc-rail-branch-height)')
   assert.equal(value(turns, 'width'), 'calc(var(--hc-rail-branch-step) + 1px)')
   assert.equal(value(turns, 'left'), 'calc(1px - var(--hc-rail-offset))')
@@ -615,10 +613,6 @@ test('expanded branched groups turn smoothly into and out of their child rail', 
   assert.equal(value(inbound, 'mask-image'), 'var(--hc-rail-branch-in)')
   assert.equal(value(outbound, 'mask-image'), 'var(--hc-rail-branch-out)')
   assert.equal(value(outbound, 'bottom'), '0')
-  assert.equal(
-    value(outbound, 'height'),
-    'calc(var(--hc-rail-branch-height) + var(--hc-rail-branch-tail))'
-  )
 
   // Both embedded SVG paths are cubic curves with vertical tangents at their
   // endpoints. There is no line command that could introduce the forbidden
@@ -633,6 +627,31 @@ test('expanded branched groups turn smoothly into and out of their child rail', 
     value(rule(`${branchedOpen} > .block-main-container > .block-control-wrap::after`), 'bottom'),
     '0'
   )
+})
+
+test('a branched return reaches its following sibling without forking nested returns', () => {
+  const outbound = rule(`${branchedSiblingGroup}::after`)
+
+  assert.equal(value(outbound, 'bottom'), 'calc(-1 * var(--hc-block-gap))')
+  assert.equal(
+    value(outbound, 'height'),
+    'calc(var(--hc-rail-branch-height) + var(--hc-block-gap))'
+  )
+  assert.equal(
+    value(outbound, 'mask-image'),
+    'var(--hc-rail-branch-out), linear-gradient(black, black)'
+  )
+  assert.equal(value(outbound, 'mask-position'), 'center top, left bottom')
+  assert.equal(
+    value(outbound, 'mask-size'),
+    '100% var(--hc-rail-branch-height), 1px var(--hc-block-gap)'
+  )
+
+  // The extra handoff is conditional on a same-level sibling. A final nested
+  // child therefore retains the bounded return asserted above and cannot
+  // overlap the ancestor turn that follows it.
+  assert.match(branchedSiblingGroup, /:has\(~ \.ls-block\)/)
+  assert.doesNotMatch(branchedGroup, /:has\(~ \.ls-block\)/)
 })
 
 test('folded parents cannot paint branched connectors', () => {
