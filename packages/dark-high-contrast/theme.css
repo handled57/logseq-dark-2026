@@ -89,7 +89,7 @@ html[data-theme][data-color]:root body,
    * `--hc-block-gap` is the space left between two blocks: it clears two of
    * those paddings, so two blocks selected one after the other keep their
    * outlines apart. */
-  --hc-block-outline-pad: 4px;
+  --hc-block-outline-pad: 6px;
   --hc-block-gap: calc(4px + 2 * var(--hc-block-outline-pad));
 
   /* Collapsible rich content: the box the control is drawn in, and the height
@@ -994,7 +994,9 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 
 /* The line. Each block paints the stretch of rail its own row is responsible
  * for: up from the gap above the row to the center of its bullet, and down from
- * that center to the foot of the row, where the next block's segment starts.
+ * that center across the whole gap below it, to the top of the next row, where
+ * the next block's segment starts. The downward reach is the gap itself, so the
+ * rail stays unbroken however far apart the blocks are spaced.
  * Every stretch is drawn in `--hc-rail-default-color`, the one color the theme
  * lets a reader set, so the rail runs the page in a single color however deep
  * the tree goes; the hierarchy is left to the bullets hanging on it. Painted
@@ -1021,7 +1023,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::after {
   top: var(--hc-rail-bullet-y);
-  bottom: -8px;
+  bottom: calc(-1 * var(--hc-block-gap));
 }
 
 /* A page's properties are its front matter rather than a block of its text, so

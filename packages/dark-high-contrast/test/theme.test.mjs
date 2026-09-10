@@ -439,7 +439,7 @@ test('the block outline stands off the text on a padding of its own', () => {
 
   assert.match(
     css,
-    /--hc-block-outline-pad:\s*4px;/,
+    /--hc-block-outline-pad:\s*\d+px;/,
     'the padding is a variable a graph can retune'
   )
 
@@ -488,19 +488,14 @@ test('the block outline stands off the text on a padding of its own', () => {
     'the gap clears two of the paddings'
   )
 
-  /* The rail's line bridges the space between two rows by reaching above and
-   * below each of them. The wider gap has to stay inside that reach or the
-   * rail would break between every pair of blocks. */
-  const above = Number(/\.block-control-wrap::before \{[^}]*top:\s*-(\d+)px/.exec(
-    css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').replace(/\{ /g, '{')
-  )?.[1])
-  const below = Number(/\.block-control-wrap::after \{[^}]*bottom:\s*-(\d+)px/.exec(
-    css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').replace(/\{ /g, '{')
-  )?.[1])
-  const pad = Number(/--hc-block-outline-pad:\s*(\d+)px/.exec(css)[1])
-  assert.ok(
-    above + below >= 4 + 2 * pad,
-    `the rail's ${above}px and ${below}px reach must cover the ${4 + 2 * pad}px gap`
+  /* The rail's line bridges the space between two rows by reaching down from
+   * each of them to the top of the next. That reach is the gap itself, so the
+   * rail cannot break however far apart a padding widens the blocks. */
+  const flat = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').replace(/\{ /g, '{')
+  assert.match(
+    flat,
+    /\.block-control-wrap::after \{[^}]*bottom: calc\(-1 \* var\(--hc-block-gap\)\)/,
+    'each row paints its stretch of rail down to the top of the next'
   )
 })
 

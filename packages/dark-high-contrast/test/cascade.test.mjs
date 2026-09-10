@@ -880,12 +880,13 @@ test('the rail line runs from the first bullet to the end of the last block', ()
   assert.ok(px(up, 'top') < 0, 'the upward segment does not cover the gap above its row')
   assert.equal(added(value(up, 'height'), '--hc-rail-bullet-y'), -px(up, 'top'))
 
-  // The downward segment leaves that center and runs past the foot of its row,
-  // by less than the distance a bullet sits below the row it follows — so it
-  // always meets the next segment and can never outrun a bullet center.
-  const overshoot = -px(down, 'bottom')
-  assert.ok(overshoot > 0, 'the downward segment stops short of the block below it')
-  assert.ok(overshoot < rail.box / 2, 'the downward segment can outrun the bullet below it')
+  // The downward segment leaves that center and runs the whole gap below its
+  // row, to the top of the next one, where the next block's segment starts. It
+  // is the gap itself rather than a number of its own, so widening the space
+  // between blocks can never break the line; and landing on the next row's top
+  // it still stops short of the bullet that row hangs below it.
+  assert.equal(value(down, 'bottom'), 'calc(-1 * var(--hc-block-gap))')
+  assert.equal(value(rule('.ls-block'), 'margin-bottom'), 'var(--hc-block-gap)')
 
   // The rail starts at a bullet center: the first rendered block draws nothing
   // above its own bullet.
