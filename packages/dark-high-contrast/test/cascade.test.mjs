@@ -308,14 +308,14 @@ test('the moved property table lines up with the box text and takes the box tail
   assert.match(css, /> \.block-body > :is\([^{]*\.passage\) \{\s*\n\s*margin-bottom:\s*0;/)
 })
 
-/* The bullet rail hangs every block's bullet on one vertical line. Every
- * distance it moves a bullet by is Logseq's own: the 29px a nesting level
- * indents its subtree, the 22px fold arrow the bullet sits behind, the 16px
- * bullet, the 24px control box the bullet is centered in, the 2rem the scroll
- * container keeps left of the page, and the size Logseq gives each heading,
- * which is what a heading's bullet drops by. Those are pinned here because the
- * rail is arithmetic on them — if Logseq re-measures a block, the rail bends
- * rather than breaks visibly, so nothing else would catch it. */
+/* Flat mode hangs every block's bullet on one vertical line; Branched mode
+ * keeps Logseq's 29px step at every nesting level. Every other distance the
+ * rail moves a bullet by is Logseq's own: the 22px fold arrow the bullet sits
+ * behind, the 16px bullet, the 24px control box the bullet is centered in, the
+ * 2rem the scroll container keeps left of the page, and the size Logseq gives
+ * each heading, which is what a heading's bullet drops by. Those are pinned
+ * here because the rail is arithmetic on them — if Logseq re-measures a block,
+ * the rail bends rather than breaks visibly, so nothing else would catch it. */
 const railMetrics = [
   '.block-children-container{margin-left:29px;position:relative}',
   '.block-control-wrap{height:24px;margin-top:0;padding-right:6px}',
@@ -462,6 +462,10 @@ const scope =
 const block = `${scope} .ls-block:not(.block-content-wrapper *)`
 const row = `${block} > .block-main-container`
 const wrap = `${row} > .block-control-wrap`
+const branchedScope = `body[data-hc-rail-layout="branched"] ${scope}`
+const branchedOpen =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))`
+const branchedGroup = `${branchedOpen} > .block-children-container > .block-children`
 
 /* The two rows that open the rail: the page's first block, and the block under
  * a page-properties block, which is the first one the reader wrote. */
@@ -568,6 +572,77 @@ test('the rail takes back exactly the indentation each nesting level applied', (
   }
   for (let depth = 1; depth <= levels.size; depth += 1) {
     assert.ok(levels.has(depth), `nesting level ${depth} has no rail rule`)
+  }
+})
+
+test('branched layout keeps Logseq nesting while Flat remains the default geometry', () => {
+  // The base rules are still the flat layout: without the host marker every
+  // level takes back its accumulated indentation and lands on one column.
+  assert.doesNotMatch(wrap, /data-hc-rail-layout/)
+
+  // Branched mode takes back only the margin offset. The 29px Logseq adds for
+  // each child therefore remains visible as one horizontal rail step, while
+  // equal opposite margins leave the content column where Logseq put it.
+  const nested = rule(
+    `${branchedScope} .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap`
+  )
+  assert.equal(value(nested, '--hc-rail-indent'), 'var(--hc-rail-offset) !important')
+  assert.equal(px(rule('#main-content-container > .cp__sidebar-main-content[data-is-full-width="true"]'), '--hc-rail-offset'), 24)
+  assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?--hc-rail-offset: 48px;/)
+  const step = css.match(/--hc-rail-branch-step:\s*([\d.]+)px;/)
+  assert.ok(step, 'branched layout declares no horizontal step')
+  assert.equal(Number.parseFloat(step[1]), rail.indent)
+  assert.match(css, /--hc-rail-branch-tail:\s*calc\(var\(--hc-block-gap\) - 5px\);/)
+})
+
+test('expanded branched groups turn smoothly into and out of their child rail', () => {
+  const group = rule(branchedGroup)
+  const turns = rule(`${branchedGroup}::before, ${branchedGroup}::after`)
+  const inbound = rule(`${branchedGroup}::before`)
+  const outbound = rule(`${branchedGroup}::after`)
+
+  // One tail per group makes nested closures occur one after another instead
+  // of drawing several return curves in the same pixels.
+  assert.equal(value(group, 'padding-top'), 'var(--hc-rail-branch-height)')
+  assert.equal(
+    value(group, 'padding-bottom'),
+    'calc(var(--hc-rail-branch-height) + var(--hc-rail-branch-tail))'
+  )
+  assert.equal(value(turns, 'height'), 'var(--hc-rail-branch-height)')
+  assert.equal(value(turns, 'width'), 'calc(var(--hc-rail-branch-step) + 1px)')
+  assert.equal(value(turns, 'left'), 'calc(1px - var(--hc-rail-offset))')
+  assert.equal(value(turns, 'background-color'), 'var(--hc-rail-default-color)')
+  assert.equal(value(inbound, 'mask-image'), 'var(--hc-rail-branch-in)')
+  assert.equal(value(outbound, 'mask-image'), 'var(--hc-rail-branch-out)')
+  assert.equal(value(outbound, 'bottom'), '0')
+  assert.equal(
+    value(outbound, 'height'),
+    'calc(var(--hc-rail-branch-height) + var(--hc-rail-branch-tail))'
+  )
+
+  // Both embedded SVG paths are cubic curves with vertical tangents at their
+  // endpoints. There is no line command that could introduce the forbidden
+  // straight diagonal between levels.
+  assert.match(css, /M\.5 0 C\.5 16 29\.5 16 29\.5 32/)
+  assert.match(css, /M29\.5 0 C29\.5 16 \.5 16 \.5 32/)
+  assert.doesNotMatch(css, /--hc-rail-branch-(?:in|out):[^;]*\bL[\d. -]/)
+
+  // A parent's ordinary downward segment ends where its guarded group starts;
+  // the curve, rather than a diagonal or a parallel vertical, owns that turn.
+  assert.equal(
+    value(rule(`${branchedOpen} > .block-main-container > .block-control-wrap::after`), 'bottom'),
+    '0'
+  )
+})
+
+test('folded parents cannot paint branched connectors', () => {
+  const curved = [...rules.keys()].filter(
+    (selector) => selector.startsWith(branchedScope) && /\.block-children::(?:before|after)/.test(selector)
+  )
+  assert.ok(curved.length >= 2, 'branched layout has no child-group curves')
+  for (const selector of curved) {
+    assert.match(selector, /\[haschild="true"\]/)
+    assert.match(selector, /\.bullet-container:not\(\.bullet-closed\)/)
   }
 })
 

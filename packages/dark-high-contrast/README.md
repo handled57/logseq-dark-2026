@@ -11,7 +11,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - VS Code-inspired semantic colors for links, references, properties, tasks, and code.
 - Compact workbench treatment for the header, sidebars, command palette, menus, dialogs, and settings.
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
-- Every block in the main editor hangs its bullet on one vertical rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at the size of that line, with the content column keeping its usual nesting.
+- Every block in the main editor hangs its bullet on a rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at the size of that line. **Flat** keeps one vertical rail; **Branched** follows the outline depth with smooth turns into and out of expanded child groups. The content column keeps its usual nesting in both layouts.
 - The rail's line is one color the whole way down the page, the one the **Rail color** setting names. The bullets hanging on it carry the hierarchy: a heading or a block with children takes the color of its own depth — magenta at the top level, then orange, brown, amber, teal, blue, indigo and violet — and ordinary leaf prose keeps a white bullet.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Block headings are set 20% below the sizes Logseq gives them, so a heading reads as the head of its outline rather than dominating the notes under it. Every level keeps Logseq's proportions, and page titles are unchanged.
@@ -22,6 +22,25 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Sets the emoji a block opens with in a gutter of its own, left of the block's text, so it reads as that block's icon and the lines under it stay in one column. The emoji is left exactly where it is written.
 - Left-clicking a block bullet expands or collapses that block rather than opening it. Shift-click still opens the block in the sidebar, and right-clicking offers **Open**, immediately above **Open in sidebar**, to open the block in the main editor.
 - No build runtime, tracking, remote imports, or network access.
+
+## Rail layouts
+
+Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
+
+- **Flat** is the default. It moves every bullet onto the same vertical line,
+  preserving the theme's original rail.
+- **Branched** leaves one 29px horizontal step between nesting levels. An
+  expanded parent's line turns smoothly right into the child rail, runs
+  vertically through sibling children, and curves back after the final child.
+  A nested expanded block repeats the same shape at its own level. The turns
+  are cubic curves with a vertical tangent at both ends, rather than diagonal
+  segments; a collapsed parent has no visible child connector.
+
+Changing the setting repaints the current page immediately. Rail color,
+depth-colored bullets, open rings, hover behavior, headings and special-block
+alignment are shared by both layouts. The ordinary/full-width and narrow-window
+offsets still apply, and document mode, embeds, queries, references, sidebars,
+whiteboards and dialogs remain outside the rail.
 
 ## Color palette
 
@@ -60,10 +79,11 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 
 Every heading, and every block with children, draws its bullet in the color of
 its own depth. Depth 1 is a top-level block. The eight colors repeat below the
-eighth level — depth 9 is magenta again — and a block deeper than depth 13, the
-twelfth level below the top and the last one the rail places, hangs from that
-level's rail position and keeps its color. The line itself takes none of these:
-it is one color the whole way down the page.
+eighth level — depth 9 is magenta again. Flat layout caps a block deeper than
+depth 13 at that final rail position; Branched layout continues Logseq's 29px
+step at every rendered depth. Both keep the depth-13 color below that tested
+color range. The line itself takes none of these: it is one color the whole way
+down the page.
 
 | Depth | Color | Tokens |
 | --- | --- | --- |

@@ -324,6 +324,21 @@ test('the rail line is the structural border, and the setting writes over it', (
   assert.match(script, /title: 'Rail color'/)
 })
 
+test('the optional branched rail is body-scoped and documented', async () => {
+  const readme = await readFile(resolve(root, 'README.md'), 'utf8')
+
+  assert.match(script, /const DEFAULT_RAIL_LAYOUT = 'Flat'/)
+  assert.match(script, /enumChoices: \[DEFAULT_RAIL_LAYOUT, BRANCHED_RAIL_LAYOUT\]/)
+  assert.match(script, /doc\.body\.setAttribute\(\s*RAIL_LAYOUT_ATTR/)
+  assert.match(script, /doc\.body\.removeAttribute\(RAIL_LAYOUT_ATTR\)/)
+  assert.match(css, /body\[data-hc-rail-layout="branched"\] main:not\(\.ls-fold-button-on-right\)/)
+  assert.match(css, /mask-image: var\(--hc-rail-branch-in\)/)
+  assert.match(css, /mask-image: var\(--hc-rail-branch-out\)/)
+  assert.match(readme, /## Rail layouts/)
+  assert.match(readme, /\*\*Flat\*\* is the default/)
+  assert.match(readme, /\*\*Branched\*\* leaves one 29px horizontal step/)
+})
+
 test('classic and ShUI theme contracts cover every planned surface', () => {
   for (const variable of [
     '--background', '--foreground', '--card', '--popover', '--primary', '--accent', '--ring',
@@ -558,7 +573,10 @@ test('the rail reaches the page tree in the main editor and nothing else', () =>
       // Sidebars, whiteboards and dialogs render outside the main editor; the
       // right-hand fold button and document mode re-measure the indentation the
       // rail is drawn from. All four are out of reach by construction.
-      assert.ok(part.startsWith(railScope), `a rail rule escapes the main editor: "${part.slice(0, 60)}…"`)
+      assert.ok(
+        part.startsWith(railScope) || part.startsWith(`body[data-hc-rail-layout="branched"] ${railScope}`),
+        `a rail rule escapes the main editor: "${part.slice(0, 60)}…"`
+      )
       // Embedded and queried trees render inside a block's content and keep
       // Logseq's own layout rather than being pulled onto the page's rail.
       assert.ok(
@@ -600,17 +618,22 @@ test('every rendered block in the main editor keeps a bullet on the rail', () =>
   // them, and this is the rule that keeps them from coming back.
   assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left:\s*0\s*!important/)
 
-  // The rail reads `.block-children` as the record of how deep a block sits and
-  // declares nothing on those boxes: not a connector line, and not a display
-  // that would reveal the descendants a collapsed block never renders. Every
-  // rule paints a row or something in its control column, and nothing else —
-  // the block types a rule names to place a bullet are guards on the row, not
-  // boxes it touches.
-  const painted = /^(?:\.block-main-container|\.block-control-wrap|\.block-control|\.bullet-link-wrap|\.bullet-container|\.bullet|label|\[data-hc-property-toggle\])(?:\.[\w-]+)*(?::(?:hover|focus-visible))?(?:::(?:before|after))?$/
+  // Flat layout reads `.block-children` only as the record of depth. Branched
+  // layout additionally paints a guarded child group's two curves, but never
+  // changes its display (which could reveal a folded subtree). Everything else
+  // remains on the row or in its control column.
+  const painted = /^(?:\.block-children|\.block-main-container|\.block-control-wrap|\.block-control|\.bullet-link-wrap|\.bullet-container|\.bullet|label|\[data-hc-property-toggle\])(?:\.[\w-]+)*(?::(?:hover|focus-visible))?(?:::(?:before|after))?$/
   for (const [selector] of railRules) {
     for (const part of selectors(selector)) {
+      const target = subject(part)
+      if (target.startsWith('.block-children')) {
+        assert.ok(
+          part.startsWith('body[data-hc-rail-layout="branched"] '),
+          `a flat rail rule paints a child group: "${part.slice(0, 60)}…"`
+        )
+      }
       assert.match(
-        subject(part),
+        target,
         painted,
         `a rail rule paints something other than a block's own control column: "${part.slice(0, 60)}…"`
       )

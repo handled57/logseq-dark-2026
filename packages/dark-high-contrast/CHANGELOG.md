@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## 2.10.0 - 2026-09-10
+
+- Add a **Rail layout** setting. **Flat** remains the default and preserves the
+  single vertical rail. **Branched** keeps each child bullet at its nesting
+  depth, carries the line through siblings, and joins expanded child groups
+  with smooth cubic turns that become vertical before reaching either rail.
+  Nested groups add one branch and return at each level; folded groups draw no
+  connector. Both layouts retain the rail color, depth-colored bullets,
+  open-ring and hover states, first-line alignment, exclusions, and the narrow
+  and full-width offsets.
+
 ## 2.9.1 - 2026-09-10
 
 - Keep the property-toggle dot hidden until its block is hovered or the control

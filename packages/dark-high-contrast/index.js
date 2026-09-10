@@ -99,6 +99,16 @@ const RAIL_COLOR_SETTING = 'defaultRailColor'
 const DEFAULT_RAIL_COLOR = '#5B7E96'
 const RAIL_COLOR_PROPERTY = '--hc-rail-default-color'
 
+/* The rail can keep every bullet on its original single column, or let each
+ * nesting level keep Logseq's 29px horizontal step so the line can branch
+ * through the hierarchy. The stylesheet owns both geometries; the entry only
+ * reflects the live setting onto the host body, where a settings change can
+ * switch layouts without reloading the theme. */
+const RAIL_LAYOUT_SETTING = 'railLayout'
+const DEFAULT_RAIL_LAYOUT = 'Flat'
+const BRANCHED_RAIL_LAYOUT = 'Branched'
+const RAIL_LAYOUT_ATTR = 'data-hc-rail-layout'
+
 /* Leading-emoji block icons. A block whose text opens with one emoji has that
  * emoji set in a gutter to the left of the text, the way a passage sets a verse
  * number, so it reads as the block's icon. Nothing is rewritten: the emoji is
@@ -130,6 +140,17 @@ const settingsSchema = [
       'every nesting level. Defaults to the border color used around the editor, the left menu ' +
       'and the sidebars. Leave empty to keep that border color. The eight colors the bullets ' +
       'carry the hierarchy in are unaffected.'
+  },
+  {
+    key: RAIL_LAYOUT_SETTING,
+    type: 'enum',
+    enumChoices: [DEFAULT_RAIL_LAYOUT, BRANCHED_RAIL_LAYOUT],
+    enumPicker: 'select',
+    default: DEFAULT_RAIL_LAYOUT,
+    title: 'Rail layout',
+    description:
+      'Flat keeps every bullet on one vertical rail. Branched moves child bullets right with ' +
+      'their nesting depth and joins expanded child groups with smooth curved connectors.'
   },
   {
     key: BLOCK_ICONS_SETTING,
@@ -780,10 +801,19 @@ function applyRailColor() {
   else style.removeProperty(RAIL_COLOR_PROPERTY)
 }
 
+function applyRailLayout() {
+  const layout = readSetting(RAIL_LAYOUT_SETTING, DEFAULT_RAIL_LAYOUT.toLowerCase())
+  doc.body.setAttribute(
+    RAIL_LAYOUT_ATTR,
+    layout === BRANCHED_RAIL_LAYOUT.toLowerCase() ? 'branched' : 'flat'
+  )
+}
+
 function paint() {
   const active = rules()
 
   applyRailColor()
+  applyRailLayout()
 
   /* Turning the setting off answers here as well as in the pass below, so a
    * block whose source cannot be read back still gives its mark up. */
@@ -887,6 +917,7 @@ function teardown() {
   doc.removeEventListener('keydown', togglePropertiesOnKey, true)
 
   doc.body.style.removeProperty(RAIL_COLOR_PROPERTY)
+  doc.body.removeAttribute(RAIL_LAYOUT_ATTR)
 
   collapsedContent.clear()
   propertyVisibility.clear()

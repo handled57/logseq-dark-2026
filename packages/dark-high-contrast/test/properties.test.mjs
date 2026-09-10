@@ -630,6 +630,38 @@ test('unloading takes the rail color back off the host root', async () => {
   assert.equal(context.hostStyle.properties.has(RAIL_PROPERTY), false)
 })
 
+test('the rail layout setting offers Flat by default and Branched as an alternative', async () => {
+  const context = await render({}, [])
+  const setting = context.logseq.schema.find(({ key }) => key === 'railLayout')
+
+  assert.ok(setting, 'the theme offers no rail layout setting')
+  assert.equal(setting.type, 'enum')
+  assert.equal(setting.enumPicker, 'select')
+  assert.deepEqual([...setting.enumChoices], ['Flat', 'Branched'])
+  assert.equal(setting.default, 'Flat')
+  assert.equal(setting.title, 'Rail layout')
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'flat')
+})
+
+test('choosing Branched updates the host layout marker on repaint', async () => {
+  const context = await render({ railLayout: 'Branched' }, [])
+
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'branched')
+
+  context.logseq.settings.railLayout = 'Flat'
+  context.paint()
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'flat')
+})
+
+test('an unknown rail layout falls back to Flat and unloading removes the marker', async () => {
+  const context = await render({ railLayout: 'diagonal' }, [])
+
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'flat')
+
+  for (const handler of context.logseq.unloads) await handler()
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), null)
+})
+
 function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '', wrapperSelector = '', uuid = '' } = {}) {
   const wrapper = {
     textContent: text,

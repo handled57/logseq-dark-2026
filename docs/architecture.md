@@ -43,9 +43,12 @@ with pinned Logseq 0.10.15 declarations and can also read the installed CSS via
 `LOGSEQ_CSS`.
 
 The main-editor bullet rail repositions Logseq's own bullet; it never clones
-one. For each nesting level, the control column moves left by that level's
-`29px` indentation plus `--hc-rail-offset`, then returns the same distance as
-margin so the content hierarchy does not move. The rail is scoped to the page
+one. Flat layout is the default: for each nesting level, the control column
+moves left by that level's `29px` indentation plus `--hc-rail-offset`, then
+returns the same distance as margin so every bullet lands on one column and the
+content hierarchy does not move. Branched layout takes back only
+`--hc-rail-offset`, leaving Logseq's accumulated `29px` indentation visible in
+the bullet positions without moving the content. The rail is scoped to the page
 tree, stops short of embeds, queries, references, sidebars, dialogs, document
 mode, and right-side fold controls, and uses smaller offsets for narrow and
 full-width layouts. `--hc-rail-bullet-y` aligns a bullet and fold arrow with the
@@ -60,6 +63,22 @@ resolve against the root's scale and never follow a heading's. The scale
 defaults to `1`, so every surface the rail does not reach is untouched. These numbers derive from pinned
 upstream declarations; change arithmetic, selectors, and cascade tests
 together.
+
+`index.js` reflects the **Rail layout** enum onto `body` as
+`data-hc-rail-layout="flat|branched"` on every paint and removes it on unload.
+The flat geometry is the unqualified stylesheet fallback. Branched rules are
+qualified by the body attribute, so changing settings switches the current
+page without reinstalling or reloading the theme. Each expanded
+`[haschild="true"]` group whose bullet is not `.bullet-closed` reserves one
+`--hc-rail-branch-height` at its foot. Its `::before` and `::after` masks are
+opposite cubic paths across `--hc-rail-branch-step` (the pinned 29px indent),
+with vertical tangents at both endpoints. The entry curve hands the parent rail
+to the first child's vertical column; the return curve hands the last child's
+column back. A nested group's reserved foot puts its return before its
+ancestor's return, so closing levels unwind separately. The return's reserved
+height includes a short tail, keeping that curve continuous with the following
+sibling rail without overlapping its ancestor's turn. The open-bullet guard and
+Logseq's hidden child container ensure folded parents paint no curves.
 
 Block headings are not Logseq's size. `--hc-heading-scale` takes every level to
 one fraction of the multiple Logseq sets it in, and each heading rule scales
