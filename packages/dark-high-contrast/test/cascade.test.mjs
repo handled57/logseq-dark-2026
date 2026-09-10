@@ -561,18 +561,16 @@ test('every nesting level takes the next color of the spectrum', () => {
 })
 
 test('a heading and a block with children take their depth color; ordinary prose does not', () => {
-  // Ordinary prose keeps its white bullet, on the base rail line the theme's
-  // own setting paints — never on a hierarchy color.
+  // Ordinary prose keeps its white bullet — never a hierarchy color.
   const defaults = rule(wrap)
-  assert.equal(value(defaults, '--hc-rail-line-color'), 'var(--hc-rail-default-color)')
   assert.equal(value(defaults, '--hc-rail-bullet-color'), 'var(--vscode-hc-white)')
   assert.equal(value(defaults, '--hc-rail-bullet-fill'), 'var(--hc-rail-bullet-color)')
 
-  // A block that carries the hierarchy hands its depth's color to both, so its
-  // bullet and the stretch of line it paints always agree.
+  // A block that carries the hierarchy hands its depth's color to its bullet,
+  // and to its bullet only: the line under it is the reader's own color.
   const carried = rule(qualifying.join(', '))
-  assert.equal(value(carried, '--hc-rail-line-color'), 'var(--hc-rail-depth-color)')
   assert.equal(value(carried, '--hc-rail-bullet-color'), 'var(--hc-rail-depth-color)')
+  assert.doesNotMatch(carried, /--hc-rail-line-color:/)
   for (const selector of qualifying) {
     assert.ok(
       compare(specificity(selector), specificity(wrap)) > 0,
@@ -580,9 +578,13 @@ test('a heading and a block with children take their depth color; ordinary prose
     )
   }
 
-  // The line and the bullet read those two variables and nothing else, so a
-  // block's segment is painted in the same color as its own bullet.
-  assert.equal(value(rule(`${wrap}::before, ${wrap}::after`), 'background-color'), 'var(--hc-rail-line-color)')
+  // The line is the one color the theme lets a reader set, whatever the block's
+  // depth; only the bullet reads the hierarchy.
+  assert.equal(
+    value(rule(`${wrap}::before, ${wrap}::after`), 'background-color'),
+    'var(--hc-rail-default-color)'
+  )
+  assert.ok(!/--hc-rail-line-color/.test(css), 'the line still has a color of its own to take from a depth')
   const dot = rule(`${wrap} .bullet-container .bullet`)
   assert.equal(value(dot, 'background-color'), 'var(--hc-rail-bullet-fill)')
   assert.match(dot, /0 0 0 calc\(2px \* var\(--hc-rail-bullet-scale\)\) var\(--hc-rail-bullet-color\)/)
@@ -591,7 +593,7 @@ test('a heading and a block with children take their depth color; ordinary prose
   // which no descendant block sits inside: a child's segment takes the child's
   // depth, never the color of the parent holding it.
   for (const [selector, body] of rules) {
-    if (!/(?:^|;|\n)\s*--hc-rail-(?:depth-color|line-color|bullet-color|bullet-fill):/.test(body)) continue
+    if (!/(?:^|;|\n)\s*--hc-rail-(?:depth-color|bullet-color|bullet-fill):/.test(body)) continue
     for (const part of splitSelectors(selector)) {
       assert.ok(
         plain(part).endsWith('.block-control-wrap'),
@@ -630,7 +632,7 @@ test('a block standing open is a ring; a folded or childless one is filled', () 
 
   // Only the fill: the rings the bullet is drawn with are still its own color,
   // so an open block reads as its depth's hue rather than disappearing.
-  assert.doesNotMatch(rule(open), /--hc-rail-(?:bullet|line|depth)-color:/)
+  assert.doesNotMatch(rule(open), /--hc-rail-(?:bullet|depth)-color:/)
 
   // A collapsed block and a leaf are untouched, so the ring is the one state
   // that is different rather than a new appearance for every bullet.
@@ -767,7 +769,7 @@ test('the rail line runs from the first bullet to the end of the last block', ()
   // The fold arrow, then half a bullet: the center of the bullet Logseq draws.
   assert.equal(px(line, 'left'), rail.arrow + rail.bullet / 2)
   assert.equal(px(line, 'width'), 1)
-  assert.match(line, /background-color:\s*var\(--hc-rail-line-color\)/)
+  assert.match(line, /background-color:\s*var\(--hc-rail-default-color\)/)
   // Decorative: the line is never what a click lands on.
   assert.match(line, /pointer-events:\s*none/)
   // Behind the bullets, inside the stacking context the row is given for it.
@@ -856,15 +858,15 @@ test('hovering a block lights its own bullet and no other', () => {
   const halo = rule(`${hovered} .bullet-container`)
   const dot = rule(`${hovered} .bullet-container .bullet`)
 
-  // The color that block paints the rail with, at a fraction of full strength:
-  // the line's cyan for ordinary prose, its own depth's hue for a heading or a
-  // parent, so the halo stays visible against every bullet the rail draws.
-  const glow = /color-mix\(in srgb, var\(--hc-rail-line-color\) \d+%, transparent\)/
-  assert.match(halo, new RegExp(`background-color:\\s*${glow.source}`), 'a hovered bullet is not lit in its own rail color')
+  // The bullet's own color, at a fraction of full strength: white for ordinary
+  // prose, its own depth's hue for a heading or a parent, so the halo stays
+  // visible against every bullet the rail draws.
+  const glow = /color-mix\(in srgb, var\(--hc-rail-bullet-color\) \d+%, transparent\)/
+  assert.match(halo, new RegExp(`background-color:\\s*${glow.source}`), 'a hovered bullet is not lit in its own color')
   assert.match(
     dot,
     new RegExp(`0 0 0 calc\\(\\d+px \\* var\\(--hc-rail-bullet-scale\\)\\) ${glow.source}`),
-    'a hovered bullet has no ring in its own rail color'
+    'a hovered bullet has no ring in its own color'
   )
 
   // The dot keeps the ring the theme draws it with, so hover adds to a bullet
