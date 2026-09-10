@@ -35,7 +35,15 @@ function pdf(name, bytes = PDF_BYTES) {
   return { name, type: 'application/pdf', async arrayBuffer() { return bytes } }
 }
 
-function load({ graph = GRAPH, onDisk = [], pages = {}, templates = {}, setting = 'No template', writable = true } = {}) {
+function load({
+  graph = GRAPH,
+  onDisk = [],
+  pages = {},
+  templates = {},
+  setting = 'No template',
+  highlightSetting = 'No template',
+  writable = true
+} = {}) {
   const host = node('body')
   const windowListeners = []
   const listeners = []
@@ -48,6 +56,9 @@ function load({ graph = GRAPH, onDisk = [], pages = {}, templates = {}, setting 
   const created = []
   const appended = []
   const inserted = []
+  const nested = []
+  const deleted = []
+  const changed = []
   const schemas = []
   const files = new Map(onDisk.map((path) => [path, PDF_BYTES.byteLength]))
   const blocks = { ...pages }
@@ -109,11 +120,17 @@ function load({ graph = GRAPH, onDisk = [], pages = {}, templates = {}, setting 
     logseq: {
       provided,
       unloads,
-      settings: { annotationPageTemplate: setting },
+      settings: {
+        annotationPageTemplate: setting,
+        annotationHighlightTemplate: highlightSetting
+      },
       useSettingsSchema(schema) {
         schemas.push(schema)
       },
       DB: {
+        onChanged(handler) {
+          changed.push(handler)
+        },
         async datascriptQuery() {
           return Object.entries(templates).map(([name, properties]) => [name, properties])
         }
@@ -145,8 +162,17 @@ function load({ graph = GRAPH, onDisk = [], pages = {}, templates = {}, setting 
           appended.push({ page: title, content })
           blocks[title] = [...(blocks[title] ?? []), { content }]
         },
+        async insertBlock(parent, content, options) {
+          const block = { uuid: `child-${parent}`, content }
+          nested.push({ parent, content, options, block })
+          return block
+        },
+        async deleteBlock(block) {
+          deleted.push(block)
+        },
         async insertTemplate(block, name) {
           inserted.push({ block, name })
+          if (!String(block).startsWith('first-')) return
           const title = String(block).replace(/^first-/, '')
           const properties = templates[name] ?? {}
           const propertyLines = Object.entries(properties).map(([key, value]) => `${key}:: ${value}`)
@@ -215,10 +241,17 @@ function load({ graph = GRAPH, onDisk = [], pages = {}, templates = {}, setting 
     created,
     appended,
     inserted,
+    nested,
+    deleted,
     schemas,
     messages,
     files,
     blocks,
+    change: async (event) => {
+      for (const handler of changed) handler(event)
+      await flush()
+      await flush()
+    },
     writes: () => actions.filter((entry) => entry.action === 'writeFile'),
     slash: () => commands[0],
     command: () => palette[0]
@@ -305,8 +338,78 @@ test('the settings dropdown lists block and page templates in name order', async
       description:
         'Template to apply when Anno creates a page. Choices come from blocks and pages ' +
         'with a template property; existing pages are left as they are.'
+    },
+    {
+      key: 'annotationHighlightTemplate',
+      type: 'enum',
+      enumChoices: ['No template', 'Book', 'Source'],
+      enumPicker: 'select',
+      default: 'No template',
+      title: 'Annotation/highlight template',
+      description:
+        'Template to add beneath each new PDF annotation or highlight block. Choices come ' +
+        'from blocks and pages with a template property; existing highlights are left alone.'
     }
   ])
+})
+
+test('a selected highlight template is nested under each new PDF annotation block', async () => {
+  const context = load({
+    highlightSetting: 'Note prompt',
+    templates: { 'Note prompt': { template: 'Note prompt' } }
+  })
+  await flush()
+
+  await context.change({
+    blocks: [
+      {
+        uuid: 'highlight-1',
+        content: 'Call me Ishmael.',
+        properties: { 'ls-type': 'annotation', 'hl-page': 1, 'hl-color': 'yellow' }
+      }
+    ],
+    txMeta: { outlinerOp: 'insert-blocks' }
+  })
+
+  assert.deepEqual(plain(context.nested), [
+    {
+      parent: 'highlight-1',
+      content: '',
+      options: { sibling: false },
+      block: { uuid: 'child-highlight-1', content: '' }
+    }
+  ])
+  assert.deepEqual(context.inserted, [
+    { block: 'child-highlight-1', name: 'Note prompt' }
+  ])
+  assert.deepEqual(context.deleted, [])
+})
+
+test('highlight templates ignore old annotations, ordinary blocks and No template', async () => {
+  const context = load({
+    highlightSetting: 'Note prompt',
+    templates: { 'Note prompt': { template: 'Note prompt' } }
+  })
+  await flush()
+
+  await context.change({
+    blocks: [{ uuid: 'old-highlight', properties: { 'ls-type': 'annotation' } }],
+    txMeta: { outlinerOp: 'save-block' }
+  })
+  await context.change({
+    blocks: [{ uuid: 'ordinary', properties: {} }],
+    txMeta: { outlinerOp: 'insert-blocks' }
+  })
+
+  const disabled = load({ templates: { 'Note prompt': { template: 'Note prompt' } } })
+  await flush()
+  await disabled.change({
+    blocks: [{ uuid: 'new-highlight', properties: { 'ls-type': 'annotation' } }],
+    txMeta: { outlinerOp: 'insert-blocks' }
+  })
+
+  assert.deepEqual(context.nested, [])
+  assert.deepEqual(disabled.nested, [])
 })
 
 test('the prompt opens the file chooser with it, and the button reopens it', async () => {

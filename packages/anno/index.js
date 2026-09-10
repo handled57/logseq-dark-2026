@@ -39,7 +39,8 @@ const TITLE_FIELD_ID = 'anno-page-title'
 const PDF_ACCEPT = 'application/pdf,.pdf'
 const PDF_EXTENSION = /\.pdf$/i
 
-const TEMPLATE_SETTING = 'annotationPageTemplate'
+const PAGE_TEMPLATE_SETTING = 'annotationPageTemplate'
+const HIGHLIGHT_TEMPLATE_SETTING = 'annotationHighlightTemplate'
 const NO_TEMPLATE = 'No template'
 let templates = []
 
@@ -70,7 +71,7 @@ async function loadTemplates() {
 function settingsSchema() {
   return [
     {
-      key: TEMPLATE_SETTING,
+      key: PAGE_TEMPLATE_SETTING,
       type: 'enum',
       enumChoices: [NO_TEMPLATE, ...templates.map(([name]) => name)],
       enumPicker: 'select',
@@ -79,13 +80,53 @@ function settingsSchema() {
       description:
         'Template to apply when Anno creates a page. Choices come from blocks and pages ' +
         'with a template property; existing pages are left as they are.'
+    },
+    {
+      key: HIGHLIGHT_TEMPLATE_SETTING,
+      type: 'enum',
+      enumChoices: [NO_TEMPLATE, ...templates.map(([name]) => name)],
+      enumPicker: 'select',
+      default: NO_TEMPLATE,
+      title: 'Annotation/highlight template',
+      description:
+        'Template to add beneath each new PDF annotation or highlight block. Choices come ' +
+        'from blocks and pages with a template property; existing highlights are left alone.'
     }
   ]
 }
 
-function selectedTemplate() {
-  const selected = logseq.settings?.[TEMPLATE_SETTING]
+function selectedTemplate(setting = PAGE_TEMPLATE_SETTING) {
+  const selected = logseq.settings?.[setting]
   return templates.find(([name]) => name === selected) ?? null
+}
+
+/* Logseq creates the graph block for a PDF highlight lazily, when the reader
+ * first links, drags or opens that highlight in the graph. It identifies that
+ * block with `ls-type:: annotation`. Only an insertion transaction qualifies:
+ * editing an old annotation after Anno starts must not apply a newly selected
+ * template retroactively.
+ *
+ * A highlight's own block carries native text, UUID and PDF properties, so the
+ * template belongs beneath it. An empty child gives Logseq's template command
+ * the same replaceable target it receives on a newly created page. */
+const INSERT_BLOCK_OPS = new Set(['insert-block', 'insert-blocks'])
+async function templateNewHighlights({ blocks = [], txMeta = {} } = {}) {
+  const template = selectedTemplate(HIGHLIGHT_TEMPLATE_SETTING)
+  const operation = String(txMeta.outlinerOp ?? txMeta['outliner-op'] ?? '').replace(/^:/, '')
+  if (!template || !INSERT_BLOCK_OPS.has(operation)) return
+
+  for (const block of blocks) {
+    if (block?.properties?.['ls-type'] !== 'annotation' || !block.uuid) continue
+
+    let target = null
+    try {
+      target = await logseq.Editor.insertBlock(block.uuid, '', { sibling: false })
+      if (target?.uuid) await logseq.Editor.insertTemplate(target.uuid, template[0])
+    } catch (error) {
+      if (target?.uuid) await logseq.Editor.deleteBlock?.(target.uuid)
+      console.warn('Anno could not apply the annotation/highlight template', error)
+    }
+  }
 }
 
 /* Naming the asset.
@@ -579,6 +620,7 @@ function main() {
   logseq.provideStyle({ key: DIALOG_STYLE_KEY, style: DIALOG_STYLE })
   logseq.Editor?.registerSlashCommand?.(COMMAND_LABEL, () => importPdf())
   logseq.App?.registerCommandPalette?.({ key: PALETTE_KEY, label: COMMAND_LABEL }, () => importPdf())
+  logseq.DB?.onChanged?.((change) => void templateNewHighlights(change))
   logseq.beforeunload?.(async () => teardown())
 }
 

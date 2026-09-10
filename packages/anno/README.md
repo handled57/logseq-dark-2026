@@ -67,7 +67,7 @@ A *page* that already exists is used as it stands — the PDF is added to it, an
 nothing on it is replaced. Importing the same PDF onto the page it is already
 linked from adds no second link.
 
-## Annotation page template
+## Templates
 
 Anno's settings include an **Annotation page template** dropdown. Its choices
 are the names in `template` properties on blocks and pages in the current
@@ -80,6 +80,12 @@ makes sure the new page carries Logseq's PDF metadata: if the template does not
 provide `file` or `file-path`, Anno adds the missing property with the imported
 PDF's link or relative asset path. A template's own value for either property
 is left unchanged.
+
+The **Annotation/highlight template** dropdown uses the same choices. When
+selected, Anno adds that template beneath each new PDF annotation block Logseq
+creates, leaving the highlight's quoted text, UUID, and PDF properties intact.
+Existing annotation blocks are not changed, and **No template** leaves new
+highlights in Logseq's normal form.
 
 ## Compatibility
 

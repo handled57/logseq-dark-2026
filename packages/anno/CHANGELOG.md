@@ -10,6 +10,9 @@ All notable changes to this package are documented here.
   pages remain untouched, and **No template** preserves the original behavior.
 - New templated pages receive any `file` and `file-path` PDF properties the
   template does not already provide. Template-supplied values are preserved.
+- Added an **Annotation/highlight template** dropdown. A selected template is
+  added beneath each newly created PDF annotation block without changing its
+  native highlight text or properties; existing annotations remain untouched.
 
 ## 0.1.0 - 2026-09-06
 

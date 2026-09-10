@@ -27,8 +27,9 @@ the [Passage setup guide](packages/passage/README.md#choosing-a-translation).
 Anno needs nothing beyond an open file graph. It imports a PDF into that graph's
 `assets/` folder under the page title you give it, which is what puts Logseq's
 own highlights for that PDF on a page of the same name; see the
-[Anno guide](packages/anno/README.md#what-the-import-does). A template for new
-annotation pages can be selected from Anno's settings.
+[Anno guide](packages/anno/README.md#what-the-import-does). Anno's settings can
+select separate templates for new annotation pages and new PDF highlight
+blocks.
 
 ## Install
 
