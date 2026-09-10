@@ -61,6 +61,16 @@ defaults to `1`, so every surface the rail does not reach is untouched. These nu
 upstream declarations; change arithmetic, selectors, and cascade tests
 together.
 
+Block headings are not Logseq's size. `--hc-heading-scale` takes every level to
+one fraction of the multiple Logseq sets it in, and each heading rule scales
+that multiple rather than declaring a size, so the levels keep their upstream
+proportions. Both of Logseq's selectors are matched — the rendered heading and
+the editor textarea that carries the level as a class — and the rendered one is
+qualified with `:not(.block-ref *)` because upstream normalizes a quoted
+heading to `1rem` at equal specificity, which this stylesheet would otherwise
+win on load order. A heading's rail bullet is measured from the same variable,
+so the type and the bullet that hangs beside it cannot drift apart.
+
 The rail's bullets carry the hierarchy; its line does not. The line's two
 pseudo-elements paint in `--hc-rail-default-color` at every depth, so the whole
 rail is the one color a reader configures. `--hc-rail-depth-color` is declared
