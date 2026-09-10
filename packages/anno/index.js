@@ -89,7 +89,7 @@ function settingsSchema() {
       default: NO_TEMPLATE,
       title: 'Annotation/highlight template',
       description:
-        'Template to add beneath each new PDF annotation or highlight block. Choices come ' +
+        'Template properties to add to each new PDF annotation or highlight block. Choices come ' +
         'from blocks and pages with a template property; existing highlights are left alone.'
     }
   ]
@@ -106,9 +106,11 @@ function selectedTemplate(setting = PAGE_TEMPLATE_SETTING) {
  * editing an old annotation after Anno starts must not apply a newly selected
  * template retroactively.
  *
- * A highlight's own block carries native text, UUID and PDF properties, so the
- * template belongs beneath it. An empty child gives Logseq's template command
- * the same replaceable target it receives on a newly created page. */
+ * A highlight's own block carries native text, UUID and PDF properties. Copy
+ * the selected template's properties directly onto it instead of expanding
+ * the template as blocks: expansion would create children and could replace
+ * the highlight's native content. The `template` marker itself is metadata for
+ * finding the source and must not turn every highlight into a new template. */
 const INSERT_BLOCK_OPS = new Set(['insert-block', 'insert-blocks'])
 async function templateNewHighlights({ blocks = [], txMeta = {} } = {}) {
   const template = selectedTemplate(HIGHLIGHT_TEMPLATE_SETTING)
@@ -123,19 +125,16 @@ async function templateNewHighlights({ blocks = [], txMeta = {} } = {}) {
     const type = block?.properties?.lsType ?? block?.properties?.['ls-type']
     if (type !== 'annotation' || !block.uuid) continue
 
-    let target = null
     try {
-      target = await logseq.Editor.insertBlock(block.uuid, '', { sibling: false })
-      if (target?.uuid) {
-        await logseq.Editor.insertTemplate(target.uuid, template[0])
-        /* On an annotation page Logseq inserts the expanded template beside
-         * this empty target rather than replacing it. The target is only a
-         * temporary anchor, so remove it once the template exists. */
-        await logseq.Editor.deleteBlock?.(target.uuid)
-        target = null
+      const existing = new Set(
+        Object.keys(block.properties ?? {}).map((key) => key.replace(/[-_]/g, '').toLowerCase())
+      )
+      for (const [key, value] of Object.entries(template[1] ?? {})) {
+        const normalized = key.replace(/[-_]/g, '').toLowerCase()
+        if (normalized === 'template' || existing.has(normalized)) continue
+        await logseq.Editor.upsertBlockProperty(block.uuid, key, value)
       }
     } catch (error) {
-      if (target?.uuid) await logseq.Editor.deleteBlock?.(target.uuid)
       console.warn('Anno could not apply the annotation/highlight template', error)
     }
   }

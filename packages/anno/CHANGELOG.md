@@ -10,13 +10,14 @@ All notable changes to this package are documented here.
   pages remain untouched, and **No template** preserves the original behavior.
 - New templated pages receive any `file` and `file-path` PDF properties the
   template does not already provide. Template-supplied values are preserved.
-- Added an **Annotation/highlight template** dropdown. A selected template is
-  added beneath each newly created PDF annotation block without changing its
-  native highlight text or properties; existing annotations remain untouched.
+- Added an **Annotation/highlight template** dropdown. A selected template's
+  properties are copied directly onto each newly created PDF annotation block
+  without changing its native highlight text or existing properties; existing
+  annotations remain untouched.
 - Fixed highlight detection to recognize Logseq's camel-cased annotation
   properties when applying that template.
-- Removes the temporary empty child after Logseq expands a highlight template
-  beside it.
+- Highlight templates add no child or placeholder blocks, and their `template`
+  marker is not copied onto annotations.
 
 ## 0.1.0 - 2026-09-06
 

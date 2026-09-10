@@ -58,6 +58,7 @@ function load({
   const inserted = []
   const nested = []
   const deleted = []
+  const upserted = []
   const changed = []
   const schemas = []
   const files = new Map(onDisk.map((path) => [path, PDF_BYTES.byteLength]))
@@ -170,6 +171,9 @@ function load({
         async deleteBlock(block) {
           deleted.push(block)
         },
+        async upsertBlockProperty(block, key, value) {
+          upserted.push({ block, key, value })
+        },
         async insertTemplate(block, name) {
           inserted.push({ block, name })
           if (!String(block).startsWith('first-')) return
@@ -243,6 +247,7 @@ function load({
     inserted,
     nested,
     deleted,
+    upserted,
     schemas,
     messages,
     files,
@@ -347,16 +352,18 @@ test('the settings dropdown lists block and page templates in name order', async
       default: 'No template',
       title: 'Annotation/highlight template',
       description:
-        'Template to add beneath each new PDF annotation or highlight block. Choices come ' +
+        'Template properties to add to each new PDF annotation or highlight block. Choices come ' +
         'from blocks and pages with a template property; existing highlights are left alone.'
     }
   ])
 })
 
-test('a selected highlight template is nested under each new PDF annotation block', async () => {
+test('a selected highlight template adds properties directly to each new PDF annotation block', async () => {
   const context = load({
     highlightSetting: 'Note prompt',
-    templates: { 'Note prompt': { template: 'Note prompt' } }
+    templates: {
+      'Note prompt': { template: 'Note prompt', author: 'Herman Melville', type: 'source' }
+    }
   })
   await flush()
 
@@ -373,22 +380,32 @@ test('a selected highlight template is nested under each new PDF annotation bloc
     txMeta: { outlinerOp: 'insert-blocks' }
   })
 
-  assert.deepEqual(plain(context.nested), [
-    {
-      parent: 'highlight-1',
-      content: '',
-      options: { sibling: false },
-      block: { uuid: 'child-highlight-1', content: '' }
-    }
+  assert.deepEqual(context.upserted, [
+    { block: 'highlight-1', key: 'author', value: 'Herman Melville' },
+    { block: 'highlight-1', key: 'type', value: 'source' }
   ])
-  assert.deepEqual(context.inserted, [
-    { block: 'child-highlight-1', name: 'Note prompt' }
+  assert.deepEqual(context.nested, [])
+  assert.deepEqual(context.inserted, [])
+  assert.deepEqual(context.deleted, [])
+})
+
+test('highlight templates preserve native properties with equivalent camel-cased keys', async () => {
+  const context = load({
+    highlightSetting: 'Note prompt',
+    templates: { 'Note prompt': { template: 'Note prompt', 'hl-page': 99, status: 'read' } }
+  })
+  await flush()
+
+  await context.change({
+    blocks: [
+      { uuid: 'highlight-1', properties: { lsType: 'annotation', hlPage: 1 } }
+    ],
+    txMeta: { outlinerOp: 'insert-blocks' }
+  })
+
+  assert.deepEqual(context.upserted, [
+    { block: 'highlight-1', key: 'status', value: 'read' }
   ])
-  assert.deepEqual(
-    context.deleted,
-    ['child-highlight-1'],
-    'the temporary empty child remained beside the expanded template'
-  )
 })
 
 test('highlight templates ignore old annotations, ordinary blocks and No template', async () => {

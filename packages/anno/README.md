@@ -82,10 +82,12 @@ PDF's link or relative asset path. A template's own value for either property
 is left unchanged.
 
 The **Annotation/highlight template** dropdown uses the same choices. When
-selected, Anno adds that template beneath each new PDF annotation block Logseq
-creates, leaving the highlight's quoted text, UUID, and PDF properties intact.
-Existing annotation blocks are not changed, and **No template** leaves new
-highlights in Logseq's normal form.
+selected, Anno copies that template's properties directly onto each new PDF
+annotation block Logseq creates. It does not add template blocks or blank child
+blocks, and it leaves the highlight's quoted text, UUID, and existing PDF
+properties intact. The source's `template` marker is not copied. Existing
+annotation blocks are not changed, and **No template** leaves new highlights in
+Logseq's normal form.
 
 ## Compatibility
 
