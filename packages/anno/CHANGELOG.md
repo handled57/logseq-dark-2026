@@ -2,6 +2,15 @@
 
 All notable changes to this package are documented here.
 
+## 0.2.0 - 2026-09-10
+
+- Added an **Annotation page template** dropdown populated from blocks and
+  pages with a `template` property in the current graph.
+- A selected template is applied when Anno creates an annotation page; existing
+  pages remain untouched, and **No template** preserves the original behavior.
+- New templated pages receive any `file` and `file-path` PDF properties the
+  template does not already provide. Template-supplied values are preserved.
+
 ## 0.1.0 - 2026-09-06
 
 - First release. **Anno: Import PDF** imports a PDF into the graph and opens

@@ -67,6 +67,20 @@ A *page* that already exists is used as it stands — the PDF is added to it, an
 nothing on it is replaced. Importing the same PDF onto the page it is already
 linked from adds no second link.
 
+## Annotation page template
+
+Anno's settings include an **Annotation page template** dropdown. Its choices
+are the names in `template` properties on blocks and pages in the current
+graph, plus **No template**, which keeps the plain-page behavior described
+above.
+
+When a template is selected, Anno applies it only when the import creates a new
+page. A page that already exists is never templated or replaced. Anno also
+makes sure the new page carries Logseq's PDF metadata: if the template does not
+provide `file` or `file-path`, Anno adds the missing property with the imported
+PDF's link or relative asset path. A template's own value for either property
+is left unchanged.
+
 ## Compatibility
 
 Anno targets **Logseq 0.10.15 classic/file graphs on desktop**.
@@ -79,7 +93,8 @@ Anno targets **Logseq 0.10.15 classic/file graphs on desktop**.
   host's file bridge, which the asset is written through, are out of reach.
 - Anno works with any theme, or none. Its one piece of chrome, the import
   prompt, carries a fallback for every colour it names.
-- Anno has no settings.
+- Template choices are read when the plugin starts. Reload Anno after adding or
+  renaming a template so the dropdown reflects the graph.
 
 ## Install from the Logseq Marketplace
 

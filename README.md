@@ -10,7 +10,7 @@ dependencies, compilation, remote imports, or runtime network access.
 | --- | --- | --- | --- |
 | **Dark High Contrast** | [`packages/dark-high-contrast`](packages/dark-high-contrast) | `2.1.0` | A pure-black, accessible theme for Logseq classic/file graphs. |
 | **Passage** | [`packages/passage`](packages/passage) | `0.6.1` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
-| **Anno** | [`packages/anno`](packages/anno) | `0.1.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
+| **Anno** | [`packages/anno`](packages/anno) | `0.2.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
 
 Install any one package by itself or install them together. None of them calls
 another. Dark High Contrast styles any
@@ -27,7 +27,8 @@ the [Passage setup guide](packages/passage/README.md#choosing-a-translation).
 Anno needs nothing beyond an open file graph. It imports a PDF into that graph's
 `assets/` folder under the page title you give it, which is what puts Logseq's
 own highlights for that PDF on a page of the same name; see the
-[Anno guide](packages/anno/README.md#what-the-import-does).
+[Anno guide](packages/anno/README.md#what-the-import-does). A template for new
+annotation pages can be selected from Anno's settings.
 
 ## Install
 

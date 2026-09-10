@@ -39,6 +39,55 @@ const TITLE_FIELD_ID = 'anno-page-title'
 const PDF_ACCEPT = 'application/pdf,.pdf'
 const PDF_EXTENSION = /\.pdf$/i
 
+const TEMPLATE_SETTING = 'annotationPageTemplate'
+const NO_TEMPLATE = 'No template'
+let templates = []
+
+/* Classic graphs store both block and page properties on `:block/properties`,
+ * so one query finds either kind of template. Keep the properties with the
+ * name: they say which pieces of Logseq's PDF metadata the template already
+ * supplies and therefore which pieces Anno must add. */
+async function loadTemplates() {
+  const rows =
+    (await logseq.DB?.datascriptQuery?.(
+      '[:find ?template ?properties :where [?entity :block/properties ?properties] ' +
+        '[(get ?properties :template) ?template]]'
+    )) ?? []
+  const found = new Map()
+
+  for (const [value, properties] of rows) {
+    const names = Array.isArray(value) ? value : [value]
+    for (const name of names) {
+      const label = typeof name === 'string' ? name.trim() : ''
+      if (label && !found.has(label)) found.set(label, properties ?? {})
+    }
+  }
+
+  templates = [...found].sort(([left], [right]) => left.localeCompare(right))
+  return templates
+}
+
+function settingsSchema() {
+  return [
+    {
+      key: TEMPLATE_SETTING,
+      type: 'enum',
+      enumChoices: [NO_TEMPLATE, ...templates.map(([name]) => name)],
+      enumPicker: 'select',
+      default: NO_TEMPLATE,
+      title: 'Annotation page template',
+      description:
+        'Template to apply when Anno creates a page. Choices come from blocks and pages ' +
+        'with a template property; existing pages are left as they are.'
+    }
+  ]
+}
+
+function selectedTemplate() {
+  const selected = logseq.settings?.[TEMPLATE_SETTING]
+  return templates.find(([name]) => name === selected) ?? null
+}
+
 /* Naming the asset.
  *
  * Logseq runs a PDF's basename through sanitize-filename to get the viewer key
@@ -141,8 +190,29 @@ const LABEL_BRACKETS = /[[\]]/g
  * so importing a second PDF under a title already in the graph adds to that
  * page rather than replacing it — and re-importing the same PDF onto it does
  * not leave the link twice. */
+function pdfProperties(title, target, templateProperties = {}) {
+  const properties = {}
+  if (!Object.hasOwn(templateProperties, 'file')) {
+    properties.file = `![${title.replace(LABEL_BRACKETS, '')}](${target.href})`
+  }
+  if (!Object.hasOwn(templateProperties, 'file-path')) properties['file-path'] = target.href
+  return properties
+}
+
 async function linkPage(title, target) {
-  const page = await logseq.Editor.createPage(title, {}, { redirect: true, createFirstBlock: false })
+  const existing = await logseq.Editor.getPage?.(title)
+  const template = existing ? null : selectedTemplate()
+  const properties = template ? pdfProperties(title, target, template[1]) : {}
+  const page = await logseq.Editor.createPage(title, properties, {
+    redirect: true,
+    createFirstBlock: Boolean(template)
+  })
+
+  if (template) {
+    const [first] = (await logseq.Editor.getPageBlocksTree?.(page?.uuid ?? title)) ?? []
+    if (first?.uuid) await logseq.Editor.insertTemplate(first.uuid, template[0])
+  }
+
   const blocks = (await logseq.Editor.getPageBlocksTree?.(page?.uuid ?? title)) ?? []
   if (blocks.some((block) => (block?.content ?? '').includes(target.href))) return
 
@@ -501,6 +571,11 @@ function teardown() {
 }
 
 function main() {
+  /* The schema is registered after the graph query lands so the enum is a real
+   * dropdown of this graph's templates rather than a free-form template name. */
+  void loadTemplates()
+    .catch(() => templates)
+    .then(() => logseq.useSettingsSchema(settingsSchema()))
   logseq.provideStyle({ key: DIALOG_STYLE_KEY, style: DIALOG_STYLE })
   logseq.Editor?.registerSlashCommand?.(COMMAND_LABEL, () => importPdf())
   logseq.App?.registerCommandPalette?.({ key: PALETTE_KEY, label: COMMAND_LABEL }, () => importPdf())
