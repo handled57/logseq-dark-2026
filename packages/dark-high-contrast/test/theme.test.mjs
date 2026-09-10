@@ -429,6 +429,81 @@ test('block hover outlines without painting a background', () => {
   )
 })
 
+/* The outline stands off the text it encloses. Logseq lays a block's content
+ * box out border-box and sizes it itself, so the room has to be taken outside
+ * that box: an outline offset and the spread of the fill's shadow, never
+ * padding, which would rewrap the block's text under the pointer. */
+test('the block outline stands off the text on a padding of its own', () => {
+  const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)]
+    .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
+
+  assert.match(
+    css,
+    /--hc-block-outline-pad:\s*4px;/,
+    'the padding is a variable a graph can retune'
+  )
+
+  const outline = rules.find(([selector]) =>
+    selector.includes('.ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper')
+  )
+  assert.match(
+    outline[1],
+    /outline-offset:\s*var\(--hc-block-outline-pad\)/,
+    'the outline is offset by that padding rather than hugging the text'
+  )
+
+  const fill = rules.find(
+    ([selector, body]) =>
+      selector.includes('.ls-block.selected > .flex > .block-content-wrapper') &&
+      /background:\s*var\(--ls-block-highlight-color\)/.test(body)
+  )
+  assert.match(
+    fill[1],
+    /box-shadow:\s*0 0 0 var\(--hc-block-outline-pad\) var\(--ls-block-highlight-color\)/,
+    'the raised fill reaches the outline it is drawn inside'
+  )
+
+  /* Padding would come out of the width Logseq gives the box, so the text
+   * would rewrap the moment the pointer arrived. */
+  for (const [selector, body] of rules) {
+    if (!selector.includes('.block-content-wrapper')) continue
+    if (!/:hover|\.selected|\.block-highlight/.test(selector)) continue
+    assert.ok(
+      !/(?:^|[;{\s])(?:padding|margin)(?:-[\w-]+)?\s*:/.test(body),
+      `${selector} must not resize the block's box to make room for its outline`
+    )
+  }
+
+  /* Two blocks selected one after the other would otherwise draw their
+   * outlines through each other. */
+  const gap = rules.find(([selector]) => selector === '.ls-block')
+  assert.match(
+    gap[1],
+    /margin-bottom:\s*var\(--hc-block-gap\)/,
+    'blocks are spaced by the gap variable'
+  )
+  assert.match(
+    css,
+    /--hc-block-gap:\s*calc\(4px \+ 2 \* var\(--hc-block-outline-pad\)\);/,
+    'the gap clears two of the paddings'
+  )
+
+  /* The rail's line bridges the space between two rows by reaching above and
+   * below each of them. The wider gap has to stay inside that reach or the
+   * rail would break between every pair of blocks. */
+  const above = Number(/\.block-control-wrap::before \{[^}]*top:\s*-(\d+)px/.exec(
+    css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').replace(/\{ /g, '{')
+  )?.[1])
+  const below = Number(/\.block-control-wrap::after \{[^}]*bottom:\s*-(\d+)px/.exec(
+    css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').replace(/\{ /g, '{')
+  )?.[1])
+  const pad = Number(/--hc-block-outline-pad:\s*(\d+)px/.exec(css)[1])
+  assert.ok(
+    above + below >= 4 + 2 * pad,
+    `the rail's ${above}px and ${below}px reach must cover the ${4 + 2 * pad}px gap`
+  )
+})
+
 /* The bullet rail: every block in the page's own tree hangs its bullet on one
  * vertical line. cascade.test.mjs checks the arithmetic that places it; these
  * are the rules about where the rail is allowed to reach and what it shows. */
