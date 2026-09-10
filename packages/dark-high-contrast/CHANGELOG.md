@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 2.9.1 - 2026-09-10
+
+- Keep the property-toggle dot hidden until its block is hovered or the control
+  receives keyboard focus. Its pointer target, keyboard operation and rail
+  geometry are unchanged.
+
 ## 2.9.0 - 2026-09-10
 
 - Add a cyan property-toggle dot immediately right of each eligible block

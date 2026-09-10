@@ -858,10 +858,18 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   border: 1px solid currentColor;
   border-radius: 50%;
   background: currentColor;
+  opacity: 0;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]:hover::before {
+  .ls-block:not(.block-content-wrapper *):hover:not(:has(.ls-block:hover)) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]::before,
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]:focus-visible::before {
+  opacity: 1;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *):hover:not(:has(.ls-block:hover)) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]:hover::before {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-hc-cyan) 35%, transparent);
 }
 
