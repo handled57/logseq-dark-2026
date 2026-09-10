@@ -30,11 +30,12 @@ Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
 - **Flat** is the default. It moves every bullet onto the same vertical line,
   preserving the theme's original rail.
 - **Branched** leaves one 29px horizontal step between nesting levels. An
-  expanded parent's line turns smoothly right into the child rail, runs
-  vertically through sibling children, and curves back after the final child.
-  A nested expanded block repeats the same shape at its own level. The turns
-  are cubic curves with a vertical tangent at both ends, rather than diagonal
-  segments; a collapsed parent has no visible child connector.
+  expanded parent sends a rounded branch from the side of its bullet and then
+  straight down the child rail, which runs vertically through sibling children
+  and curves back after the final child. A nested expanded block repeats the
+  same shape at its own level. The return is a cubic curve with a vertical
+  tangent at both ends, and neither connector uses a diagonal segment; a
+  collapsed parent has no visible child connector.
 
 Changing the setting repaints the current page immediately. Rail color,
 depth-colored bullets, open rings, hover behavior, headings and special-block

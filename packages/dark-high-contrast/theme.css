@@ -656,7 +656,7 @@ hr {
 :root {
   --hc-rail-branch-step: 29px;
   --hc-rail-branch-height: calc(var(--hc-block-gap) + 16px);
-  --hc-rail-branch-in: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 32' preserveAspectRatio='none'%3E%3Cpath d='M.5 0 C.5 16 29.5 16 29.5 32' fill='none' stroke='black' stroke-width='1' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --hc-rail-branch-radius: 16px;
   --hc-rail-branch-out: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 32' preserveAspectRatio='none'%3E%3Cpath d='M29.5 0 C29.5 16 .5 16 .5 32' fill='none' stroke='black' stroke-width='1' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
 }
 
@@ -1115,20 +1115,32 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   bottom: calc(-1 * var(--hc-block-gap));
 }
 
-/* In branched mode an expanded parent hands its line to the child group at the
- * foot of its own row. Each group reserves one short turn at either end. The
- * masks are cubic paths with vertical tangents at both endpoints: horizontal
- * movement is confined to the rounded middle of the turn, never a diagonal.
- * Nested groups reserve their own return space, so several closing levels
- * unwind one smooth step at a time instead of stacking their curves on top of
- * each other.
+/* In branched mode the connector leaves the side of an expanded parent's
+ * bullet, rounds one top-right corner, and then runs straight down the child
+ * column. The parent row owns that elbow: its ordinary downward segment becomes
+ * a transparent box with a top and right border, extended through the child
+ * group's reserved head so the first child's incoming line overlaps it. The
+ * bullet paints over the start of the top border, making the line visibly
+ * emerge from the ring rather than from its center.
+ *
+ * Each group reserves one short return at its foot. The return mask is a cubic
+ * path with vertical tangents at both endpoints, never a diagonal. Nested
+ * groups reserve their own return space, so several closing levels unwind one
+ * smooth step at a time instead of stacking their curves on top of each other.
  * A folded parent's child group is hidden by Logseq and also fails the open
  * bullet guard here, so it contributes no connector. */
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
   > .block-main-container > .block-control-wrap::after {
-  bottom: 0;
+  top: var(--hc-rail-bullet-y);
+  bottom: calc(-1 * var(--hc-rail-branch-height));
+  width: calc(var(--hc-rail-branch-step) + 1px);
+  box-sizing: border-box;
+  border-top: 1px solid var(--hc-rail-default-color);
+  border-right: 1px solid var(--hc-rail-default-color);
+  border-top-right-radius: var(--hc-rail-branch-radius);
+  background-color: transparent;
 }
 
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
@@ -1140,10 +1152,6 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   padding-bottom: var(--hc-rail-branch-height);
 }
 
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
-  > .block-children-container > .block-children::before,
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
@@ -1159,20 +1167,6 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   mask-position: center;
   mask-size: 100% 100%;
   mask-repeat: no-repeat;
-}
-
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
-  > .block-children-container > .block-children::before {
-  top: 0;
-  mask-image: var(--hc-rail-branch-in);
-}
-
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
-  > .block-children-container > .block-children::after {
   bottom: 2px;
   mask-image: var(--hc-rail-branch-out);
 }

@@ -70,19 +70,21 @@ The flat geometry is the unqualified stylesheet fallback. Branched rules are
 qualified by the body attribute, so changing settings switches the current
 page without reinstalling or reloading the theme. Each expanded
 `[haschild="true"]` group whose bullet is not `.bullet-closed` reserves one
-`--hc-rail-branch-height` at its foot. Its `::before` and `::after` masks are
-opposite cubic paths across `--hc-rail-branch-step` (the pinned 29px indent),
-with vertical tangents at both endpoints. The entry curve hands the parent rail
-to the first child's vertical column; the return curve hands the last child's
-column back. A nested group's reserved foot puts its return before its
-ancestor's return, so closing levels unwind separately. The return's reserved
-height ends inside its own group. When that group's parent has a following
-sibling at the same level, a second mask layer adds a one-pixel vertical tail
-across Logseq's inter-block gap; final nested children omit the tail and hand
-off directly to their ancestor's return. Both the final child's straight line
-and a final group's return stop at Logseq's two-pixel row foot, so neither
-overruns the curve it hands off to. The open-bullet guard and Logseq's hidden
-child container ensure folded parents paint no curves.
+`--hc-rail-branch-height` at its head and foot. The parent's own `::after`
+becomes a border-drawn elbow: its top border emerges from the side of the
+bullet, rounds the `--hc-rail-branch-radius` corner, and its right border runs
+straight down the child column through the group's reserved head. The group's
+`::after` mask is the opposite cubic path across `--hc-rail-branch-step` (the
+pinned 29px indent), with vertical tangents at both endpoints, and hands the
+last child's column back. A nested group's reserved foot puts its return before
+its ancestor's return, so closing levels unwind separately. The return's
+reserved height ends inside its own group. When that group's parent has a
+following sibling at the same level, a second mask layer adds a one-pixel
+vertical tail across Logseq's inter-block gap; final nested children omit the
+tail and hand off directly to their ancestor's return. Both the final child's
+straight line and a final group's return stop at Logseq's two-pixel row foot,
+so neither overruns the curve it hands off to. The open-bullet guard and
+Logseq's hidden child container ensure folded parents paint no connectors.
 
 Block headings are not Logseq's size. `--hc-heading-scale` takes every level to
 one fraction of the multiple Logseq sets it in, and each heading rule scales
