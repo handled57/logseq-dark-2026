@@ -957,6 +957,21 @@ test('an ordered list keeps its number beside the content and a bullet on the ra
   assert.match(rule(`${wrap} > .bullet-link-wrap`), /position:\s*static/)
 })
 
+test('the property toggle rides beside the bullet without changing rail geometry', () => {
+  const selector = `${wrap} > [data-hc-property-toggle]`
+  const control = rule(selector)
+  const dot = rule(`${selector}::before`)
+
+  assert.match(control, /position:\s*absolute/)
+  assert.equal(px(control, 'width'), 20)
+  assert.equal(px(control, 'height'), 20)
+  assert.equal(px(control, 'left'), 38)
+  assert.equal(value(control, 'top'), 'calc(var(--hc-rail-bullet-y) - 10px)')
+  assert.equal(px(dot, 'width'), 8)
+  assert.equal(px(dot, 'height'), 8)
+  assert.ok(px(control, 'left') > 30, 'the property control is not right of the rail line')
+})
+
 test('the rail out-ranks the bullet suppression it answers', () => {
   const visible = `${wrap} .bullet-container`
   assert.match(rule(visible), /opacity:\s*1\s*!important/)

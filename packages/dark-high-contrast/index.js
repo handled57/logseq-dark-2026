@@ -49,12 +49,15 @@ const BULLET_ATTR = 'data-hc-hide-bullet'
 const VERSE_ATTR = 'data-hc-verse-lines'
 const ICON_ATTR = 'data-hc-block-icon'
 const OPEN_MENU_ATTR = 'data-hc-open-block'
+const PROPERTY_TOGGLE_ATTR = 'data-hc-property-toggle'
+const PROPERTY_TOGGLE_UUID_ATTR = 'data-hc-property-toggle-uuid'
 const BULLET_SELECTOR = '.bullet-link-wrap, .bullet-container'
 /* Whiteboard bullets carry gestures of their own — a portal shape, a shape
  * link — so they are left to Logseq. */
 const WHITEBOARD_SELECTOR = '.whiteboard-page, .tl-container'
 const HAS_CHILD_ATTR = 'haschild'
 const sourceCache = new Map()
+const propertyVisibility = new Map()
 
 const SPECIAL_CONTENT_SELECTOR = [
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -300,6 +303,125 @@ function blockUuid(block) {
 function setBulletVisibility(block, hidden) {
   if (hidden) block.setAttribute(BULLET_ATTR, '')
   else block.removeAttribute(BULLET_ATTR)
+}
+
+/* A property-bearing block gets one session-only visibility override under its
+ * UUID. The control lives beside the bullet, but never changes the graph. */
+function propertyToggleOf(host) {
+  for (const child of host.children ?? []) {
+    if (child.matches?.(`[${PROPERTY_TOGGLE_ATTR}]`)) return child
+  }
+
+  return null
+}
+
+function propertyToggleHost(table) {
+  const block = table.closest?.('.ls-block')
+  if (!block || typeof block.querySelector !== 'function') return null
+  const uuid = block ? blockUuid(block) : ''
+  if (!uuid || block.matches?.('.pre-block') || table.closest?.('.page-properties')) return null
+
+  const main = block.closest?.('main')
+  const content = block.closest?.('.content')
+  if (!main || main.matches?.('.ls-fold-button-on-right') || !block.closest?.(MAIN_EDITOR_SELECTOR)) return null
+  if (!content || content.matches?.('.doc-mode')) return null
+  if (block.parentElement?.closest?.('.block-content-wrapper')) return null
+
+  const mainContainer = [...(block.children ?? [])].find((child) => child.matches?.('.block-main-container'))
+  const host = [...(mainContainer?.children ?? [])].find((child) => child.matches?.('.block-control-wrap'))
+  return host ? { host, uuid } : null
+}
+
+function applyPropertyVisibility(table, control, visible) {
+  if (visible) table.removeAttribute(HIDDEN_ATTR)
+  else table.setAttribute(HIDDEN_ATTR, '')
+
+  const action = visible ? 'Hide' : 'Show'
+  control.setAttribute('aria-expanded', visible ? 'true' : 'false')
+  control.setAttribute('aria-label', `${action} block properties`)
+  control.setAttribute('title', `${action} block properties`)
+}
+
+function ensurePropertyToggle(host, uuid) {
+  const existing = propertyToggleOf(host)
+  const control = existing ?? doc.createElement('button')
+
+  if (!existing) {
+    control.setAttribute('type', 'button')
+    control.setAttribute(PROPERTY_TOGGLE_ATTR, '')
+    host.appendChild(control)
+  }
+
+  control.setAttribute(PROPERTY_TOGGLE_UUID_ATTR, uuid)
+  return control
+}
+
+function markPropertyToggles(active) {
+  const marked = new Set()
+
+  for (const table of doc.querySelectorAll('.block-properties')) {
+    const properties = propertiesOf(table)
+    const configuredVisible = !shouldHide(active, properties)
+    const target = propertyToggleHost(table)
+    const visible = target && propertyVisibility.has(target.uuid)
+      ? propertyVisibility.get(target.uuid)
+      : configuredVisible
+
+    if (visible) table.removeAttribute(HIDDEN_ATTR)
+    else table.setAttribute(HIDDEN_ATTR, '')
+
+    const block = table.closest('.ls-block')
+    if (block) {
+      const type = blockType(active, properties)
+      if (type) block.setAttribute(TYPE_ATTR, type)
+      else block.removeAttribute(TYPE_ATTR)
+    }
+
+    if (!target) continue
+    const control = ensurePropertyToggle(target.host, target.uuid)
+    applyPropertyVisibility(table, control, visible)
+    marked.add(control)
+  }
+
+  for (const control of doc.querySelectorAll(`[${PROPERTY_TOGGLE_ATTR}]`)) {
+    if (!marked.has(control)) control.remove()
+  }
+}
+
+function propertyToggleControl(event) {
+  return event.target?.closest?.(`[${PROPERTY_TOGGLE_ATTR}]`) ?? null
+}
+
+function togglePropertyVisibility(control) {
+  const uuid = control.getAttribute(PROPERTY_TOGGLE_UUID_ATTR) ?? ''
+  const block = control.closest?.('.ls-block')
+  const table = block?.querySelector?.('.block-properties')
+  if (!uuid || !table) return
+
+  const visible = table.getAttribute(HIDDEN_ATTR) !== null
+  propertyVisibility.set(uuid, visible)
+  applyPropertyVisibility(table, control, visible)
+  control.focus?.()
+}
+
+function toggleProperties(event) {
+  const control = propertyToggleControl(event)
+  if (!control) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  if (event.type === 'click') togglePropertyVisibility(control)
+}
+
+function togglePropertiesOnKey(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+
+  const control = propertyToggleControl(event)
+  if (!control) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  togglePropertyVisibility(control)
 }
 
 /* Highlight markup, and the one shape of it a passage carries: the superscript
@@ -673,20 +795,7 @@ function paint() {
     void refreshFromStoredSource(block)
   }
 
-  for (const table of doc.querySelectorAll('.block-properties')) {
-    const properties = propertiesOf(table)
-
-    if (shouldHide(active, properties)) table.setAttribute(HIDDEN_ATTR, '')
-    else table.removeAttribute(HIDDEN_ATTR)
-
-    /* Styling hook for theme.css, e.g. .ls-block[data-hc-block-type="foo"]. */
-    const block = table.closest('.ls-block')
-    if (!block) continue
-
-    const type = blockType(active, properties)
-    if (type) block.setAttribute(TYPE_ATTR, type)
-    else block.removeAttribute(TYPE_ATTR)
-  }
+  markPropertyToggles(active)
 
   markCollapsible()
   addOpenMenuItem()
@@ -773,12 +882,17 @@ function teardown() {
   doc.removeEventListener('mousedown', toggleCollapse, true)
   doc.removeEventListener('click', toggleCollapse, true)
   doc.removeEventListener('keydown', toggleCollapseOnKey, true)
+  doc.removeEventListener('mousedown', toggleProperties, true)
+  doc.removeEventListener('click', toggleProperties, true)
+  doc.removeEventListener('keydown', togglePropertiesOnKey, true)
 
   doc.body.style.removeProperty(RAIL_COLOR_PROPERTY)
 
   collapsedContent.clear()
+  propertyVisibility.clear()
   for (const host of doc.querySelectorAll(`[${COLLAPSIBLE_ATTR}]`)) releaseCollapsible(host)
   for (const control of doc.querySelectorAll(`[${CONTROL_ATTR}]`)) control.remove()
+  for (const control of doc.querySelectorAll(`[${PROPERTY_TOGGLE_ATTR}]`)) control.remove()
 
   for (const item of doc.querySelectorAll(`[${OPEN_MENU_ATTR}]`)) item.removeAttribute(OPEN_MENU_ATTR)
   for (const table of doc.querySelectorAll(`[${HIDDEN_ATTR}]`)) table.removeAttribute(HIDDEN_ATTR)
@@ -804,6 +918,9 @@ function main() {
   doc.addEventListener('mousedown', toggleCollapse, true)
   doc.addEventListener('click', toggleCollapse, true)
   doc.addEventListener('keydown', toggleCollapseOnKey, true)
+  doc.addEventListener('mousedown', toggleProperties, true)
+  doc.addEventListener('click', toggleProperties, true)
+  doc.addEventListener('keydown', togglePropertiesOnKey, true)
 
   /* childList/subtree only: this observer must not see its own attribute
    * writes, or every pass would schedule another one. */

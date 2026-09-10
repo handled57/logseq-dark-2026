@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## 2.9.0 - 2026-09-10
+
+- Add a cyan property-toggle dot immediately right of each eligible block
+  bullet. It shows or hides that block's rendered property table without
+  changing the graph, keeps the choice across rerenders and navigation for the
+  current Logseq session, and overrides configured property-hiding rules until
+  the theme unloads. The button supports pointer, Enter and Space operation,
+  reports the table's current visibility to assistive technology, and is kept
+  out of sidebars, embeds, queries, whiteboards, document mode, right-side fold
+  layouts and page front matter.
+
 ## 2.8.0 - 2026-09-09
 
 - Give the outline a block takes on hover, on selection and under Logseq's own
