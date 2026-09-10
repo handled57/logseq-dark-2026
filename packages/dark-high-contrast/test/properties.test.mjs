@@ -320,6 +320,125 @@ function types(blocks) {
   return blocks.map(({ host }) => host.attributes.get('data-hc-block-type'))
 }
 
+function propertyRailBlock(uuid, properties, { mainClasses = [], contentClasses = [], blockClasses = [] } = {}) {
+  const host = node('body')
+  const main = host.appendChild(node('main', { classes: mainClasses }))
+  const editor = main.appendChild(node('div', { id: 'main-content-container' }))
+  const page = editor.appendChild(node('div', { classes: ['page-blocks-inner'] }))
+  const content = page.appendChild(node('div', { classes: ['content', ...contentClasses] }))
+  const blockHost = content.appendChild(node('div', {
+    classes: ['ls-block', ...blockClasses],
+    attributes: { blockid: uuid }
+  }))
+  const blockMain = blockHost.appendChild(node('div', { classes: ['block-main-container'] }))
+  const controls = blockMain.appendChild(node('div', { classes: ['block-control-wrap'] }))
+  const bullet = controls.appendChild(node('a', { classes: ['bullet-link-wrap'] }))
+  bullet.appendChild(node('span', { classes: ['bullet-container'] }))
+  const wrapper = blockMain.appendChild(node('div', { classes: ['block-content-wrapper'] }))
+  const table = wrapper.appendChild(node('div', { classes: ['block-properties'] }))
+
+  for (const [key, value] of Object.entries(properties)) {
+    const row = table.appendChild(node('div'))
+    const keyCell = row.appendChild(node('span', { classes: ['page-property-key'] }))
+    const valueCell = row.appendChild(node('span', { classes: ['page-property-value'] }))
+    keyCell.textContent = key
+    valueCell.textContent = value
+  }
+
+  return { host, block: blockHost, controls, table }
+}
+
+test('property buttons toggle either initial state and keep accessibility in sync', async () => {
+  const hiddenFixture = propertyRailBlock('65f00000-0000-0000-0000-000000000040', { type: 'passage' })
+  const hiddenContext = load({ hiddenProperties: 'type: passage' }, [
+    { host: hiddenFixture.block, table: hiddenFixture.table }
+  ], {}, hiddenFixture.host)
+  await Promise.resolve()
+
+  const hiddenControl = hiddenFixture.controls.querySelector('[data-hc-property-toggle]')
+  assert.ok(hiddenControl)
+  assert.equal(hiddenFixture.table.attributes.has('data-hc-hidden'), true)
+  assert.equal(hiddenControl.getAttribute('aria-expanded'), 'false')
+  assert.equal(hiddenControl.getAttribute('aria-label'), 'Show block properties')
+
+  hiddenContext.dispatchDocument('click', {
+    type: 'click',
+    target: hiddenControl,
+    button: 0,
+    preventDefault() {},
+    stopPropagation() {}
+  })
+  assert.equal(hiddenFixture.table.attributes.has('data-hc-hidden'), false)
+  assert.equal(hiddenControl.getAttribute('aria-expanded'), 'true')
+  assert.equal(hiddenControl.getAttribute('title'), 'Hide block properties')
+  assert.equal(hiddenControl.focused, true)
+
+  const visibleFixture = propertyRailBlock('65f00000-0000-0000-0000-000000000041', { status: 'open' })
+  const visibleContext = load({ hiddenProperties: 'type: passage' }, [
+    { host: visibleFixture.block, table: visibleFixture.table }
+  ], {}, visibleFixture.host)
+  await Promise.resolve()
+  const visibleControl = visibleFixture.controls.querySelector('[data-hc-property-toggle]')
+
+  visibleContext.dispatchDocument('keydown', {
+    target: visibleControl,
+    key: ' ',
+    preventDefault() {},
+    stopPropagation() {}
+  })
+  assert.equal(visibleFixture.table.attributes.has('data-hc-hidden'), true)
+  assert.equal(visibleControl.getAttribute('aria-expanded'), 'false')
+})
+
+test('a property override survives repaint and settings changes for its UUID', async () => {
+  const uuid = '65f00000-0000-0000-0000-000000000042'
+  const fixture = propertyRailBlock(uuid, { type: 'passage' })
+  const context = load({ hiddenProperties: 'type: passage' }, [
+    { host: fixture.block, table: fixture.table }
+  ], {}, fixture.host)
+  await Promise.resolve()
+  const control = fixture.controls.querySelector('[data-hc-property-toggle]')
+
+  context.togglePropertyVisibility(control)
+  context.paint()
+  assert.equal(fixture.table.attributes.has('data-hc-hidden'), false)
+  assert.equal(fixture.controls.querySelectorAll('[data-hc-property-toggle]').length, 1)
+
+  context.logseq.settings.hiddenProperties = 'status: open'
+  context.paint()
+  assert.equal(fixture.table.attributes.has('data-hc-hidden'), false)
+})
+
+test('property buttons stay out of excluded layouts and teardown restores the host', async () => {
+  const fixtures = [
+    propertyRailBlock('65f00000-0000-0000-0000-000000000043', { type: 'passage' }, { blockClasses: ['pre-block'] }),
+    propertyRailBlock('65f00000-0000-0000-0000-000000000044', { type: 'passage' }, { contentClasses: ['doc-mode'] }),
+    propertyRailBlock('65f00000-0000-0000-0000-000000000045', { type: 'passage' }, { mainClasses: ['ls-fold-button-on-right'] })
+  ]
+
+  for (const fixture of fixtures) {
+    load(
+      { hiddenProperties: 'type: passage' },
+      [{ host: fixture.block, table: fixture.table }],
+      {},
+      fixture.host
+    )
+    await Promise.resolve()
+    assert.equal(fixture.controls.querySelector('[data-hc-property-toggle]'), null)
+  }
+
+  const fixture = propertyRailBlock('65f00000-0000-0000-0000-000000000046', { type: 'passage' })
+  const context = load({ hiddenProperties: 'type: passage' }, [
+    { host: fixture.block, table: fixture.table }
+  ], {}, fixture.host)
+  await Promise.resolve()
+  context.togglePropertyVisibility(fixture.controls.querySelector('[data-hc-property-toggle]'))
+  context.teardown()
+
+  assert.equal(fixture.controls.querySelector('[data-hc-property-toggle]'), null)
+  assert.equal(fixture.table.attributes.has('data-hc-hidden'), false)
+})
+
 test('a block matching any one configured pair is hidden', async () => {
   const blocks = [
     block({ type: 'foo' }),

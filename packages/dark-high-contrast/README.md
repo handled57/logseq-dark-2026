@@ -241,6 +241,14 @@ Turn it off in **Plugins → Dark High Contrast → Settings** under **Leading e
 
 Blocks whose rendered properties match any one of the configured `key: value` pairs render as bare content: the whole property table is hidden. Clicking into such a block still shows its content *and* its properties as source, because Logseq replaces the entire rendered block with a textarea over the raw block content, and custom properties are part of that content — nothing needs to be un-hidden.
 
+Every property-bearing block in the main editor also carries a cyan dot just to
+the right of its bullet. Activate it with the pointer, Enter or Space to show or
+hide that block's property table. This manual choice wins over the configured
+hiding rules and follows the block across rerenders and navigation for the rest
+of the current Logseq session; it is never persisted and writes nothing to the
+graph. Page front matter, sidebars, embeds, queries, whiteboards, document mode
+and the right-side fold-button layout keep Logseq's own presentation.
+
 Configure it in **Plugins → Dark High Contrast → Settings** under **Properties that hide the property table**. The field takes any number of pairs, separated by commas, semicolons or newlines:
 
 ```text

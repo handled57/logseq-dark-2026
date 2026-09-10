@@ -827,6 +827,50 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   margin-right: calc((16px - var(--hc-rail-bullet-size)) / 2);
 }
 
+/* A property-bearing block carries a second dot immediately right of its
+ * bullet. The button's hit target is larger than the painted dot and is taken
+ * out of flow, so neither the control column nor the block's content moves. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle] {
+  position: absolute;
+  top: calc(var(--hc-rail-bullet-y) - 10px);
+  left: 38px;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  color: var(--vscode-hc-cyan);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]:hover::before {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-hc-cyan) 35%, transparent);
+}
+
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]:focus-visible {
+  outline: 2px solid var(--vscode-hc-focus);
+  outline-offset: 0;
+}
+
 /* Bullets the theme hides elsewhere — code, centered text, verse, passages,
  * empty blocks — are part of the rail, so the suppression rules above are
  * answered here. They still hold everywhere the rail does not reach.
@@ -2533,6 +2577,12 @@ html.custom-scrollbar ::-webkit-scrollbar-corner {
    * resting dimming, which would leave it faint on a forced background. */
   [data-hc-collapse] {
     opacity: 1;
+  }
+
+  [data-hc-property-toggle] {
+    opacity: 1;
+    color: ButtonText;
+    forced-color-adjust: auto;
   }
 }
 
