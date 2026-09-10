@@ -79,8 +79,10 @@ ancestor's return, so closing levels unwind separately. The return's reserved
 height ends inside its own group. When that group's parent has a following
 sibling at the same level, a second mask layer adds a one-pixel vertical tail
 across Logseq's inter-block gap; final nested children omit the tail and hand
-off directly to their ancestor's return. The open-bullet guard and Logseq's
-hidden child container ensure folded parents paint no curves.
+off directly to their ancestor's return. Both the final child's straight line
+and a final group's return stop at Logseq's two-pixel row foot, so neither
+overruns the curve it hands off to. The open-bullet guard and Logseq's hidden
+child container ensure folded parents paint no curves.
 
 Block headings are not Logseq's size. `--hc-heading-scale` takes every level to
 one fraction of the multiple Logseq sets it in, and each heading rule scales

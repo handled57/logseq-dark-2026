@@ -468,6 +468,8 @@ const branchedOpen =
 const branchedGroup = `${branchedOpen} > .block-children-container > .block-children`
 const branchedSiblingGroup =
   `${branchedOpen}:has(~ .ls-block) > .block-children-container > .block-children`
+const branchedFinalLeaf =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-children-container > .block-children > .ls-block:not(.block-content-wrapper *):not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)) > .block-main-container > .block-control-wrap::after`
 
 /* The two rows that open the rail: the page's first block, and the block under
  * a page-properties block, which is the first one the reader wrote. */
@@ -612,7 +614,8 @@ test('expanded branched groups turn smoothly into and out of their child rail', 
   assert.equal(value(turns, 'background-color'), 'var(--hc-rail-default-color)')
   assert.equal(value(inbound, 'mask-image'), 'var(--hc-rail-branch-in)')
   assert.equal(value(outbound, 'mask-image'), 'var(--hc-rail-branch-out)')
-  assert.equal(value(outbound, 'bottom'), '0')
+  assert.equal(value(outbound, 'bottom'), '2px')
+  assert.equal(value(rule(branchedFinalLeaf), 'bottom'), '2px')
 
   // Both embedded SVG paths are cubic curves with vertical tangents at their
   // endpoints. There is no line command that could introduce the forbidden

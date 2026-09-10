@@ -1119,8 +1119,9 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
  * foot of its own row. Each group reserves one short turn at either end. The
  * masks are cubic paths with vertical tangents at both endpoints: horizontal
  * movement is confined to the rounded middle of the turn, never a diagonal.
- * Nested groups reserve their own tail, so several closing levels unwind one
- * smooth step at a time instead of stacking their curves on top of each other.
+ * Nested groups reserve their own return space, so several closing levels
+ * unwind one smooth step at a time instead of stacking their curves on top of
+ * each other.
  * A folded parent's child group is hidden by Logseq and also fails the open
  * bullet guard here, so it contributes no connector. */
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
@@ -1172,7 +1173,7 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
   > .block-children-container > .block-children::after {
-  bottom: 0;
+  bottom: 2px;
   mask-image: var(--hc-rail-branch-out);
 }
 
@@ -1194,13 +1195,16 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
 }
 
 /* The generic end-of-page rule stops the final leaf at its row. A nested final
- * leaf must instead reach its group's return curve; only a top-level final
+ * leaf stops at the two-pixel foot Logseq keeps inside that row, exactly where
+ * its group's return curve begins; extending it across the normal block gap
+ * would leave a straight stub dangling past the curve. Only a top-level final
  * block is still the actual end of the rail. */
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .block-children .ls-block:not(.block-content-wrapper *):not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)):not(.ls-block:has(~ .ls-block) *)
+  .ls-block:not(.block-content-wrapper *) > .block-children-container > .block-children
+  > .ls-block:not(.block-content-wrapper *):not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block))
   > .block-main-container > .block-control-wrap::after {
-  bottom: calc(-1 * var(--hc-block-gap));
+  bottom: 2px;
 }
 
 /* A page's properties are its front matter rather than a block of its text, so
