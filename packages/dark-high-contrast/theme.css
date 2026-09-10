@@ -394,6 +394,55 @@ h6,
   margin-top: 1em !important;
 }
 
+/* Headings are set below the sizes Logseq gives them. Against this theme's
+ * dense prose Logseq's scale reads oversized — an `h1` at twice the block's
+ * text dwarfs the outline it heads — so every level is taken to the same
+ * fraction of it, and a graph that wants its own scale can retune that one
+ * number from `custom.css`.
+ *
+ * Each rule restates the multiple Logseq sets for that level and scales it,
+ * rather than declaring a size of its own, so the levels keep the proportions
+ * they render with upstream. The selectors are Logseq's own pair — the
+ * rendered heading and the editor textarea, which carries the level as a class
+ * — so a heading holds its size while it is typed in. A heading quoted inside
+ * a block reference is normalized to `1rem` upstream and is left out; the
+ * theme loads after that rule and would otherwise take it back.
+ *
+ * `min-height` is upstream's, in the heading's own `em`, so it follows. */
+:root {
+  --hc-heading-scale: 0.7;
+}
+
+.editor-inner .h1.uniline-block,
+.ls-block h1:not(.block-ref *) {
+  font-size: calc(2em * var(--hc-heading-scale));
+}
+
+.editor-inner .h2.uniline-block,
+.ls-block h2:not(.block-ref *) {
+  font-size: calc(1.5em * var(--hc-heading-scale));
+}
+
+.editor-inner .h3.uniline-block,
+.ls-block h3:not(.block-ref *) {
+  font-size: calc(1.2em * var(--hc-heading-scale));
+}
+
+.editor-inner .h4.uniline-block,
+.ls-block h4:not(.block-ref *) {
+  font-size: calc(1em * var(--hc-heading-scale));
+}
+
+.editor-inner .h5.uniline-block,
+.ls-block h5:not(.block-ref *) {
+  font-size: calc(0.83em * var(--hc-heading-scale));
+}
+
+.editor-inner .h6.uniline-block,
+.ls-block h6:not(.block-ref *) {
+  font-size: calc(0.75em * var(--hc-heading-scale));
+}
+
 hr {
   border-color: var(--vscode-hc-border);
 }
@@ -633,9 +682,12 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 
 /* A heading opens its block a long way below the row's top: the theme gives it
  * a margin of its own font size, and its line is half again as tall as that.
- * Both are proportions of the heading's font size, which Logseq sets per level,
- * so each level's bullet drops by 1.75 times its own size, and is drawn that
- * many times the size of an ordinary bullet. The second selector
+ * Both are proportions of the heading's font size, so each level's bullet drops
+ * by 1.75 times its own size, and is drawn that many times the size of an
+ * ordinary bullet. That size is Logseq's multiple for the level taken to
+ * `--hc-heading-scale`, and the bullet reads the same scale rather than a
+ * number of its own, so retuning the type moves the bullets with it. The second
+ * selector
  * is the same heading in the editor, where Logseq renders it as a textarea
  * carrying the level as a class, so the bullet holds still while it is typed
  * in. Headings quoted inside a block reference or an embedded tree are not this
@@ -644,48 +696,48 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper h1:not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)),
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h1) {
-  --hc-rail-bullet-y: 3.5em;
-  --hc-rail-bullet-scale: 2;
+  --hc-rail-bullet-y: calc(3.5em * var(--hc-heading-scale));
+  --hc-rail-bullet-scale: calc(2 * var(--hc-heading-scale));
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper h2:not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)),
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h2) {
-  --hc-rail-bullet-y: 2.625em;
-  --hc-rail-bullet-scale: 1.5;
+  --hc-rail-bullet-y: calc(2.625em * var(--hc-heading-scale));
+  --hc-rail-bullet-scale: calc(1.5 * var(--hc-heading-scale));
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper h3:not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)),
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h3) {
-  --hc-rail-bullet-y: 2.1em;
-  --hc-rail-bullet-scale: 1.2;
+  --hc-rail-bullet-y: calc(2.1em * var(--hc-heading-scale));
+  --hc-rail-bullet-scale: calc(1.2 * var(--hc-heading-scale));
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper h4:not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)),
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h4) {
-  --hc-rail-bullet-y: 1.75em;
-  --hc-rail-bullet-scale: 1;
+  --hc-rail-bullet-y: calc(1.75em * var(--hc-heading-scale));
+  --hc-rail-bullet-scale: calc(1 * var(--hc-heading-scale));
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper h5:not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)),
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h5) {
-  --hc-rail-bullet-y: 1.4525em;
-  --hc-rail-bullet-scale: 0.83;
+  --hc-rail-bullet-y: calc(1.4525em * var(--hc-heading-scale));
+  --hc-rail-bullet-scale: calc(0.83 * var(--hc-heading-scale));
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper h6:not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)),
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h6) {
-  --hc-rail-bullet-y: 1.3125em;
-  --hc-rail-bullet-scale: 0.75;
+  --hc-rail-bullet-y: calc(1.3125em * var(--hc-heading-scale));
+  --hc-rail-bullet-scale: calc(0.75 * var(--hc-heading-scale));
 }
 
 /* The control column spans its row, so the line can run the height of it, and

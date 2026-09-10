@@ -326,6 +326,10 @@ const railMetrics = [
   '.editor-inner .h4.uniline-block,.ls-block h4{font-size:1em;min-height:1em}',
   '.editor-inner .h5.uniline-block,.ls-block h5{font-size:.83em;min-height:.83em}',
   '.editor-inner .h6.uniline-block,.ls-block h6{font-size:.75em;min-height:.75em}',
+  // A heading quoted inside a block reference is normalized to the block's own
+  // text upstream, in a rule of the same specificity that the theme loads after,
+  // which is why the theme's own heading sizes step around it.
+  '.block-ref :is(h1,h2,h3,h4,h5,h6){border-bottom:none;font-size:1rem}',
   // Logseq's own marker for a block with children, which is what the rail reads
   // to decide a block carries the hierarchy. It is written from the block's
   // stored children rather than the rendered ones, so it holds while a block is
@@ -390,6 +394,15 @@ const rail = { indent: 29, arrow: 22, bullet: 16, dot: 6, box: 24, gutter: 6, or
 
 /* Logseq's heading sizes, as multiples of the block's own text size. */
 const headings = { h1: 2, h2: 1.5, h3: 1.2, h4: 1, h5: 0.83, h6: 0.75 }
+
+/* The fraction of those the theme sets a heading at, read out of the
+ * stylesheet: the bullet a heading hangs is measured from the size the heading
+ * is actually rendered at, so the two have to be the same number. */
+const headingScale = (() => {
+  const declared = css.match(/--hc-heading-scale:\s*([\d.]+);/)
+  assert.ok(declared, 'the theme declares no heading scale')
+  return Number(declared[1])
+})()
 
 /* The rail reaches the page's own tree in the main editor and nothing else:
  * not the sidebars, whiteboards or dialogs that render outside
@@ -671,6 +684,44 @@ test('page properties carry no bullet and no rail, and the rail opens under them
   assert.equal(value(rule(railStart), 'display'), 'none')
 })
 
+test('every heading level is set to the same fraction of the size Logseq gives it', () => {
+  // Logseq's scale reads oversized against this theme's prose, so every level
+  // is taken to one fraction of it. Below 1 or the headings grew; the levels
+  // keep Logseq's proportions either way, because each rule scales that
+  // level's own multiple rather than declaring a size of its own.
+  assert.ok(headingScale > 0 && headingScale < 1, "the heading scale does not reduce Logseq's sizes")
+
+  for (const [level, size] of Object.entries(headings)) {
+    // Logseq's own pair of selectors: the rendered heading and the editor
+    // textarea, which carries the level as a class. Both are set, so a heading
+    // holds its size while it is typed in rather than jumping on each edit.
+    const body = rule(`.editor-inner .${level}.uniline-block, .ls-block ${level}:not(.block-ref *)`)
+    assert.equal(
+      value(body, 'font-size'),
+      `calc(${size}em * var(--hc-heading-scale))`,
+      `a ${level} is not set at ${size} × the scale`
+    )
+
+    // In `em`, so the margin above the heading — the theme's own `1em` — and
+    // the `min-height` upstream sets in the heading's own text both follow the
+    // type down instead of holding the old scale's spacing.
+    assert.doesNotMatch(value(body, 'font-size'), /px|rem/, `a ${level} is sized outside its own text`)
+  }
+
+  // The rendered heading is qualified so it cannot reach a heading quoted
+  // inside a block reference, which upstream normalizes to the block's own
+  // text in a rule this stylesheet would otherwise win on load order.
+  const quoted = '.ls-block h1:not(.block-ref *)'
+  assert.ok(
+    compare(specificity(quoted), specificity('.block-ref :is(h1,h2,h3,h4,h5,h6)')) > 0,
+    'the theme out-ranks the block-reference heading rule without excluding it'
+  )
+
+  // Page titles are Logseq's own size, not a block heading's, and are left
+  // alone: the theme only ever names them for their color and weight.
+  assert.doesNotMatch(css, /\.page-title[^{}]*\{[^{}]*font-size/)
+})
+
 test("a bullet sits on the middle of its block's first line", () => {
   // Half of the 24px line an ordinary block renders, which is what Logseq's own
   // 24px control box was centering the bullet by.
@@ -691,12 +742,18 @@ test("a bullet sits on the middle of its block's first line", () => {
     const body = rule(
       `${row}:has(> .block-content-wrapper ${level}${guard}), ${row}:has(> .editor-wrapper .${level})`
     )
-    const drop = Number.parseFloat(value(body, '--hc-rail-bullet-y'))
+    // The drop is Logseq's multiple for the level, and the theme takes the
+    // heading itself to a fraction of that, so the bullet reads the same
+    // scale rather than a number of its own: retuning the type moves the
+    // bullet with it instead of leaving it off the line.
+    const placement = value(body, '--hc-rail-bullet-y')
+    const match = placement.match(/^calc\(([\d.]+)em \* var\(--hc-heading-scale\)\)$/)
+    assert.ok(match, `a ${level} bullet is placed at "${placement}", not at its own scaled heading size`)
+    const drop = Number.parseFloat(match[1]) * headingScale
     assert.ok(
-      Math.abs(drop - size * 1.75) < 0.001,
-      `a ${level} bullet drops ${drop}em, not the 1.75 × ${size}em its own line asks for`
+      Math.abs(drop - size * 1.75 * headingScale) < 0.001,
+      `a ${level} bullet drops ${drop}em, not the 1.75 × ${size * headingScale}em its own line asks for`
     )
-    assert.match(value(body, '--hc-rail-bullet-y'), /em$/, `a ${level} bullet is placed in px, not in its own text`)
   }
 
   // Everything else the rail draws for a row is measured from that one number,
@@ -732,9 +789,9 @@ test("a bullet is drawn at the size of its block's first line", () => {
       `${row}:has(> .block-content-wrapper ${level}${guard}), ${row}:has(> .editor-wrapper .${level})`
     )
     assert.equal(
-      Number.parseFloat(value(body, '--hc-rail-bullet-scale')),
-      size,
-      `a ${level} bullet is not drawn at the ${size}× its own line is set in`
+      value(body, '--hc-rail-bullet-scale'),
+      `calc(${size} * var(--hc-heading-scale))`,
+      `a ${level} bullet is not drawn at the ${size * headingScale}× its own line is set in`
     )
   }
 

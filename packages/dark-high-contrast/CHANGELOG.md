@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## 2.7.0 - 2026-09-09
+
+- Set block headings 30% below the sizes Logseq gives them: an `h1` renders at
+  `1.4em` of the block's text rather than `2em`, and every level down to `h6`
+  comes to the same fraction of its own size. The levels keep the proportions
+  they had to one another, the sizes hold while a heading is being typed as
+  well as in the page view, and because the margin above a heading is its own
+  font size, the space a run of headings takes comes down with them. Page
+  titles and headings quoted inside a block reference are unchanged.
+- Measure a heading's rail bullet from that same scale, so it still drops to
+  the middle of the heading's first line and is still drawn at the weight of
+  it. The scale is `--hc-heading-scale`, `0.7` by default: a graph can retune
+  it — or restore Logseq's sizes with `1` — from `custom.css`, and the bullets
+  follow.
+
 ## 2.6.0 - 2026-09-09
 
 - Draw the bullet rail's line in one color the whole way down the page. The
