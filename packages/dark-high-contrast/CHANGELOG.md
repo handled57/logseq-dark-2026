@@ -21,8 +21,11 @@ All notable changes to this project are documented here.
   laid out after it, so that gap never fell between a parent and its first
   child, whose border was drawn through its parent's; every nested group now
   opens on the gap too, counted so a parent and its first child stand exactly
-  as far apart as two siblings. Both variables can be retuned from
-  `custom.css`.
+  as far apart as two siblings. The orange border a block wears while it is
+  being edited moves out to that same padding, so a block keeps its border in
+  one place whether it is being read or written; it is an outline now rather
+  than a border on the editor's own box, which had been narrowing the text by a
+  pixel as the block opened. Both variables can be retuned from `custom.css`.
 
 ## 2.7.1 - 2026-09-09
 

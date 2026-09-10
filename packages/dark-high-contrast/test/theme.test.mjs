@@ -488,6 +488,26 @@ test('the block outline stands off the text on a padding of its own', () => {
     'the gap clears two of the paddings'
   )
 
+  /* The block being edited wears the same border in the same place: the orange
+   * is an outline standing off on the same padding, not a border cutting into
+   * the textarea's own box. */
+  const editing = rules.find(([selector]) => selector.includes('textarea.block-editor:focus'))
+  assert.match(
+    editing[1],
+    /outline:\s*1px solid var\(--vscode-hc-focus\) !important/,
+    'the editing border is an outline of the same weight as the hover outline'
+  )
+  assert.match(
+    editing[1],
+    /outline-offset:\s*var\(--hc-block-outline-pad\) !important/,
+    'the editing outline stands off on the same padding'
+  )
+  assert.doesNotMatch(
+    editing[1],
+    /border:\s*\d/,
+    'the editing border would come out of the text box'
+  )
+
   /* A child hangs inside its parent rather than following it, so the margin
    * above never falls between the two: the nested group opens on the gap
    * instead. */
@@ -602,7 +622,10 @@ test('interactive chrome stays black with one-pixel orange borders', () => {
   assert.match(css, /#search-button,[\s\S]*?border-color:\s*transparent\s*!important/)
   assert.match(css, /#search-button:hover,[\s\S]*?border-color:\s*var\(--vscode-hc-focus\)\s*!important/)
   assert.match(css, /\.left-sidebar-inner a\.item:hover,[\s\S]*?border-color:\s*var\(--vscode-hc-focus\)/)
-  assert.match(css, /textarea\.block-editor:focus\s*\{[\s\S]*?border:\s*1px solid var\(--vscode-hc-focus\)\s*!important[\s\S]*?box-shadow:\s*none\s*!important/)
+  // The block editor's own orange is an outline rather than a border, so that
+  // it lands where the hover and selection outlines do; the weight is the same
+  // single pixel the rest of the chrome is drawn with.
+  assert.match(css, /textarea\.block-editor:focus\s*\{[\s\S]*?outline:\s*1px solid var\(--vscode-hc-focus\)\s*!important[\s\S]*?box-shadow:\s*none\s*!important/)
   assert.match(css, /th\s*\{[\s\S]*?background:\s*var\(--vscode-hc-black\)\s*!important/)
   assert.match(css, /kbd\s*\{[\s\S]*?background:\s*var\(--vscode-hc-black\)/)
 })

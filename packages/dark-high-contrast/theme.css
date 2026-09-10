@@ -1723,12 +1723,18 @@ select:focus {
   box-shadow: 0 0 0 1px var(--vscode-hc-focus) !important;
 }
 
-/* A block editor uses one orange border, matching the rest of the workbench. */
+/* A block editor uses one orange border, matching the rest of the workbench,
+ * and stands it off the text on the same padding the hover and selection
+ * outlines take, so a block wears the same border in the same place whether it
+ * is being read or written. It is an outline rather than a border for the same
+ * reason those are: a border comes out of the textarea's own box, which would
+ * narrow the text by a pixel the moment the block opened for editing. */
 .editor-inner textarea:focus,
 textarea.block-editor:focus {
-  border: 1px solid var(--vscode-hc-focus) !important;
+  border-color: transparent !important;
+  outline: 1px solid var(--vscode-hc-focus) !important;
+  outline-offset: var(--hc-block-outline-pad) !important;
   box-shadow: none !important;
-  outline: none !important;
 }
 
 .ui__toggle-background-on,
