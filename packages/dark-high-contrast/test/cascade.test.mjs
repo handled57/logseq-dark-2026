@@ -205,6 +205,16 @@ const spacingMetrics = [
   '.block-properties,.page-properties{background-color:var(--lx-gray-03,var(--ls-block-properties-background-color,var(--rx-gray-03)));margin:4px 0;padding:4px 8px}'
 ]
 
+/* A parent's row and its first child's are not two blocks in flow: the child
+ * hangs inside a nested group, so the space between those two rows is whatever
+ * the group opens on rather than the margin a block carries. These are the two
+ * upstream figures the theme counts that space out of — the padding every row
+ * is given, and the 2px a nested group opens on. */
+const nestingMetrics = [
+  '.ls-block{border-bottom:1px solid transparent;min-height:24px;padding:2px 0;position:relative;transition:background-color .3s cubic-bezier(.16,1,.3,1)}',
+  '.block-children{border-left:1px solid;border-left-color:var(--lx-gray-04-alpha,var(--ls-guideline-color,var(--rx-gray-04-alpha)))!important;padding-bottom:3px;padding-top:2px}'
+]
+
 /* A verse number is a `mark`, which upstream dresses as a page highlight. The
  * passage has to undo all of it — the padding above all, since the number is
  * set in a gutter whose width the theme, not the highlight, decides. */
@@ -860,6 +870,21 @@ test("a bullet is drawn at the size of its block's first line", () => {
   assert.equal(value(link, 'margin-right'), centering)
 })
 
+test('a parent and its first child stand as far apart as two siblings do', () => {
+  const rowPad = Number.parseInt(nestingMetrics[0].match(/padding:(\d+)px 0/)[1], 10)
+  assert.equal(Number.parseInt(nestingMetrics[1].match(/padding-top:(\d+)px/)[1], 10), rowPad)
+
+  // Two siblings are held apart by the foot of one row, the theme's gap, and
+  // the head of the next. A parent and its first child have no margin between
+  // them at all: the child hangs in a nested group, and only the head of its
+  // own row is padded. So the group opens on the gap plus the padding the
+  // parent's foot would have contributed, and the outline a hovered or selected
+  // block takes stands clear either way instead of being drawn through the
+  // border above it.
+  assert.equal(value(rule('.block-children'), 'padding-top'), `calc(var(--hc-block-gap) + ${rowPad}px)`)
+  assert.equal(value(rule('.ls-block'), 'margin-bottom'), 'var(--hc-block-gap)')
+})
+
 test('the rail line runs from the first bullet to the end of the last block', () => {
   const line = rule(`${wrap}::before, ${wrap}::after`)
   // The fold arrow, then half a bullet: the center of the bullet Logseq draws.
@@ -1066,7 +1091,8 @@ test(
       )
     }
     for (const declaration of [
-      ...admonitionMetrics, ...spacingMetrics, ...railMetrics, ...popupMetrics, ...iconMetrics, ...tableMetrics
+      ...admonitionMetrics, ...spacingMetrics, ...nestingMetrics, ...railMetrics, ...popupMetrics, ...iconMetrics,
+      ...tableMetrics
     ]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }

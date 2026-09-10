@@ -17,7 +17,12 @@ All notable changes to this project are documented here.
   after the other keep their outlines apart. Each row now paints its stretch of
   the rail down the whole gap below it, to the top of the next row, rather than
   a fixed 8px past its own foot, so the line stays unbroken however far apart
-  the blocks are spaced. Both variables can be retuned from `custom.css`.
+  the blocks are spaced. A child block is nested inside its parent rather than
+  laid out after it, so that gap never fell between a parent and its first
+  child, whose border was drawn through its parent's; every nested group now
+  opens on the gap too, counted so a parent and its first child stand exactly
+  as far apart as two siblings. Both variables can be retuned from
+  `custom.css`.
 
 ## 2.7.1 - 2026-09-09
 

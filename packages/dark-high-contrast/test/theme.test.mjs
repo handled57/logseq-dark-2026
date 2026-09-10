@@ -488,6 +488,16 @@ test('the block outline stands off the text on a padding of its own', () => {
     'the gap clears two of the paddings'
   )
 
+  /* A child hangs inside its parent rather than following it, so the margin
+   * above never falls between the two: the nested group opens on the gap
+   * instead. */
+  const nested = rules.find(([selector]) => selector === '.block-children')
+  assert.match(
+    nested[1],
+    /padding-top:\s*calc\(var\(--hc-block-gap\) \+ 2px\)/,
+    'a nested group opens on the same space two siblings keep'
+  )
+
   /* The rail's line bridges the space between two rows by reaching down from
    * each of them to the top of the next. That reach is the gap itself, so the
    * rail cannot break however far apart a padding widens the blocks. */

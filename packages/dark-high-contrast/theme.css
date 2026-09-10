@@ -540,6 +540,19 @@ hr {
   margin-bottom: var(--hc-block-gap);
 }
 
+/* A child is nested inside its parent rather than laid out after it, so the gap
+ * two siblings keep between them never falls between a parent and its first
+ * child: Logseq opens a nested group on 2px, far less room than the outline
+ * needs, and the child's border would be drawn through its parent's. The group
+ * opens on the gap instead. Two siblings stand `--hc-block-gap` apart plus the
+ * 2px Logseq pads the foot of one row and the head of the next with; only the
+ * head of the child's row is padded here, so the group carries that odd 2px
+ * itself and a parent and its first child end up exactly as far apart as two
+ * siblings are. */
+.block-children {
+  padding-top: calc(var(--hc-block-gap) + 2px);
+}
+
 .ls-block:focus-visible {
   outline-width: 1px !important;
 }
