@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## 2.7.1 - 2026-09-09
+
+- Stop a table's narrow columns collapsing until their headings break mid-word.
+  Logseq breaks a block's text anywhere it has to, and a cell inheriting that
+  reported a narrowest width of one character, so the automatic layout was free
+  to squeeze a `Level` column down to `Lev/el` while a column holding a whole
+  sentence kept the width of the table. A cell now breaks at word boundaries,
+  which gives every column a floor of its own longest word and leaves the wide
+  column to wrap instead. A single run too long for its column — a URL, a hash
+  — still breaks within the line, and a table wider than the block it sits in
+  still scrolls.
+
 ## 2.7.0 - 2026-09-09
 
 - Set block headings 20% below the sizes Logseq gives them: an `h1` renders at

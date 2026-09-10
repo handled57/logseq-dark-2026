@@ -1365,6 +1365,30 @@ td {
   border-color: var(--vscode-hc-border) !important;
 }
 
+/* Logseq gives a block `word-break: break-word`, the legacy value that computes
+ * to `overflow-wrap: anywhere`. Unlike `break-word`, `anywhere` counts toward
+ * intrinsic sizing, so a cell inheriting it reports a min-content width of one
+ * character rather than of its longest word. A table is laid out automatically
+ * at `width: 100%`, which hands each column its min-content width and then
+ * shares the surplus out in proportion to the width each column would need on a
+ * single line — so one column holding a sentence takes nearly all of it, and
+ * the columns beside it, having claimed no floor of their own, are squeezed
+ * until their headings break mid-word.
+ *
+ * Restoring `word-break: normal` puts that floor back: a column is never
+ * narrower than its own longest word, and the sentence column wraps instead. A
+ * cell keeps `overflow-wrap: break-word`, so a single run too long for its
+ * column — a URL, a hash — still breaks within the line rather than running out
+ * of the table, and where such a run is wider than the table can give it, the
+ * `overflow: auto` Logseq puts on `div.table-wrapper` scrolls to it.
+ *
+ * A directly matched declaration beats an inherited one whatever its
+ * specificity, so this needs no weight to answer `.block-content`. */
+.block-content :is(th, td) {
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
 th {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;

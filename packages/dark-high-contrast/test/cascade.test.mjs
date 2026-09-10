@@ -369,6 +369,45 @@ const iconMetrics = [
     'overflow-wrap:break-word;white-space:pre-wrap;word-break:break-word}'
 ]
 
+/* A table is laid out automatically inside a scrolling wrapper at the full
+ * width of the block, so what decides a column's width is what each cell
+ * reports as its narrowest and widest. The `word-break: break-word` pinned in
+ * `iconMetrics` above is inherited into those cells and computes to
+ * `overflow-wrap: anywhere`, which counts toward intrinsic sizing and takes a
+ * column's floor down to a single character. These are the declarations the
+ * cell rule answers. */
+const tableMetrics = [
+  '.block-content div.table-wrapper,.cp__all_pages-content div.table-wrapper,' +
+    '.cp__shortcut-page div.table-wrapper{overflow:auto}',
+  '.block-content table,.cp__all_pages-content table,.cp__shortcut-page table' +
+    '{border-collapse:collapse;margin:1rem 0;text-align:left;width:100%}'
+]
+
+test('a table cell keeps a floor of its own longest word', () => {
+  // The value the fix exists to answer, read back off the pinned block rule so
+  // an upstream change that drops it takes this test with it.
+  const inherited = iconMetrics.find((declaration) => declaration.startsWith('.block-content{'))
+  assert.match(inherited, /word-break:break-word/, 'Logseq no longer breaks a block mid-word')
+
+  // Nothing here relies on out-ranking `.block-content`: a declaration that
+  // matches the cell itself beats one the cell only inherits.
+  const rule = css.match(/\n\.block-content :is\(th, td\) \{([^}]*)\}/)
+  assert.ok(rule, '.block-content :is(th, td) is missing')
+
+  // `normal` restores the column floor `anywhere` removed, so a column is at
+  // least as wide as its longest word and the wide column wraps instead.
+  assert.match(rule[1], /\n\s*word-break:\s*normal;/)
+  // `break-word` still breaks a run too long for its column, and unlike
+  // `anywhere` it leaves intrinsic sizing alone, so the floor survives it.
+  assert.match(rule[1], /\n\s*overflow-wrap:\s*break-word;/)
+  assert.doesNotMatch(rule[1], /overflow-wrap:\s*anywhere/)
+
+  // The floor can push the table past the block; the wrapper is what scrolls
+  // to it rather than the table being forced to shatter its words again.
+  assert.ok(tableMetrics[0].includes('overflow:auto'), 'the table wrapper no longer scrolls')
+  assert.ok(tableMetrics[1].includes('width:100%'), 'a table is no longer laid out at the full block width')
+})
+
 test('the block-icon gutter and the indent that hangs out of it are one number', () => {
   const gutter = 'var(--hc-block-icon-gutter)'
   const scope = '.ls-block[data-hc-block-icon] > .block-main-container > ' +
@@ -1026,7 +1065,7 @@ test(
       )
     }
     for (const declaration of [
-      ...admonitionMetrics, ...spacingMetrics, ...railMetrics, ...popupMetrics, ...iconMetrics
+      ...admonitionMetrics, ...spacingMetrics, ...railMetrics, ...popupMetrics, ...iconMetrics, ...tableMetrics
     ]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }
