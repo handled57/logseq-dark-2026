@@ -609,6 +609,39 @@ hr {
   background-color: transparent !important;
 }
 
+/* Page title alignment
+ *
+ * The page title starts where the text under it does. Logseq leaves the title
+ * at the page's own left edge, pulls the block tree 20px left of that with an
+ * inline margin on `.page-blocks-inner`, and then holds every block's text
+ * 44px right of the tree: the 22px box the fold arrow is drawn in, the 16px
+ * bullet, and the 6px gutter between the bullet and the text. A block's text
+ * therefore starts 24px right of the page, while the title, whose box is laid
+ * 6px left of the page and pads its text 8px inside that, starts 2px right of
+ * it — 22px short of the prose it heads.
+ *
+ * The rail moves the bullet out of that column but not the column itself,
+ * which leaves the title the one line on the page that starts nowhere: the
+ * rail stands well to its left and the text it heads sits to its right. The
+ * title is handed the difference here, on its own box rather than on the text
+ * inside it, so the background the title is hovered and edited in travels with
+ * it.
+ *
+ * Logseq's own `-6px` is restated rather than added to, because the indent is
+ * measured to the text: the box lands 8px left of the column and its padding
+ * carries the text onto it. Document mode and the right-hand fold layout
+ * re-measure the tree, and the rail steps aside for both, so the title keeps
+ * Logseq's alignment there. A page in the sidebar, a zoomed block and a
+ * whiteboard render no title row at all. */
+:root {
+  --hc-title-indent: 24px;
+}
+
+main:not(.ls-fold-button-on-right)
+  #main-content-container:not(:has(.page-blocks-inner .content.doc-mode)) .ls-page-title {
+  margin-left: calc(var(--hc-title-indent) - 8px);
+}
+
 /* Bullet rail
  *
  * Every block in the primary editor hangs its bullet on one vertical line in
