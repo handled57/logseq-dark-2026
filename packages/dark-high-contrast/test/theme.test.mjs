@@ -333,7 +333,7 @@ test('the optional branched rail is body-scoped and documented', async () => {
   assert.match(script, /doc\.body\.removeAttribute\(RAIL_LAYOUT_ATTR\)/)
   assert.match(css, /body\[data-hc-rail-layout="branched"\] main:not\(\.ls-fold-button-on-right\)/)
   assert.match(css, /border-top-right-radius: var\(--hc-rail-branch-radius\)/)
-  assert.match(css, /border-top-left-radius: var\(--hc-rail-branch-radius\)/)
+  assert.match(css, /transform: scaleX\(-1\)/)
   assert.match(css, /--hc-rail-branch-width: 2px/)
   assert.match(readme, /## Rail layouts/)
   assert.match(readme, /\*\*Flat\*\* is the default/)

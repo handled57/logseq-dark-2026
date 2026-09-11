@@ -1052,6 +1052,20 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   --hc-rail-indent: var(--hc-rail-offset) !important;
 }
 
+/* A branched rail is one continuous 2px stroke. The flat fallback remains the
+ * original 1px line, while every ordinary vertical segment in Branched uses
+ * the same width as its elbows. Keeping the shared 30.5px center fixed avoids
+ * shifting the rail when its width changes. */
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::before,
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::after {
+  left: calc(30.5px - var(--hc-rail-branch-width) / 2);
+  width: var(--hc-rail-branch-width);
+}
+
 /* The blocks that carry the hierarchy take their depth's color for their
  * bullet: a block that opens with a heading, and a block with children of its
  * own, which is Logseq's own `haschild` and so stays true while the block is
@@ -1134,9 +1148,10 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
   > .block-main-container > .block-control-wrap::after {
-  top: var(--hc-rail-bullet-y);
+  left: 30.5px;
+  top: calc(var(--hc-rail-bullet-y) - var(--hc-rail-branch-width) / 2);
   bottom: calc(-1 * var(--hc-rail-branch-height));
-  width: calc(var(--hc-rail-branch-step) + 1px);
+  width: calc(var(--hc-rail-branch-step) + var(--hc-rail-branch-width) / 2);
   box-sizing: border-box;
   border-top: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
   border-right: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
@@ -1159,17 +1174,19 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   > .block-children-container > .block-children::after {
   content: '';
   position: absolute;
-  left: calc(1px - var(--hc-rail-offset));
-  width: calc(var(--hc-rail-branch-step) + 1px);
+  left: calc(1.5px - var(--hc-rail-offset) - var(--hc-rail-branch-width) / 2);
+  width: calc(var(--hc-rail-branch-step) + var(--hc-rail-branch-width) / 2);
   height: var(--hc-rail-branch-height);
   box-sizing: border-box;
   z-index: 0;
   border-top: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-left: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-top-left-radius: var(--hc-rail-branch-radius);
+  border-right: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
+  border-top-right-radius: var(--hc-rail-branch-radius);
   background-color: transparent;
   pointer-events: none;
   bottom: 2px;
+  transform: scaleX(-1);
+  transform-origin: center;
 }
 
 /* A return whose parent has another sibling at the same level owns the handoff
@@ -1184,7 +1201,7 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   > .block-children-container > .block-children::after {
   bottom: calc(-1 * var(--hc-block-gap));
   height: calc(var(--hc-rail-branch-height) + var(--hc-block-gap));
-  border-left: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
+  border-right: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
 }
 
 /* The generic end-of-page rule stops the final leaf at its row. A nested final

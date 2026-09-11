@@ -33,10 +33,10 @@ Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
   expanded parent sends a rounded branch from the side of its bullet and then
   straight down the child rail, which runs vertically through sibling children
   and curves back after the final child. A nested expanded block repeats the
-  same shape at its own level. The return uses the same 2px rounded elbow as
-  the parent-to-child branch, mirrored back toward the parent rail; neither
-  connector uses a diagonal segment. A collapsed parent has no visible child
-  connector.
+  same shape at its own level. The entire branched path is 2px wide, including
+  its straight rails. The return is an exact horizontal reflection of the
+  parent-to-child elbow back toward the parent rail; neither connector uses a
+  diagonal segment. A collapsed parent has no visible child connector.
 
 Changing the setting repaints the current page immediately. Rail color,
 depth-colored bullets, open rings, hover behavior, headings and special-block

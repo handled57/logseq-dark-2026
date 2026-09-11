@@ -75,9 +75,11 @@ becomes a border-drawn elbow: its top border emerges from the side of the
 bullet, rounds the `--hc-rail-branch-radius` corner, and its right border runs
 straight down the child column through the group's reserved head. The group's
 `::after` is a matching border-drawn elbow across `--hc-rail-branch-step` (the
-pinned 29px indent): its top-left radius mirrors the parent's top-right radius
-and hands the last child's column back to the parent rail. Both elbows use the
-2px `--hc-rail-branch-width`. A nested group's reserved foot puts its return
+pinned 29px indent): it reuses the parent's top-right border geometry under a
+horizontal reflection and hands the last child's column back to the parent
+rail. Every ordinary vertical segment and both elbows use the same 2px
+`--hc-rail-branch-width`, centered on the 1px Flat rail's original axis. A
+nested group's reserved foot puts its return
 before its ancestor's return, so closing levels unwind separately. The
 return's reserved height ends inside its own group. When that group's parent
 has a following sibling at the same level, its left border continues

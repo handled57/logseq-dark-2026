@@ -602,12 +602,22 @@ test('expanded branched groups use matching elbows into and out of their child r
   const group = rule(branchedGroup)
   const branch = rule(`${branchedOpen} > .block-main-container > .block-control-wrap::after`)
   const outbound = rule(`${branchedGroup}::after`)
+  const branchedLine = rule(
+    `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::before, ` +
+    `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::after`
+  )
+
+  // Every straight stretch and both elbows share one width without moving the
+  // center inherited from Flat's original one-pixel rail.
+  assert.equal(value(branchedLine, 'left'), 'calc(30.5px - var(--hc-rail-branch-width) / 2)')
+  assert.equal(value(branchedLine, 'width'), 'var(--hc-rail-branch-width)')
 
   // The branch emerges from the parent bullet's side, rounds one corner and
   // continues straight down the child column through the reserved group head.
-  assert.equal(value(branch, 'top'), 'var(--hc-rail-bullet-y)')
+  assert.equal(value(branch, 'left'), '30.5px')
+  assert.equal(value(branch, 'top'), 'calc(var(--hc-rail-bullet-y) - var(--hc-rail-branch-width) / 2)')
   assert.equal(value(branch, 'bottom'), 'calc(-1 * var(--hc-rail-branch-height))')
-  assert.equal(value(branch, 'width'), 'calc(var(--hc-rail-branch-step) + 1px)')
+  assert.equal(value(branch, 'width'), 'calc(var(--hc-rail-branch-step) + var(--hc-rail-branch-width) / 2)')
   assert.equal(value(branch, 'box-sizing'), 'border-box')
   assert.equal(value(branch, 'border-top'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
   assert.equal(value(branch, 'border-right'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
@@ -619,18 +629,22 @@ test('expanded branched groups use matching elbows into and out of their child r
   assert.equal(value(group, 'padding-top'), 'var(--hc-rail-branch-height)')
   assert.equal(value(group, 'padding-bottom'), 'var(--hc-rail-branch-height)')
   assert.equal(value(outbound, 'height'), 'var(--hc-rail-branch-height)')
-  assert.equal(value(outbound, 'width'), 'calc(var(--hc-rail-branch-step) + 1px)')
-  assert.equal(value(outbound, 'left'), 'calc(1px - var(--hc-rail-offset))')
+  assert.equal(value(outbound, 'width'), 'calc(var(--hc-rail-branch-step) + var(--hc-rail-branch-width) / 2)')
+  assert.equal(value(outbound, 'left'), 'calc(1.5px - var(--hc-rail-offset) - var(--hc-rail-branch-width) / 2)')
   assert.equal(value(outbound, 'box-sizing'), 'border-box')
   assert.equal(value(outbound, 'border-top'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(outbound, 'border-left'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(outbound, 'border-top-left-radius'), 'var(--hc-rail-branch-radius)')
+  assert.equal(value(outbound, 'border-right'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(outbound, 'border-top-right-radius'), 'var(--hc-rail-branch-radius)')
+  assert.equal(value(outbound, 'transform'), 'scaleX(-1)')
+  assert.equal(value(outbound, 'transform-origin'), 'center')
   assert.equal(value(outbound, 'background-color'), 'transparent')
   assert.equal(value(outbound, 'bottom'), '2px')
   assert.equal(value(rule(branchedFinalLeaf), 'bottom'), '2px')
 
-  // Entry and return use the same radius and stroke width on opposite corners.
-  assert.equal(value(branch, 'border-top-right-radius'), value(outbound, 'border-top-left-radius'))
+  // Entry and return are the same border geometry; the return is its exact
+  // horizontal reflection rather than an independently approximated curve.
+  assert.equal(value(branch, 'width'), value(outbound, 'width'))
+  assert.equal(value(branch, 'border-top-right-radius'), value(outbound, 'border-top-right-radius'))
   assert.match(css, /--hc-rail-branch-width:\s*2px;/)
   assert.doesNotMatch(css, /--hc-rail-branch-out:/)
 })
@@ -643,7 +657,7 @@ test('a branched return reaches its following sibling without forking nested ret
     value(outbound, 'height'),
     'calc(var(--hc-rail-branch-height) + var(--hc-block-gap))'
   )
-  assert.equal(value(outbound, 'border-left'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(outbound, 'border-right'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
 
   // The extra handoff is conditional on a same-level sibling. A final nested
   // child therefore retains the bounded return asserted above and cannot
