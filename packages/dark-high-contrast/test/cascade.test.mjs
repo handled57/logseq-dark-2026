@@ -598,7 +598,7 @@ test('branched layout keeps Logseq nesting while Flat remains the default geomet
   assert.equal(Number.parseFloat(step[1]), rail.indent)
 })
 
-test('expanded branched groups leave the parent side and return from their child rail', () => {
+test('expanded branched groups use matching elbows into and out of their child rail', () => {
   const group = rule(branchedGroup)
   const branch = rule(`${branchedOpen} > .block-main-container > .block-control-wrap::after`)
   const outbound = rule(`${branchedGroup}::after`)
@@ -609,8 +609,8 @@ test('expanded branched groups leave the parent side and return from their child
   assert.equal(value(branch, 'bottom'), 'calc(-1 * var(--hc-rail-branch-height))')
   assert.equal(value(branch, 'width'), 'calc(var(--hc-rail-branch-step) + 1px)')
   assert.equal(value(branch, 'box-sizing'), 'border-box')
-  assert.equal(value(branch, 'border-top'), '1px solid var(--hc-rail-default-color)')
-  assert.equal(value(branch, 'border-right'), '1px solid var(--hc-rail-default-color)')
+  assert.equal(value(branch, 'border-top'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(branch, 'border-right'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
   assert.equal(value(branch, 'border-top-right-radius'), 'var(--hc-rail-branch-radius)')
   assert.equal(value(branch, 'background-color'), 'transparent')
 
@@ -621,15 +621,18 @@ test('expanded branched groups leave the parent side and return from their child
   assert.equal(value(outbound, 'height'), 'var(--hc-rail-branch-height)')
   assert.equal(value(outbound, 'width'), 'calc(var(--hc-rail-branch-step) + 1px)')
   assert.equal(value(outbound, 'left'), 'calc(1px - var(--hc-rail-offset))')
-  assert.equal(value(outbound, 'background-color'), 'var(--hc-rail-default-color)')
-  assert.equal(value(outbound, 'mask-image'), 'var(--hc-rail-branch-out)')
+  assert.equal(value(outbound, 'box-sizing'), 'border-box')
+  assert.equal(value(outbound, 'border-top'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(outbound, 'border-left'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(outbound, 'border-top-left-radius'), 'var(--hc-rail-branch-radius)')
+  assert.equal(value(outbound, 'background-color'), 'transparent')
   assert.equal(value(outbound, 'bottom'), '2px')
   assert.equal(value(rule(branchedFinalLeaf), 'bottom'), '2px')
 
-  // The return path is a cubic curve with vertical tangents at its endpoints.
-  // There is no line command that could introduce a forbidden diagonal.
-  assert.match(css, /M29\.5 0 C29\.5 16 \.5 16 \.5 32/)
-  assert.doesNotMatch(css, /--hc-rail-branch-out:[^;]*\bL[\d. -]/)
+  // Entry and return use the same radius and stroke width on opposite corners.
+  assert.equal(value(branch, 'border-top-right-radius'), value(outbound, 'border-top-left-radius'))
+  assert.match(css, /--hc-rail-branch-width:\s*2px;/)
+  assert.doesNotMatch(css, /--hc-rail-branch-out:/)
 })
 
 test('a branched return reaches its following sibling without forking nested returns', () => {
@@ -640,15 +643,7 @@ test('a branched return reaches its following sibling without forking nested ret
     value(outbound, 'height'),
     'calc(var(--hc-rail-branch-height) + var(--hc-block-gap))'
   )
-  assert.equal(
-    value(outbound, 'mask-image'),
-    'var(--hc-rail-branch-out), linear-gradient(black, black)'
-  )
-  assert.equal(value(outbound, 'mask-position'), 'center top, left bottom')
-  assert.equal(
-    value(outbound, 'mask-size'),
-    '100% var(--hc-rail-branch-height), 1px var(--hc-block-gap)'
-  )
+  assert.equal(value(outbound, 'border-left'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
 
   // The extra handoff is conditional on a same-level sibling. A final nested
   // child therefore retains the bounded return asserted above and cannot
