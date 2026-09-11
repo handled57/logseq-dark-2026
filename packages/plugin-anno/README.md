@@ -124,8 +124,8 @@ No dependency installation or compilation is needed to use the plugin.
 ## Development
 
 ```sh
-npm test --workspace packages/anno            # the package's own suites
-npm run check --workspace packages/anno       # test, build and verify the ZIP
+npm test --workspace packages/plugin-anno            # the package's own suites
+npm run check --workspace packages/plugin-anno       # test, build and verify the ZIP
 ```
 
 `test/package.test.mjs` covers the package's structure and metadata;

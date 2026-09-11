@@ -16,7 +16,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Block headings are set 20% below the sizes Logseq gives them, so a heading reads as the head of its outline rather than dominating the notes under it. Every level keeps Logseq's proportions, and page titles are unchanged.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
-- Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../passage) plugin's job, and the theme does not require it.
+- Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../plugin-passage) plugin's job, and the theme does not require it.
 - Sizes named-admonition and passage icons at 1.5 times the first line's font and aligns them with that line while their semantic divider continues through the full block height.
 - Folds a long rendered box — an admonition, a passage, a table, a quote, a code block, a math block, a piece of media, a block or page embed — on a control of its own, without folding the block that holds it or touching a line of its source.
 - Sets the emoji a block opens with in a gutter of its own, left of the block's text, so it reads as that block's icon and the lines under it stay in one column. The emoji is left exactly where it is written.
@@ -300,7 +300,7 @@ Verse numbers are read from the block's own source. Where every number in a bloc
 
 ### Writing one
 
-Writing a passage belongs to the [**Passage**](../passage) plugin, which installs, updates and unloads on its own. It resolves a typed reference against its own index of books and chapters, writes it back canonically with one namespaced tag per chapter, and — with a local text index you build yourself — writes the verse text under it, optionally with chapter headings, verse numbers, or a line to a verse.
+Writing a passage belongs to the [**Passage**](../plugin-passage) plugin, which installs, updates and unloads on its own. It resolves a typed reference against its own index of books and chapters, writes it back canonically with one namespaced tag per chapter, and — with a local text index you build yourself — writes the verse text under it, optionally with chapter headings, verse numbers, or a line to a verse.
 
 Neither package needs the other. The theme styles whatever passage blocks a graph holds, whoever wrote them; Passage writes ordinary Logseq markup that renders readably with any theme, or none. What the two agree on is a block shape, published as [`docs/contracts/passage-v1.md`](../../docs/contracts/passage-v1.md) and tested from both sides against the same fixtures.
 
@@ -380,7 +380,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 
 The committed `theme.css` and `index.js` are canonical. The repository keeps one vendored Logseq SDK at `vendor/logseq/lsplugin.user.js`; release tooling copies it into the staged package as `lib/lsplugin.user.js`.
 
-This theme is one workspace of the [logseq-dark-2026](https://github.com/handled57/logseq-dark-2026) monorepo, and lives in `packages/dark-high-contrast/`. Run its scripts from this directory, or from the repository root with `--workspace packages/dark-high-contrast`:
+This theme is one workspace of the [logseq-dark-2026](https://github.com/handled57/logseq-dark-2026) monorepo, and lives in `packages/theme-dark-high-contrast/`. Run its scripts from this directory, or from the repository root with `--workspace packages/theme-dark-high-contrast`:
 
 ```sh
 npm test

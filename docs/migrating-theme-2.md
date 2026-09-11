@@ -27,7 +27,7 @@ Passage validates references and writes the reference and chapter tags
 immediately, and from 0.7.0 it ships the New English Translation, so verse text
 is written with no further setup. Another translation is built locally and
 chosen by name; see
-[Choosing a translation](../packages/passage/README.md#choosing-a-translation).
+[Choosing a translation](../packages/plugin-passage/README.md#choosing-a-translation).
 
 ## Choose the translation instead of a path
 

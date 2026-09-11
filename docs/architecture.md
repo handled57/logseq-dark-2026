@@ -34,7 +34,7 @@ rather than copying this setting automatically.
 
 ## Theme cascade and bullet rail
 
-`packages/dark-high-contrast/theme.css` is the canonical palette and stylesheet.
+`packages/theme-dark-high-contrast/theme.css` is the canonical palette and stylesheet.
 Logseq often resolves a color through `--lx-*`, then `--ls-*`, then `--rx-*`,
 and per-accent rules can outrank a simple theme declaration. Palette changes
 therefore preserve exact High Contrast constants and enough selector specificity
@@ -230,7 +230,7 @@ removes every control along with the attributes.
 
 ## Passage parser and local text
 
-`packages/passage/bible.js` is a classic browser script loaded before
+`packages/plugin-passage/bible.js` is a classic browser script loaded before
 `index.js`. It deliberately avoids module imports or a build step and exposes
 the parser/formatter surface the entry consumes.
 
@@ -254,10 +254,14 @@ for manual testing. Verification rejects missing or unexpected ZIP members.
 ## Shared release infrastructure
 
 `scripts/release-support.mjs` discovers npm workspaces from `packages/*` and
-normalizes their package metadata and output paths. Each package owns the exact
-list in `package.json#release.files`. `build-release.mjs` copies those canonical
-sources into `dist/<package-name>/`, then adds the root `LICENSE` and the single
-vendored SDK from `vendor/logseq/lsplugin.user.js` and creates the ZIP.
+normalizes their package metadata and output paths. A workspace folder is named
+for what the package is — `packages/theme-*` for a theme, `packages/plugin-*`
+for a plugin — and nothing downstream reads that name: archives, package names,
+Logseq ids and release tags all come from the package's own metadata. Each
+package owns the exact list in `package.json#release.files`. `build-release.mjs`
+copies those canonical sources into `dist/<package-name>/`, then adds the root
+`LICENSE` and the single vendored SDK from `vendor/logseq/lsplugin.user.js` and
+creates the ZIP.
 
 `verify-release.mjs` reads the archive directly and proves:
 

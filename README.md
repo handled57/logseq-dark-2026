@@ -8,9 +8,9 @@ dependencies, compilation, remote imports, or runtime network access.
 
 | Marketplace package | npm workspace | Version | Install it when you want |
 | --- | --- | --- | --- |
-| **Dark High Contrast** | [`packages/dark-high-contrast`](packages/dark-high-contrast) | `2.1.0` | A pure-black, accessible theme for Logseq classic/file graphs. |
-| **Passage** | [`packages/passage`](packages/passage) | `0.6.1` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
-| **Anno** | [`packages/anno`](packages/anno) | `0.2.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
+| **Dark High Contrast** | [`packages/theme-dark-high-contrast`](packages/theme-dark-high-contrast) | `2.1.0` | A pure-black, accessible theme for Logseq classic/file graphs. |
+| **Passage** | [`packages/plugin-passage`](packages/plugin-passage) | `0.6.1` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
+| **Anno** | [`packages/plugin-anno`](packages/plugin-anno) | `0.2.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
 
 Install any one package by itself or install them together. None of them calls
 another. Dark High Contrast styles any
@@ -22,12 +22,12 @@ translation it offers — enough to validate and canonicalize a reference agains
 that translation's own canon — and the New English Translation's verse text,
 which it writes by default. Another translation is chosen from the
 **Translation** dropdown once its index has been built locally, as described in
-the [Passage setup guide](packages/passage/README.md#choosing-a-translation).
+the [Passage setup guide](packages/plugin-passage/README.md#choosing-a-translation).
 
 Anno needs nothing beyond an open file graph. It imports a PDF into that graph's
 `assets/` folder under the page title you give it, which is what puts Logseq's
 own highlights for that PDF on a page of the same name; see the
-[Anno guide](packages/anno/README.md#what-the-import-does). Anno's settings can
+[Anno guide](packages/plugin-anno/README.md#what-the-import-does). Anno's settings can
 select separate templates for new annotation pages and new PDF highlight
 blocks.
 
@@ -67,8 +67,8 @@ Target one package with npm's workspace flag. Its build removes only its own
 outputs from `dist/`:
 
 ```sh
-npm test --workspace packages/passage
-npm run check --workspace packages/dark-high-contrast
+npm test --workspace packages/plugin-passage
+npm run check --workspace packages/theme-dark-high-contrast
 ```
 
 Every ZIP has an exact package-owned allowlist plus the root `LICENSE` and
@@ -80,9 +80,9 @@ byte parity with canonical source files.
 | Owner | What belongs there |
 | --- | --- |
 | Root | Workspace coordination, shared release tooling and tests, the license, vendored SDK, CI, and repository-wide documentation. |
-| `packages/dark-high-contrast/` | Theme CSS, property/classification runtime, theme metadata, tests, screenshots, changelog, and package README. |
-| `packages/passage/` | Passage command, reference parser, per-translation book manifests, plugin metadata, tests, changelog, and package README. |
-| `packages/anno/` | Anno's PDF import command, its prompt, plugin metadata, tests, changelog, and package README. |
+| `packages/theme-dark-high-contrast/` | Theme CSS, property/classification runtime, theme metadata, tests, screenshots, changelog, and package README. |
+| `packages/plugin-passage/` | Passage command, reference parser, per-translation book manifests, plugin metadata, tests, changelog, and package README. |
+| `packages/plugin-anno/` | Anno's PDF import command, its prompt, plugin metadata, tests, changelog, and package README. |
 | `docs/contracts/` | Versioned, runtime-neutral agreements that more than one package consumes. |
 | `test/support/` | Reusable test fixtures; package-specific assertions stay in their workspace. |
 | `scripts/` | Workspace discovery and release construction/verification shared by all packages. |

@@ -6,6 +6,10 @@ Use this checklist when adding another independently shipped Logseq package.
 
 - [ ] Create `packages/<workspace>/` with a unique package name, Logseq id,
       title, version, entry path, repository URL, description, and keywords.
+- [ ] Name the folder for what the package is: `packages/theme-<name>/` for a
+      theme, `packages/plugin-<name>/` for a plugin. The folder name is a
+      workspace path only; the published package name and the Logseq id stay
+      whatever the package calls itself.
 - [ ] Decide whether the runtime truly needs `effect: true`; document any
       host-origin constraint and keep `package.json` and `manifest.json` equal.
 - [ ] Keep the shipped runtime self-contained: no production dependencies,
