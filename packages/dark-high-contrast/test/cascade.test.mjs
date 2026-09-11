@@ -319,6 +319,7 @@ test('the moved property table lines up with the box text and takes the box tail
 const railMetrics = [
   '.block-children-container{margin-left:29px;position:relative}',
   '.block-control-wrap{height:24px;margin-top:0;padding-right:6px}',
+  '.block-control,.block-control:hover{color:var(--ls-secondary-text-color);cursor:default;font-size:14px;min-height:22px;min-width:22px;opacity:.4;padding:2px;text-decoration:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}',
   '.bullet-container{align-items:center;border-radius:50%;display:flex;height:16px;justify-content:center;width:16px}',
   '.bullet-container .bullet{border-radius:9999px;font-size:15px;height:6px;opacity:.8;width:6px}',
   '.bullet-container.as-order-list{justify-content:center;padding-left:3px;white-space:nowrap;width:22px}',
@@ -1092,6 +1093,63 @@ test("the popup's section headings are white, bold, and still Logseq's size", ()
   assert.doesNotMatch(heading, /font-size:|padding:|background:/)
 })
 
+/* The boxes the page title is laid out in. Logseq holds the title's row at the
+ * page's own left edge, lays the title's box 6px left of that and pads its text
+ * 8px inside the box, and the title element inside it adds no offset of its own
+ * — the linked form pads its text by the same 8px and lays itself back by it —
+ * so the title's text starts 2px right of the page. The 20px the block tree is
+ * pulled left by is an inline style on `.page-blocks-inner` rather than a
+ * declaration, so it is the one measurement the title's arithmetic rests on
+ * that cannot be pinned from the stylesheet. */
+const titleMetrics = [
+  '.ls-page-title{border-radius:calc(var(--radius) - 4px);margin:0 -6px;padding:5px 8px}',
+  'a.page-title{color:inherit;display:block;margin-left:-8px;padding:0 8px;transition:none}',
+  '.page-title{flex-grow:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+]
+
+const title = { box: 6, pad: 8, treePull: 20 }
+
+test("the page title's text starts in the column the blocks' text stands in", () => {
+  // Where a block's text stands, measured from the page's left edge: the tree
+  // is pulled left of the page, and then every block holds its text right of
+  // the fold arrow's box, the bullet, and the gutter between bullet and text.
+  const column = rail.arrow + rail.bullet + rail.gutter - title.treePull
+
+  // Left where Logseq puts it, the title's text falls short of that column,
+  // which is the gap the theme closes. The rail moves the bullet out of the
+  // column but not the column itself, so closing it is the title's own work.
+  assert.ok(title.pad - title.box < column, 'Logseq no longer starts the title left of the blocks')
+
+  const declared = css.match(/\n:root \{\n  --hc-title-indent: ([\d.]+)px;\n\}/)
+  assert.ok(declared, 'the title has no indent to stand in the text column by')
+  assert.equal(Number.parseFloat(declared[1]), column, 'the title is not indented to the text column')
+
+  // The indent is measured to the text, and the title's own box carries its
+  // text 8px in, so the box is laid that much short of the column. Declared on
+  // the box rather than on the heading inside it, so the background the title
+  // is hovered and edited in travels with the text.
+  const selector = [...rules.keys()].find((key) => plain(key).endsWith('.ls-page-title'))
+  assert.ok(selector, 'no rule moves the page title')
+  assert.equal(value(rule(selector), 'margin-left'), `calc(var(--hc-title-indent) - ${title.pad}px)`)
+
+  // Logseq's own margin on that box is restated, not added to, so the theme has
+  // to out-rank it rather than tie with it.
+  assert.ok(
+    compare(specificity(selector), specificity('.ls-page-title')) > 0,
+    'the title indent does not out-rank Logseq\'s own margin on the same box'
+  )
+
+  // Same scope as the rail: the page's own title in the main editor. The two
+  // layouts that re-measure the tree keep Logseq's alignment, since the column
+  // the title would be indented to is not where their text stands.
+  assert.ok(selector.startsWith('main:not(.ls-fold-button-on-right)'), 'the right-hand fold layout is indented too')
+  assert.match(selector, /#main-content-container:not\(:has\(\.page-blocks-inner \.content\.doc-mode\)\)/)
+
+  // Nothing else moves: the indent is one declaration on one box.
+  const declarations = rule(selector).split(';').filter((part) => part.trim())
+  assert.equal(declarations.length, 1, 'the title rule carries more than the indent')
+})
+
 /* Optional: confirm the pinned literals still describe the installed app. */
 const upstreamPath = process.env.LOGSEQ_CSS
 test(
@@ -1107,7 +1165,7 @@ test(
       )
     }
     for (const declaration of [
-      ...admonitionMetrics, ...spacingMetrics, ...nestingMetrics, ...railMetrics, ...popupMetrics, ...iconMetrics,
+      ...admonitionMetrics, ...spacingMetrics, ...nestingMetrics, ...railMetrics, ...titleMetrics, ...popupMetrics, ...iconMetrics,
       ...tableMetrics
     ]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)

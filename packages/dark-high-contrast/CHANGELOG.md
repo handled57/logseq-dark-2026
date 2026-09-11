@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## 2.10.0 - 2026-09-10
+
+- Align a page's title with the text of the blocks below it. Logseq leaves the
+  title at the page's own left edge while holding every block's text 22px
+  further right — past the fold arrow's box, the bullet and the gutter between
+  the bullet and the text — which the bullet rail made plainer by moving the
+  bullet out of that column but not the column itself. The title is now indented
+  to the column its prose stands in, on its own box, so the background it is
+  hovered and edited in travels with it. The column is `--hc-title-indent`, 24px
+  by default, and can be retuned from `custom.css`. Document mode and the
+  right-hand fold layout re-measure the tree and keep Logseq's own alignment, as
+  do journal headings on the Journals route; the rail, the blocks and the
+  sidebars are unchanged.
+
 ## 2.9.1 - 2026-09-10
 
 - Keep the property-toggle dot hidden until its block is hovered or the control
