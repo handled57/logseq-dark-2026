@@ -811,17 +811,18 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   --hc-rail-indent: var(--hc-rail-offset);
 
   /* What this block's own depth is colored in, what its bullet is drawn in,
-   * and what is drawn around that bullet. A block that carries the hierarchy —
-   * a heading, or a block with children — takes its depth's color for its
-   * bullet; every other block keeps a white one. A bullet is always solid in
-   * that color: the rings around it, not its inside, are what says a block has
-   * children or is under the pointer. `--hc-rail-bullet-edge` is how far the
+   * what fills that bullet, and what is drawn around it. A block that carries
+   * the hierarchy — a heading, or a block with children — takes its depth's
+   * color for its bullet; every other block keeps a white one. The fill is that
+   * same color everywhere but one state: a block standing open over its
+   * children is emptied out to a ring. `--hc-rail-bullet-edge` is how far the
    * rings already reach, which is where the one hover adds starts. The line
    * itself is not here: every stretch of it paints in
    * `--hc-rail-default-color`, whatever the block's depth, so the rail is one
    * color the reader chose. */
   --hc-rail-depth-color: var(--hc-rail-depth-1);
   --hc-rail-bullet-color: var(--vscode-hc-white);
+  --hc-rail-bullet-fill: var(--hc-rail-bullet-color);
   --hc-rail-bullet-edge: var(--hc-rail-bullet-gap);
   --hc-rail-bullet-rings: 0 0 0 var(--hc-rail-bullet-gap) var(--vscode-hc-black);
   --hc-rail-bullet-hover-rings: 0 0 0 0 transparent;
@@ -909,12 +910,13 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
  * empty blocks — are part of the rail, so the suppression rules above are
  * answered here. They still hold everywhere the rail does not reach.
  *
- * A bullet is one size and solid in its own color at every first line, inside
- * Logseq's own halo. Everything else it says it says in the rings the control
- * column hands it: the black gap at rest, the ring a block with children adds,
- * and the ring the pointer adds outside both. The hover band is declared as a
- * zero-width transparent ring when there is no pointer, so the two lists always
- * compose into one valid shadow. */
+ * A bullet is one size at every first line, inside Logseq's own halo, and is
+ * filled in its own color unless its block is standing open over children.
+ * Everything else it says it says in the rings the control column hands it: the
+ * black gap at rest, the ring a block with children adds, and the ring the
+ * pointer adds outside both. The hover band is declared as a zero-width
+ * transparent ring when there is no pointer, so the two lists always compose
+ * into one valid shadow. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container {
   opacity: 1 !important;
@@ -927,18 +929,19 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   width: var(--hc-rail-bullet-dot);
   height: var(--hc-rail-bullet-dot);
   flex: none;
-  background-color: var(--hc-rail-bullet-color);
+  background-color: var(--hc-rail-bullet-fill);
   box-shadow: var(--hc-rail-bullet-rings), var(--hc-rail-bullet-hover-rings);
 }
 
 /* Pointing at a bullet leaves its inside alone. Upstream repaints it in the
  * stock bullet gray — with `!important`, from `.bullet-link-wrap:hover` — which
- * would take a depth's color off the one bullet the reader is looking at. It is
- * answered here, in the block's own color, at a specificity no upstream rule
- * reaches. The halo and the scale upstream adds on hover are untouched. */
+ * would take a depth's color off the one bullet the reader is looking at, and
+ * fill in the one standing open. It is answered here, from the same fill the
+ * bullet carries at rest, at a specificity no upstream rule reaches. The halo
+ * and the scale upstream adds on hover are untouched. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap:hover .bullet-container .bullet {
-  background-color: var(--hc-rail-bullet-color) !important;
+  background-color: var(--hc-rail-bullet-fill) !important;
 }
 
 /* An ordered list's marker is a label inside its bullet. The bullet rides the
@@ -957,7 +960,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   width: var(--hc-rail-bullet-dot);
   height: var(--hc-rail-bullet-dot);
   border-radius: 9999px;
-  background-color: var(--hc-rail-bullet-color);
+  background-color: var(--hc-rail-bullet-fill);
   box-shadow: var(--hc-rail-bullet-rings), var(--hc-rail-bullet-hover-rings);
 }
 
@@ -1068,18 +1071,30 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   --hc-rail-bullet-color: var(--hc-rail-depth-color);
 }
 
-/* A block with something under it is ringed: the bullet stays solid in its own
- * color and takes a ring of that color around it, so a glance down the rail
- * says which rows hold a tree without any of them giving up their fill. Logseq
- * marks such a block with `haschild`, which holds whether the children are
- * showing or folded away, so the bullet does not change under the reader when a
- * block is folded. A leaf keeps the black gap alone. The ring is also how far
- * the bullet now reaches, which is where a hover ring starts. */
+/* A block with something under it is ringed: it takes a ring of its own color
+ * around the bullet, so a glance down the rail says which rows hold a tree.
+ * Logseq marks such a block with `haschild`, which holds whether the children
+ * are showing or folded away. A leaf keeps the black gap alone, and is ringed
+ * only under the pointer. The ring is also how far the bullet now reaches,
+ * which is where a hover ring starts. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap {
   --hc-rail-bullet-edge: calc(var(--hc-rail-bullet-gap) + var(--hc-rail-bullet-ring));
   --hc-rail-bullet-rings: 0 0 0 var(--hc-rail-bullet-gap) var(--vscode-hc-black),
     0 0 0 calc(var(--hc-rail-bullet-gap) + var(--hc-rail-bullet-ring)) var(--hc-rail-bullet-color);
+}
+
+/* A block standing open over its children is emptied out: the ring is all that
+ * is left of it, and the rail reads as a row that is showing what it holds.
+ * Folding it away fills it back in, so a filled ring is a block with something
+ * hidden under it. Logseq marks the folded state on the bullet's own container,
+ * inside the control column the fill is declared on. The inside is painted the
+ * page's black rather than left clear: the rail line runs behind the bullet,
+ * and a clear middle would draw it through the ring. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container
+  > .block-control-wrap:has(.bullet-container:not(.bullet-closed)) {
+  --hc-rail-bullet-fill: var(--vscode-hc-black);
 }
 
 /* The line. Each block paints the stretch of rail its own row is responsible

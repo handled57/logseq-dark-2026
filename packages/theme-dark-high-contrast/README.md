@@ -90,12 +90,13 @@ The line every bullet hangs on is the **Rail color** setting, one color at
 every depth. That defaults to `#5b7e96`, the same `--vscode-hc-border` the
 editor, the left menu and the sidebars are drawn with.
 
-A bullet is always solid in its own color, and says what it has to say in the
-rings around it: a block with children carries one ring, whether they are
-showing or folded away, and a block with none carries no ring at all. Hovering a
-block adds one more ring outside whatever its bullet already carries — a first
-ring for a leaf, a second for a block with children — and never changes what is
-inside it.
+A bullet says what it has to say in the ring around it: a block with children
+carries one, whether they are showing or folded away, and a block with none
+carries no ring at all. A block standing open over its children is emptied out
+to that ring alone; folding it fills the bullet back in, so a filled ring is a
+row holding something you cannot see. Hovering a block adds one more ring
+outside whatever its bullet already carries — a first ring for a leaf, a second
+for a block with children — and never changes what is inside it.
 
 A page's properties are the page's front matter rather than a block of its text,
 so they render with no bullet and no rail segment, and the rail opens at the

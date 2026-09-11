@@ -86,20 +86,28 @@ deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
 pins each literal, its position in the cycle, and the 3:1 a non-text interface
 component owes the canvas.
 
-A bullet is always solid in `--hc-rail-bullet-color`; what it carries around
-it, not its inside, reports the rest. `--hc-rail-bullet-rings` is the shadow
-list a bullet is drawn with — the black gap alone for a leaf, the gap plus a
-ring of the bullet's own color for `[haschild="true"]`, which holds whether the
-children are showing or folded, so folding a block never changes its bullet.
-`--hc-rail-bullet-edge` records how far those rings reach, and the innermost
-hovered block sets `--hc-rail-bullet-hover-rings` to one more ring starting
-there, so a leaf gains its first ring and a parent a second beyond its own; at
-rest that band is a zero-width transparent ring, so the two lists always compose
-into one valid `box-shadow`. All of them are declared on the block's own control
-column. The rest state and the hover state paint the inside from the one color,
-the hover with `!important`, because upstream repaints a hovered bullet's inside
-from `.bullet-link-wrap:hover` with an important declaration of its own; the
-halo and the scale it adds are left alone.
+`--hc-rail-bullet-rings` is the shadow list a bullet is drawn with — the black
+gap alone for a leaf, the gap plus a ring of the bullet's own color for
+`[haschild="true"]`, which holds whether the children are showing or folded, so
+the ring stays put across a fold. `--hc-rail-bullet-edge` records how far those
+rings reach, and the innermost hovered block sets
+`--hc-rail-bullet-hover-rings` to one more ring starting there, so a leaf gains
+its first ring and a parent a second beyond its own; at rest that band is a
+zero-width transparent ring, so the two lists always compose into one valid
+`box-shadow`.
+
+`--hc-rail-bullet-fill` is the inside, `--hc-rail-bullet-color` everywhere but
+one state: a `[haschild="true"]` block whose control column
+`:has(.bullet-container:not(.bullet-closed))` — one standing open over its
+children — takes `--vscode-hc-black` instead and reads as a ring with nothing
+in it, so a filled ring is a row with something hidden under it. The fill is
+the page's black rather than `transparent` because the rail line runs behind
+the bullet and would otherwise be drawn through the middle of the ring. All of
+these are declared on the block's own control column. Both the rest state and
+the hover state paint the inside from that one variable, the hover with
+`!important`, because upstream repaints a hovered bullet's inside from
+`.bullet-link-wrap:hover` with an important declaration of its own; the halo
+and the scale it adds are left alone.
 
 `--hc-rail-default-color` is the line, and the only part of the rail a reader
 configures. theme.css declares it as `--vscode-hc-border`, the structural

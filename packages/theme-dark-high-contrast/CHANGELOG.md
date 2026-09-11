@@ -8,11 +8,12 @@ All notable changes to this project are documented here.
   heading's dot, whatever its block's first line is set in. Where a bullet sits
   still follows that line, so a heading's bullet stays on the middle of it; only
   its bulk is gone, and a heading is marked by the color of its bullet instead.
-- Fill every bullet solid in its own color. A block whose children were showing
-  used to give up its inside and read as an empty ring.
 - Ring the bullet of a block that has children, in that bullet's own color,
-  whether the children are showing or folded away, so the bullet of a block that
-  holds a tree reads the same before and after it is folded.
+  whether the children are showing or folded away. A block with none is no
+  longer ringed at rest.
+- Empty out the bullet of a block standing open over its children, so the ring
+  is all that is left of it, and fill it back in when the block is folded: a
+  filled ring is now a row holding something you cannot see.
 - Replace the hover halo with one more ring, in the bullet's own color, outside
   whatever the bullet already carries: a first ring for ordinary prose, a second
   beyond its own for a block with children.

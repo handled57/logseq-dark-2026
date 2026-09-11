@@ -635,6 +635,7 @@ test('a heading and a block with children take their depth color; ordinary prose
   // Ordinary prose keeps its white bullet — never a hierarchy color.
   const defaults = rule(wrap)
   assert.equal(value(defaults, '--hc-rail-bullet-color'), 'var(--vscode-hc-white)')
+  assert.equal(value(defaults, '--hc-rail-bullet-fill'), 'var(--hc-rail-bullet-color)')
   assert.equal(value(defaults, '--hc-rail-bullet-rings'), `0 0 0 var(--hc-rail-bullet-gap) var(--vscode-hc-black)`)
 
   // A block that carries the hierarchy hands its depth's color to its bullet,
@@ -657,7 +658,7 @@ test('a heading and a block with children take their depth color; ordinary prose
   )
   assert.ok(!/--hc-rail-line-color/.test(css), 'the line still has a color of its own to take from a depth')
   const dot = rule(`${wrap} .bullet-container .bullet`)
-  assert.equal(value(dot, 'background-color'), 'var(--hc-rail-bullet-color)')
+  assert.equal(value(dot, 'background-color'), 'var(--hc-rail-bullet-fill)')
   assert.equal(
     value(dot, 'box-shadow'),
     'var(--hc-rail-bullet-rings), var(--hc-rail-bullet-hover-rings)',
@@ -668,7 +669,7 @@ test('a heading and a block with children take their depth color; ordinary prose
   // which no descendant block sits inside: a child's segment takes the child's
   // depth, never the color of the parent holding it.
   for (const [selector, body] of rules) {
-    if (!/(?:^|;|\n)\s*--hc-rail-(?:depth-color|bullet-color|bullet-edge|bullet-rings|bullet-hover-rings):/.test(body)) continue
+    if (!/(?:^|;|\n)\s*--hc-rail-(?:depth-color|bullet-color|bullet-fill|bullet-edge|bullet-rings|bullet-hover-rings):/.test(body)) continue
     for (const part of splitSelectors(selector)) {
       assert.ok(
         plain(part).endsWith('.block-control-wrap'),
@@ -677,12 +678,12 @@ test('a heading and a block with children take their depth color; ordinary prose
     }
   }
 
-  // Pointing at a bullet leaves its inside alone: the same color it is drawn
+  // Pointing at a bullet leaves its inside alone: the same fill it is drawn
   // with at rest, and `!important` because upstream repaints the inside from
   // `.bullet-link-wrap:hover` with an important declaration of its own.
   assert.equal(
     value(rule(`${wrap}:hover .bullet-container .bullet`), 'background-color'),
-    'var(--hc-rail-bullet-color) !important'
+    'var(--hc-rail-bullet-fill) !important'
   )
   assert.ok(
     compare(specificity(`${wrap}:hover .bullet-container .bullet`), specificity(`${wrap} .bullet-container .bullet`)) > 0,
@@ -697,10 +698,10 @@ test('a heading and a block with children take their depth color; ordinary prose
   )
 })
 
-test('a block with children carries a ring; a leaf carries none', () => {
+test('a block with children carries a ring, and standing open empties it out', () => {
   // Logseq marks a block that has children with `haschild`, and keeps the mark
-  // while they are folded away, so the bullet of a block that holds a tree
-  // reads the same before and after it is folded.
+  // while they are folded away, so a block that holds a tree is ringed either
+  // way.
   const parent = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap`
   assert.equal(
     declaration(rule(parent), '--hc-rail-bullet-rings'),
@@ -709,10 +710,23 @@ test('a block with children carries a ring; a leaf carries none', () => {
     'a block with children is not ringed in its own color'
   )
 
-  // The ring is around the bullet, never instead of it: no state on the rail
-  // gives up the fill, so a bullet is solid at every depth and in every one of
-  // hover, folded and open.
-  assert.ok(!/--hc-rail-bullet-fill/.test(css), 'a bullet still has an inside of its own to give up')
+  // What the ring holds is the one thing folding changes: a block standing open
+  // over its children is emptied out to the page's black, and folding it fills
+  // it back in. Logseq marks the folded state on the bullet's own container,
+  // inside the control column the fill is declared on.
+  const open = `${parent}:has(.bullet-container:not(.bullet-closed))`
+  assert.equal(value(rule(open), '--hc-rail-bullet-fill'), 'var(--vscode-hc-black)')
+  assert.ok(
+    compare(specificity(open), specificity(parent)) > 0,
+    'a block standing open does not out-rank the filled bullet it replaces'
+  )
+  assert.ok(
+    compare(specificity(open), specificity(wrap)) > 0,
+    'a block standing open does not out-rank the defaults it replaces'
+  )
+
+  // Every bullet on the rail is painted from that one variable, so the emptied
+  // state reaches all of them and no rule paints a bullet a color of its own.
   let filled = 0
   for (const [selector, body] of rules) {
     for (const part of splitSelectors(selector)) {
@@ -721,19 +735,25 @@ test('a block with children carries a ring; a leaf carries none', () => {
       filled += 1
       assert.match(
         value(body, 'background-color'),
-        /^var\(--hc-rail-bullet-color\)( !important)?$/,
-        `a bullet on the rail is painted "${value(body, 'background-color')}" rather than its own color`
+        /^var\(--hc-rail-bullet-fill\)( !important)?$/,
+        `a bullet on the rail is painted "${value(body, 'background-color')}" rather than from its own fill`
       )
     }
   }
   assert.ok(filled >= 3, `only ${filled} of the rail's bullets declare what they are filled with`)
 
-  // A folded block is not singled out: Logseq's own `.bullet-closed` is never
-  // named inside the rail, so folding a block leaves its bullet alone.
+  // Folding is read nowhere else: a leaf is never ringed at rest, and the ring
+  // a parent carries is the same whether its children are showing or not.
   assert.deepEqual(
-    [...rules.keys()].filter((selector) => selector.startsWith(scope) && selector.includes('.bullet-closed')),
+    [...rules.keys()].filter(
+      (selector) => selector.startsWith(scope) && selector.includes('.bullet-closed') && !selector.startsWith(parent)
+    ),
     [],
-    'the rail draws a folded bullet differently from the block it belongs to'
+    'the rail reads the folded state somewhere other than the bullet it empties'
+  )
+  assert.ok(
+    !/--hc-rail-bullet-rings:/.test(rule(open)),
+    'standing open changes the rings around the bullet as well as its inside'
   )
 
   // The ring is also how far the bullet reaches, which is where hover starts.
@@ -963,7 +983,7 @@ test('an ordered list keeps its number beside the content and a bullet on the ra
   // sized like every other bullet by the line it hangs beside.
   assert.equal(value(marker, 'width'), 'var(--hc-rail-bullet-size)')
   assert.equal(px(marker, 'padding-left'), 0)
-  assert.match(rule(`${wrap} .bullet-container.typed-list .bullet`), /background-color:\s*var\(--hc-rail-bullet-color\)/)
+  assert.match(rule(`${wrap} .bullet-container.typed-list .bullet`), /background-color:\s*var\(--hc-rail-bullet-fill\)/)
 
   // Logseq drops the gutter for an ordered list because its number is wider
   // than a bullet. The number is no longer there, so the gutter comes back and
