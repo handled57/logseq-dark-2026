@@ -110,9 +110,6 @@ const BRANCHED_RAIL_LAYOUT = 'Branched'
 const RAIL_LAYOUT_ATTR = 'data-hc-rail-layout'
 const RAIL_ENTRY_ATTR = 'data-hc-rail-entry'
 const RAIL_EXIT_ATTR = 'data-hc-rail-exit'
-const RAIL_ENTRY_DISTANCE_PROPERTY = '--hc-rail-entry-distance'
-const RAIL_EXIT_DISTANCE_PROPERTY = '--hc-rail-exit-distance'
-const RAIL_DEPTH_STEP = 29
 
 /* Leading-emoji block icons. A block whose text opens with one emoji has that
  * emoji set in a gutter to the left of the text, the way a passage sets a verse
@@ -155,7 +152,7 @@ const settingsSchema = [
     title: 'Rail layout',
     description:
       'Flat keeps every bullet on one vertical rail. Branched moves child bullets right with ' +
-      'their nesting depth and joins expanded child groups with smooth curved connectors.'
+      'their nesting depth and draws vertical rails only between consecutive blocks at the same depth.'
   },
   {
     key: BLOCK_ICONS_SETTING,
@@ -816,38 +813,14 @@ function applyRailLayout() {
   applyRailPath(value)
 }
 
-/* A gap cannot occupy half a nesting column. When its exact midpoint falls
- * between two columns, use the odd-numbered one; that alternates whether a
- * one-level move leaves its parent row or arrives on its child row and creates
- * the node-centred weave used by the branched rail. */
-function railBridgeDepth(firstDepth, secondDepth) {
-  const midpoint = (firstDepth + secondDepth) / 2
-  const inner = Math.floor(midpoint)
-  if (Number.isInteger(midpoint) || inner % 2 === 1) return inner
-  return inner + 1
-}
-
-/* Branched is one continuous traversal line rather than a parent rail with a
- * second child rail beside it. DOM order is the rendered tree's preorder: a
- * parent, its visible descendants, then its next sibling. Between two rows the
- * vertical stretch occupies the whole-number nesting lane nearest the midpoint
- * of their depths. Each row then joins that incoming lane to its bullet and its
- * bullet to the outgoing lane. A one-level descent can therefore leave from a
- * parent row or arrive on a child row, while a deep return becomes a staircase
- * across adjacent block rows instead of one oversized curve.
- *
- * Collapsed descendants remain in some Logseq renders but have no client
- * rectangle. Skipping those keeps the next visible sibling's return measured
- * from the collapsed parent rather than from a hidden leaf. The lightweight
- * test host has no layout API, so an absent `getClientRects` means rendered. */
+/* Connect only consecutive visible rows at the same depth. Hidden descendants
+ * and embedded trees do not participate; each content root has its own path. */
 function applyRailPath(layout) {
   const blocks = [...doc.querySelectorAll('.ls-block')]
 
   for (const block of blocks) {
     block.removeAttribute(RAIL_ENTRY_ATTR)
     block.removeAttribute(RAIL_EXIT_ATTR)
-    block.style?.removeProperty(RAIL_ENTRY_DISTANCE_PROPERTY)
-    block.style?.removeProperty(RAIL_EXIT_DISTANCE_PROPERTY)
   }
 
   if (layout !== 'branched') return
@@ -855,7 +828,7 @@ function applyRailPath(layout) {
   const paths = new Map()
 
   for (const block of blocks) {
-    if (block.closest?.('.block-content-wrapper')) continue
+    if (block.closest?.('.block-content-wrapper') || block.matches?.('.pre-block')) continue
     if (typeof block.getClientRects === 'function' && block.getClientRects().length === 0) continue
 
     const root = block.closest?.('.content') ?? doc.body
@@ -870,29 +843,11 @@ function applyRailPath(layout) {
   }
 
   for (const path of paths.values()) {
-    const bridgeDepths = path.slice(0, -1).map(({ depth }, index) =>
-      railBridgeDepth(depth, path[index + 1].depth)
-    )
-
     path.forEach(({ block, depth }, index) => {
-      const entryDepth = index === 0 ? depth : bridgeDepths[index - 1]
-      const exitDepth = index === path.length - 1 ? depth : bridgeDepths[index]
-
-      if (entryDepth !== depth) {
-        block.setAttribute(RAIL_ENTRY_ATTR, depth > entryDepth ? 'deeper' : 'shallower')
-        block.style?.setProperty(
-          RAIL_ENTRY_DISTANCE_PROPERTY,
-          `${Math.abs(depth - entryDepth) * RAIL_DEPTH_STEP}px`
-        )
-      }
-
-      if (exitDepth !== depth) {
-        block.setAttribute(RAIL_EXIT_ATTR, exitDepth > depth ? 'deeper' : 'shallower')
-        block.style?.setProperty(
-          RAIL_EXIT_DISTANCE_PROPERTY,
-          `${Math.abs(exitDepth - depth) * RAIL_DEPTH_STEP}px`
-        )
-      }
+      block.setAttribute(RAIL_ENTRY_ATTR, index === 0 ? 'start' :
+        path[index - 1].depth === depth ? 'connected' : 'none')
+      block.setAttribute(RAIL_EXIT_ATTR,
+        path[index + 1]?.depth === depth ? 'connected' : 'none')
     })
   }
 }
@@ -1010,8 +965,6 @@ function teardown() {
   for (const block of doc.querySelectorAll('.ls-block')) {
     block.removeAttribute(RAIL_ENTRY_ATTR)
     block.removeAttribute(RAIL_EXIT_ATTR)
-    block.style?.removeProperty(RAIL_ENTRY_DISTANCE_PROPERTY)
-    block.style?.removeProperty(RAIL_EXIT_DISTANCE_PROPERTY)
   }
 
   collapsedContent.clear()

@@ -463,19 +463,6 @@ const block = `${scope} .ls-block:not(.block-content-wrapper *)`
 const row = `${block} > .block-main-container`
 const wrap = `${row} > .block-control-wrap`
 const branchedScope = `body[data-hc-rail-layout="branched"] ${scope}`
-const branchedEntry =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry] > .block-main-container > .block-control-wrap::before`
-const branchedEntryDeeper =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="deeper"] > .block-main-container > .block-control-wrap::before`
-const branchedEntryShallower =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="shallower"] > .block-main-container > .block-control-wrap::before`
-const branchedExit =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit] > .block-main-container > .block-control-wrap::after`
-const branchedExitDeeper =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="deeper"] > .block-main-container > .block-control-wrap::after`
-const branchedExitShallower =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="shallower"] > .block-main-container > .block-control-wrap::after`
-
 /* The two rows that open the rail: the page's first block, and the block under
  * a page-properties block, which is the first one the reader wrote. */
 const railStart = `${block}:not(.ls-block *):not(.ls-block ~ .ls-block) > .block-main-container > .block-control-wrap::before, ${block}.pre-block:not(.ls-block *):not(.ls-block ~ .ls-block) ~ .ls-block:not(.block-content-wrapper *):not(.ls-block *):not(.ls-block ~ .ls-block ~ .ls-block) > .block-main-container > .block-control-wrap::before`
@@ -598,82 +585,28 @@ test('branched layout keeps Logseq nesting while Flat remains the default geomet
   assert.equal(value(nested, '--hc-rail-indent'), 'var(--hc-rail-offset) !important')
   assert.equal(px(rule('#main-content-container > .cp__sidebar-main-content[data-is-full-width="true"]'), '--hc-rail-offset'), 24)
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?--hc-rail-offset: 48px;/)
-  const step = css.match(/--hc-rail-branch-step:\s*([\d.]+)px;/)
-  assert.ok(step, 'branched layout declares no horizontal step')
-  assert.equal(Number.parseFloat(step[1]), rail.indent)
 })
 
-test('branched rows curve independently into and out of each bullet without spacer rows', () => {
-  const entry = rule(branchedEntry)
-  const entryDeeper = rule(branchedEntryDeeper)
-  const entryShallower = rule(branchedEntryShallower)
-  const exit = rule(branchedExit)
-  const exitDeeper = rule(branchedExitDeeper)
-  const exitShallower = rule(branchedExitShallower)
-  const branchedLine = rule(
-    `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::before, ` +
-    `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::after`
+test('branched rails hide both segments at depth changes and retain the opening cap', () => {
+  const controls = `${branchedScope} .ls-block:not(.block-content-wrapper *)`
+  const before = ' > .block-main-container > .block-control-wrap::before'
+  const after = ' > .block-main-container > .block-control-wrap::after'
+  const breaks = rule(
+    controls + '[data-hc-rail-entry="none"]' + before + ', ' +
+    controls + '[data-hc-rail-exit="none"]' + after
   )
-
-  // Every straight stretch and both elbows share one width without moving the
-  // center inherited from Flat's original one-pixel rail.
-  assert.equal(value(branchedLine, 'left'), 'calc(30.5px - var(--hc-rail-branch-width) / 2)')
-  assert.equal(value(branchedLine, 'width'), 'var(--hc-rail-branch-width)')
-
-  // Each turn consumes one of the two row segments already present in Flat, so
-  // changing depth adds no child-group padding or blank connector row.
-  assert.equal(value(entry, 'top'), '-10px')
-  assert.equal(
-    value(entry, 'height'),
-    'calc(var(--hc-rail-bullet-y) + 10px + var(--hc-rail-branch-width) / 2)'
-  )
-  assert.equal(value(entry, 'box-sizing'), 'border-box')
-  assert.equal(value(entry, 'background-color'), 'transparent')
-  assert.equal(value(exit, 'box-sizing'), 'border-box')
-  assert.equal(value(exit, 'background-color'), 'transparent')
+  assert.equal(value(breaks, 'display'), 'none !important')
+  assert.equal(value(rule(controls + '[data-hc-rail-entry="start"]' + before), 'display'), 'block !important')
+  const lines = rule(controls + before + ', ' + controls + after)
+  assert.equal(value(lines, 'width'), 'var(--hc-rail-branch-width)')
+  assert.equal(value(lines, 'left'), 'calc(30.5px - var(--hc-rail-branch-width) / 2)')
   assert.equal(value(rule('.block-children'), 'padding-top'), 'calc(var(--hc-block-gap) + 2px)')
-
-  // An incoming arm curves into the bullet from either side.
-  assert.equal(
-    value(entryDeeper, 'left'),
-    'calc(30.5px - var(--hc-rail-entry-distance) - var(--hc-rail-branch-width) / 2)'
-  )
-  assert.equal(value(entryDeeper, 'width'), 'calc(var(--hc-rail-entry-distance) + var(--hc-rail-branch-width) / 2)')
-  assert.equal(value(entryDeeper, 'border-left'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(entryDeeper, 'border-bottom'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(entryDeeper, 'border-bottom-left-radius'), 'var(--hc-rail-branch-radius)')
-  assert.equal(value(entryShallower, 'left'), '30.5px')
-  assert.equal(value(entryShallower, 'width'), 'calc(var(--hc-rail-entry-distance) + var(--hc-rail-branch-width) / 2)')
-  assert.equal(value(entryShallower, 'border-right'), value(entryDeeper, 'border-left'))
-  assert.equal(value(entryShallower, 'border-bottom'), value(entryDeeper, 'border-bottom'))
-  assert.equal(value(entryShallower, 'border-bottom-right-radius'), value(entryDeeper, 'border-bottom-left-radius'))
-
-  // The outgoing half mirrors that geometry vertically and can coexist with
-  // the incoming half to draw `- * -` through one node.
-  assert.equal(value(exitDeeper, 'left'), '30.5px')
-  assert.equal(value(exitDeeper, 'width'), 'calc(var(--hc-rail-exit-distance) + var(--hc-rail-branch-width) / 2)')
-  assert.equal(value(exitDeeper, 'border-top'), value(entryDeeper, 'border-bottom'))
-  assert.equal(value(exitDeeper, 'border-right'), value(entryDeeper, 'border-left'))
-  assert.equal(value(exitDeeper, 'border-top-right-radius'), value(entryDeeper, 'border-bottom-left-radius'))
-  assert.equal(
-    value(exitShallower, 'left'),
-    'calc(30.5px - var(--hc-rail-exit-distance) - var(--hc-rail-branch-width) / 2)'
-  )
-  assert.equal(value(exitShallower, 'width'), value(exitDeeper, 'width'))
-  assert.equal(value(exitShallower, 'border-left'), value(exitDeeper, 'border-right'))
-  assert.equal(value(exitShallower, 'border-top'), value(exitDeeper, 'border-top'))
-  assert.equal(value(exitShallower, 'border-top-left-radius'), value(exitDeeper, 'border-top-right-radius'))
-  assert.match(css, /--hc-rail-branch-width:\s*2px;/)
-  assert.doesNotMatch(css, /--hc-rail-branch-height:/)
-})
-
-test('branched turns are row-owned and never paint or resize a child group', () => {
-  const branched = [...rules.keys()].filter((selector) => selector.startsWith(branchedScope))
-  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-entry="deeper"]')))
-  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-entry="shallower"]')))
-  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-exit="deeper"]')))
-  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-exit="shallower"]')))
-  assert.ok(branched.every((selector) => !/\.block-children(?:::before|::after|\s*>)/.test(selector)))
+  const branched = [...rules].filter(([selector]) => selector.startsWith(branchedScope))
+  for (const [selector, declarations] of branched) {
+    assert.doesNotMatch(declarations, /border-(?:left|right|top|bottom)|radius/)
+    assert.doesNotMatch(selector, /\.block-children(?:::before|::after|\s*>)/)
+  }
+  assert.doesNotMatch(css, /--hc-rail-(?:entry-distance|exit-distance|branch-radius)/)
 })
 
 /* The rail's hierarchy colors, in the ROYGBIV order it steps through, and the

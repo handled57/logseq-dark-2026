@@ -11,7 +11,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - VS Code-inspired semantic colors for links, references, properties, tasks, and code.
 - Compact workbench treatment for the header, sidebars, command palette, menus, dialogs, and settings.
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
-- Every block in the main editor hangs its bullet on a rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at the size of that line. **Flat** keeps one vertical rail; **Branched** follows the outline depth with smooth turns into and out of expanded child groups. The content column keeps its usual nesting in both layouts.
+- Every block in the main editor hangs its bullet on a rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at the size of that line. **Flat** keeps one vertical rail; **Branched** keeps bullets at their outline depth and joins consecutive same-depth blocks with vertical rails. The content column keeps its usual nesting in both layouts.
 - The rail's line is one color the whole way down the page, the one the **Rail color** setting names. The bullets hanging on it carry the hierarchy: a heading or a block with children takes the color of its own depth — magenta at the top level, then orange, brown, amber, teal, blue, indigo and violet — and ordinary leaf prose keeps a white bullet.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Block headings are set 20% below the sizes Logseq gives them, so a heading reads as the head of its outline rather than dominating the notes under it. Every level keeps Logseq's proportions, and page titles are unchanged.
@@ -29,34 +29,26 @@ Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
 
 - **Flat** is the default. It moves every bullet onto the same vertical line,
   preserving the theme's original rail.
-- **Branched** leaves one 29px horizontal step between nesting levels. It draws
-  one continuous 2px line through the visible block order. The vertical stretch
-  between two rows takes the nesting lane nearest their midpoint, and each row
-  curves from that incoming lane through its bullet toward the outgoing lane.
-  A block can therefore carry a short arm on the left, the right, or both. A
-  multi-level return becomes a readable staircase across adjacent block rows
-  instead of one oversized curve. It does not leave a second parent rail beside
-  the children or insert blank connector rows, and collapsed descendants add no
-  turn.
+- **Branched** leaves one 29px horizontal step between nesting levels. A 2px
+  vertical rail connects only consecutive visible blocks at the same depth.
+  Every depth change leaves a gap, with no curves or horizontal connectors.
+  The first visible block has a short opening rail above it; the final block
+  has no trailing rail. Collapsed descendants are skipped and block spacing
+  stays unchanged.
 
-```text
+```markdown
 |
-*         Block A
+*        Block A
+
+   *       Block A.1
+   |
+   *       Block A.2
+
+      *       Block A.2.1
+
+*        Block B
 |
-*-        Block B
-  |
-  *         Block B.1
-  |
-  - * -       Block 8.1.1
-      |
-      *         Block 8.1.1
-      |
-  - * -     Block B.2
-  |
-* -       Block C
-|
-*         Block D
-|
+*        Block C
 ```
 
 Changing the setting repaints the current page immediately. Rail color,

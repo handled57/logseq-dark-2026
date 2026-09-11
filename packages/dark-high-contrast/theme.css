@@ -654,8 +654,6 @@ hr {
 }
 
 :root {
-  --hc-rail-branch-step: 29px;
-  --hc-rail-branch-radius: 16px;
   --hc-rail-branch-width: 2px;
 }
 
@@ -1051,10 +1049,7 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   --hc-rail-indent: var(--hc-rail-offset) !important;
 }
 
-/* A branched rail is one continuous 2px stroke. The flat fallback remains the
- * original 1px line, while every ordinary vertical segment in Branched uses
- * the same width as its elbows. Keeping the shared 30.5px center fixed avoids
- * shifting the rail when its width changes. */
+/* Branched vertical segments share a 2px width on the original rail axis. */
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::before,
@@ -1128,74 +1123,24 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   bottom: calc(-1 * var(--hc-block-gap));
 }
 
-/* Branched follows the visible tree in reading order as one continuous line.
- * `index.js` chooses the nesting lane used in each gap between rows, then marks
- * a row when either that incoming lane or its outgoing lane differs from the
- * bullet's own depth. The two halves are independent: `::before` can curve
- * from an incoming lane into the bullet, and `::after` can curve away from the
- * bullet into the outgoing lane. A node can therefore carry a horizontal arm
- * on either side, or both, while the vertical stretches remain unbroken and no
- * connector-only row or child-group padding is added. */
+/* Break both halves at a depth change; only consecutive same-depth blocks
+ * share a vertical segment. The first visible block retains the opening cap. */
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry]
-  > .block-main-container > .block-control-wrap::before {
-  top: -10px;
-  height: calc(var(--hc-rail-bullet-y) + 10px + var(--hc-rail-branch-width) / 2);
-  box-sizing: border-box;
-  background-color: transparent;
-}
-
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="none"]
+  > .block-main-container > .block-control-wrap::before,
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="deeper"]
-  > .block-main-container > .block-control-wrap::before {
-  left: calc(30.5px - var(--hc-rail-entry-distance) - var(--hc-rail-branch-width) / 2);
-  width: calc(var(--hc-rail-entry-distance) + var(--hc-rail-branch-width) / 2);
-  border-left: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-bottom: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-bottom-left-radius: var(--hc-rail-branch-radius);
-}
-
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="shallower"]
-  > .block-main-container > .block-control-wrap::before {
-  left: 30.5px;
-  width: calc(var(--hc-rail-entry-distance) + var(--hc-rail-branch-width) / 2);
-  border-right: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-bottom: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-bottom-right-radius: var(--hc-rail-branch-radius);
-}
-
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit]
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="none"]
   > .block-main-container > .block-control-wrap::after {
-  box-sizing: border-box;
-  background-color: transparent;
+  display: none !important;
 }
 
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="deeper"]
-  > .block-main-container > .block-control-wrap::after {
-  left: 30.5px;
-  width: calc(var(--hc-rail-exit-distance) + var(--hc-rail-branch-width) / 2);
-  border-top: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-right: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-top-right-radius: var(--hc-rail-branch-radius);
-}
-
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="shallower"]
-  > .block-main-container > .block-control-wrap::after {
-  left: calc(30.5px - var(--hc-rail-exit-distance) - var(--hc-rail-branch-width) / 2);
-  width: calc(var(--hc-rail-exit-distance) + var(--hc-rail-branch-width) / 2);
-  border-left: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-top: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-top-left-radius: var(--hc-rail-branch-radius);
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="start"]
+  > .block-main-container > .block-control-wrap::before {
+  display: block !important;
 }
 
 /* A page's properties are its front matter rather than a block of its text, so

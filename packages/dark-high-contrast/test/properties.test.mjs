@@ -680,86 +680,62 @@ test('choosing Branched updates the host layout marker on repaint', async () => 
   assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'flat')
 })
 
-test('Branched routes the traversal rail through each block and its midpoint gap lanes', async () => {
+test('Branched connects consecutive same-depth rows and breaks at every depth change', async () => {
   const fixture = railTree()
   const a = fixture.appendBlock(fixture.content)
+  const children = fixture.childrenOf(a)
+  const a1 = fixture.appendBlock(children)
+  const a2 = fixture.appendBlock(children)
+  const a21 = fixture.appendBlock(fixture.childrenOf(a2))
   const b = fixture.appendBlock(fixture.content)
-  const bChildren = fixture.childrenOf(b)
-  const b1 = fixture.appendBlock(bChildren)
-  const b1Children = fixture.childrenOf(b1)
-  const b11 = fixture.appendBlock(b1Children)
-  const b11Children = fixture.childrenOf(b11)
-  const b111 = fixture.appendBlock(b11Children)
-  const b12 = fixture.appendBlock(b1Children)
   const c = fixture.appendBlock(fixture.content)
-  const d = fixture.appendBlock(fixture.content)
+  const blocks = [a, a1, a2, a21, b, c]
   const context = load({ railLayout: 'Branched' }, [], {}, fixture.host)
   await Promise.resolve()
+  const entry = () => blocks.map(block => block.getAttribute('data-hc-rail-entry'))
+  const exit = () => blocks.map(block => block.getAttribute('data-hc-rail-exit'))
+  assert.deepEqual(entry(), ['start', 'none', 'connected', 'none', 'none', 'connected'])
+  assert.deepEqual(exit(), ['none', 'connected', 'none', 'none', 'connected', 'none'])
 
-  const blocks = [a, b, b1, b11, b111, b12, c, d]
-  const entry = (block) => block.getAttribute('data-hc-rail-entry')
-  const exit = (block) => block.getAttribute('data-hc-rail-exit')
-  const entryDistance = (block) => block.style.getPropertyValue('--hc-rail-entry-distance')
-  const exitDistance = (block) => block.style.getPropertyValue('--hc-rail-exit-distance')
-
-  assert.deepEqual(
-    blocks.map(entry),
-    [null, null, null, 'deeper', null, 'shallower', 'shallower', null]
-  )
-  assert.deepEqual(
-    blocks.map(exit),
-    [null, 'deeper', null, 'deeper', null, 'shallower', null, null]
-  )
-  assert.deepEqual(
-    blocks.map(entryDistance),
-    ['', '', '', '29px', '', '29px', '29px', '']
-  )
-  assert.deepEqual(
-    blocks.map(exitDistance),
-    ['', '29px', '', '29px', '', '29px', '', '']
-  )
+  // Collapsing A.2 removes its hidden child's segments on repaint.
+  a21.getClientRects = () => []
+  context.paint()
+  assert.deepEqual(entry(), ['start', 'none', 'connected', null, 'none', 'connected'])
+  assert.deepEqual(exit(), ['none', 'connected', 'none', null, 'connected', 'none'])
 
   context.logseq.settings.railLayout = 'Flat'
   context.paint()
-  assert.deepEqual(blocks.map(entry), Array(8).fill(null))
-  assert.deepEqual(blocks.map(exit), Array(8).fill(null))
-  assert.deepEqual(blocks.map(entryDistance), Array(8).fill(''))
-  assert.deepEqual(blocks.map(exitDistance), Array(8).fill(''))
+  assert.deepEqual(entry(), Array(6).fill(null))
+  assert.deepEqual(exit(), Array(6).fill(null))
+  context.logseq.settings.railLayout = 'Branched'
+  context.paint()
+  for (const handler of context.logseq.unloads) await handler()
+  assert.deepEqual(entry(), Array(6).fill(null))
+  assert.deepEqual(exit(), Array(6).fill(null))
 })
 
-test('Branched splits deep returns across both rows and skips collapsed descendants', async () => {
+test('Branched ignores front matter and embedded or hidden blocks in each content root', async () => {
   const fixture = railTree()
+  const front = fixture.appendBlock(fixture.content)
+  front.classList.add('pre-block')
   const a = fixture.appendBlock(fixture.content)
-  const aChildren = fixture.childrenOf(a)
-  const a1 = fixture.appendBlock(aChildren)
-  const a1Children = fixture.childrenOf(a1)
-  const a11 = fixture.appendBlock(a1Children)
-  const a11Children = fixture.childrenOf(a11)
-  const a111 = fixture.appendBlock(a11Children)
+  const hidden = fixture.appendBlock(fixture.childrenOf(a), { visible: false })
+  const embed = fixture.appendBlock(a.querySelector('.block-content-wrapper'))
   const b = fixture.appendBlock(fixture.content)
-  const hiddenChildren = fixture.childrenOf(b)
-  const hidden = fixture.appendBlock(hiddenChildren, { visible: false })
-  const c = fixture.appendBlock(fixture.content)
-  const context = load({ railLayout: 'Branched' }, [], {}, fixture.host)
+  const other = fixture.host.appendChild(node('div', { classes: ['content'] }))
+  const lone = fixture.appendBlock(other)
+  load({ railLayout: 'Branched' }, [], {}, fixture.host)
   await Promise.resolve()
-
-  assert.equal(a.getAttribute('data-hc-rail-exit'), 'deeper')
-  assert.equal(a1.getAttribute('data-hc-rail-exit'), null)
-  assert.equal(a11.getAttribute('data-hc-rail-entry'), 'deeper')
-  assert.equal(a11.getAttribute('data-hc-rail-exit'), 'deeper')
-  assert.equal(a111.getAttribute('data-hc-rail-exit'), 'shallower')
-  assert.equal(a111.style.getPropertyValue('--hc-rail-exit-distance'), '58px')
-  assert.equal(b.getAttribute('data-hc-rail-entry'), 'shallower')
-  assert.equal(b.style.getPropertyValue('--hc-rail-entry-distance'), '29px')
-  assert.equal(hidden.getAttribute('data-hc-rail-entry'), null)
-  assert.equal(hidden.getAttribute('data-hc-rail-exit'), null)
-  assert.equal(c.getAttribute('data-hc-rail-entry'), null)
-
-  for (const handler of context.logseq.unloads) await handler()
-  assert.equal(a11.getAttribute('data-hc-rail-entry'), null)
-  assert.equal(a11.getAttribute('data-hc-rail-exit'), null)
-  assert.equal(a11.style.getPropertyValue('--hc-rail-entry-distance'), '')
-  assert.equal(a11.style.getPropertyValue('--hc-rail-exit-distance'), '')
+  assert.equal(a.getAttribute('data-hc-rail-entry'), 'start')
+  assert.equal(a.getAttribute('data-hc-rail-exit'), 'connected')
+  assert.equal(b.getAttribute('data-hc-rail-entry'), 'connected')
+  assert.equal(b.getAttribute('data-hc-rail-exit'), 'none')
+  assert.equal(lone.getAttribute('data-hc-rail-entry'), 'start')
+  assert.equal(lone.getAttribute('data-hc-rail-exit'), 'none')
+  for (const block of [front, hidden, embed]) {
+    assert.equal(block.getAttribute('data-hc-rail-entry'), null)
+    assert.equal(block.getAttribute('data-hc-rail-exit'), null)
+  }
 })
 
 test('an unknown rail layout falls back to Flat and unloading removes the marker', async () => {
