@@ -71,23 +71,27 @@ qualified by the body attribute, so changing settings switches the current
 page without reinstalling or reloading the theme. Branched is one traversal
 line through the visible block order rather than a parent rail left standing
 beside a child rail. On each paint, `index.js` walks rendered `.ls-block`
-elements in DOM preorder, skips embedded and non-rendered blocks, compares each
-depth with the visible depth before it, and marks only a change as
-`data-hc-rail-turn="deeper|shallower"`. It writes the absolute depth delta in
-pixels to `--hc-rail-turn-distance`; one level is the pinned 29px Logseq
-indent. A collapsed subtree has no client rectangles, so it cannot affect the
-next visible block's turn.
+elements in DOM preorder and skips embedded and non-rendered blocks. For every
+pair of consecutive visible rows, it places the intervening vertical segment
+on the whole-number nesting lane nearest the midpoint of their depths. A
+half-depth tie takes the odd-numbered lane, which alternates one-level moves
+between departing from the parent row and arriving on the child row. A
+collapsed subtree has no client rectangles, so it cannot affect the next
+visible bridge.
 
-CSS replaces that marked row's incoming `::before` segment with a border-drawn
-curve. A deeper row keeps the vertical part on its preceding parent's column
-and rounds a bottom-left corner into its own bullet. A shallower row is the
-horizontal reflection: its incoming line remains on the preceding descendant's
-column and rounds a bottom-right corner into the ancestor/sibling bullet. A
-multi-level return uses the whole distance in one curve. The turn occupies the
-same incoming row-and-gap segment the Flat rail already paints, so it neither
-adds blank connector rows nor changes `.block-children` padding. Every straight
-segment and turn uses the same 2px `--hc-rail-branch-width`, centered on the 1px
-Flat rail's original axis.
+Each block records its incoming and outgoing changes separately as
+`data-hc-rail-entry="deeper|shallower"` and
+`data-hc-rail-exit="deeper|shallower"`; the corresponding custom properties
+hold their absolute distances in pinned 29px Logseq depth steps. CSS replaces
+only the marked half of the row's straight line with a border-drawn curve:
+`::before` joins the incoming lane to the bullet and `::after` joins the bullet
+to the outgoing lane. Both can be marked on one block, yielding a horizontal
+arm on each side. A multi-level return is divided around the midpoint gap, so
+it reads as a staircase across adjacent block rows rather than one oversized
+curve. These turns occupy the same row-and-gap segments Flat already paints;
+they add no blank rows and do not change `.block-children` padding. Every
+straight segment and turn uses the same 2px `--hc-rail-branch-width`, centered
+on the 1px Flat rail's original axis.
 
 Block headings are not Logseq's size. `--hc-heading-scale` takes every level to
 one fraction of the multiple Logseq sets it in, and each heading rule scales

@@ -30,27 +30,32 @@ Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
 - **Flat** is the default. It moves every bullet onto the same vertical line,
   preserving the theme's original rail.
 - **Branched** leaves one 29px horizontal step between nesting levels. It draws
-  one continuous 2px line through the visible block order. The line remains in
-  the preceding block's column until it curves into the next bullet: right into
-  a first child, or left into the next ancestor or sibling. A multi-level return
-  is one wider curve. It does not leave a second parent rail beside the children
-  or insert blank connector rows, and collapsed descendants add no turn.
+  one continuous 2px line through the visible block order. The vertical stretch
+  between two rows takes the nesting lane nearest their midpoint, and each row
+  curves from that incoming lane through its bullet toward the outgoing lane.
+  A block can therefore carry a short arm on the left, the right, or both. A
+  multi-level return becomes a readable staircase across adjacent block rows
+  instead of one oversized curve. It does not leave a second parent rail beside
+  the children or insert blank connector rows, and collapsed descendants add no
+  turn.
 
 ```text
 |
-*    Block A
+*         Block A
 |
-*    Block B
+*-        Block B
+  |
+  *         Block B.1
+  |
+  - * -       Block 8.1.1
+      |
+      *         Block 8.1.1
+      |
+  - * -     Block B.2
+  |
+* -       Block C
 |
-- *    Block B.1
-  |
-  *    Block B.2
-  |
-* -  Block C
-|
-- *    Block C.1
-  |
-*-   Block D
+*         Block D
 |
 ```
 

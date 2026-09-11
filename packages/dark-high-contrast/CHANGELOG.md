@@ -7,8 +7,9 @@ All notable changes to this project are documented here.
 - Add a **Rail layout** setting. **Flat** remains the default and preserves the
   single vertical rail. **Branched** keeps each child bullet at its nesting
   depth and uses one consistent 2px traversal line across straight rails and
-  rounded turns. The incoming line curves right into a first child or left into
-  the next ancestor/sibling bullet; multi-level returns use one wider curve.
+  rounded turns. Each row joins a midpoint incoming rail through its bullet to
+  a midpoint outgoing rail, so a block can have a short arm on either side or
+  both; multi-level returns form a staircase across adjacent block rows.
   It leaves no parallel parent rail beside children, adds no blank connector
   rows, and skips collapsed descendants.
   Both layouts retain the rail color, depth-colored bullets,

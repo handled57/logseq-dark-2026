@@ -463,12 +463,18 @@ const block = `${scope} .ls-block:not(.block-content-wrapper *)`
 const row = `${block} > .block-main-container`
 const wrap = `${row} > .block-control-wrap`
 const branchedScope = `body[data-hc-rail-layout="branched"] ${scope}`
-const branchedTurn =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-turn] > .block-main-container > .block-control-wrap::before`
-const branchedDeeper =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-turn="deeper"] > .block-main-container > .block-control-wrap::before`
-const branchedShallower =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-turn="shallower"] > .block-main-container > .block-control-wrap::before`
+const branchedEntry =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry] > .block-main-container > .block-control-wrap::before`
+const branchedEntryDeeper =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="deeper"] > .block-main-container > .block-control-wrap::before`
+const branchedEntryShallower =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="shallower"] > .block-main-container > .block-control-wrap::before`
+const branchedExit =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit] > .block-main-container > .block-control-wrap::after`
+const branchedExitDeeper =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="deeper"] > .block-main-container > .block-control-wrap::after`
+const branchedExitShallower =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="shallower"] > .block-main-container > .block-control-wrap::after`
 
 /* The two rows that open the rail: the page's first block, and the block under
  * a page-properties block, which is the first one the reader wrote. */
@@ -597,10 +603,13 @@ test('branched layout keeps Logseq nesting while Flat remains the default geomet
   assert.equal(Number.parseFloat(step[1]), rail.indent)
 })
 
-test('branched depth changes use matching incoming turns without spacer rows', () => {
-  const turn = rule(branchedTurn)
-  const deeper = rule(branchedDeeper)
-  const shallower = rule(branchedShallower)
+test('branched rows curve independently into and out of each bullet without spacer rows', () => {
+  const entry = rule(branchedEntry)
+  const entryDeeper = rule(branchedEntryDeeper)
+  const entryShallower = rule(branchedEntryShallower)
+  const exit = rule(branchedExit)
+  const exitDeeper = rule(branchedExitDeeper)
+  const exitShallower = rule(branchedExitShallower)
   const branchedLine = rule(
     `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::before, ` +
     `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::after`
@@ -611,42 +620,59 @@ test('branched depth changes use matching incoming turns without spacer rows', (
   assert.equal(value(branchedLine, 'left'), 'calc(30.5px - var(--hc-rail-branch-width) / 2)')
   assert.equal(value(branchedLine, 'width'), 'var(--hc-rail-branch-width)')
 
-  // A turn consumes exactly the incoming segment that already bridges the row
-  // gap, so changing depth adds no child-group padding or blank connector row.
-  assert.equal(value(turn, 'top'), '-10px')
+  // Each turn consumes one of the two row segments already present in Flat, so
+  // changing depth adds no child-group padding or blank connector row.
+  assert.equal(value(entry, 'top'), '-10px')
   assert.equal(
-    value(turn, 'height'),
+    value(entry, 'height'),
     'calc(var(--hc-rail-bullet-y) + 10px + var(--hc-rail-branch-width) / 2)'
   )
-  assert.equal(value(turn, 'box-sizing'), 'border-box')
-  assert.equal(value(turn, 'background-color'), 'transparent')
+  assert.equal(value(entry, 'box-sizing'), 'border-box')
+  assert.equal(value(entry, 'background-color'), 'transparent')
+  assert.equal(value(exit, 'box-sizing'), 'border-box')
+  assert.equal(value(exit, 'background-color'), 'transparent')
   assert.equal(value(rule('.block-children'), 'padding-top'), 'calc(var(--hc-block-gap) + 2px)')
 
-  // Into a child, the line begins one measured distance left of that child's
-  // rail and rounds into its bullet. A return is the horizontal reflection:
-  // it begins at the current bullet and reaches the preceding deeper rail.
+  // An incoming arm curves into the bullet from either side.
   assert.equal(
-    value(deeper, 'left'),
-    'calc(30.5px - var(--hc-rail-turn-distance) - var(--hc-rail-branch-width) / 2)'
+    value(entryDeeper, 'left'),
+    'calc(30.5px - var(--hc-rail-entry-distance) - var(--hc-rail-branch-width) / 2)'
   )
-  assert.equal(value(deeper, 'width'), 'calc(var(--hc-rail-turn-distance) + var(--hc-rail-branch-width) / 2)')
-  assert.equal(value(deeper, 'border-left'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(deeper, 'border-bottom'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(deeper, 'border-bottom-left-radius'), 'var(--hc-rail-branch-radius)')
+  assert.equal(value(entryDeeper, 'width'), 'calc(var(--hc-rail-entry-distance) + var(--hc-rail-branch-width) / 2)')
+  assert.equal(value(entryDeeper, 'border-left'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(entryDeeper, 'border-bottom'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(entryDeeper, 'border-bottom-left-radius'), 'var(--hc-rail-branch-radius)')
+  assert.equal(value(entryShallower, 'left'), '30.5px')
+  assert.equal(value(entryShallower, 'width'), 'calc(var(--hc-rail-entry-distance) + var(--hc-rail-branch-width) / 2)')
+  assert.equal(value(entryShallower, 'border-right'), value(entryDeeper, 'border-left'))
+  assert.equal(value(entryShallower, 'border-bottom'), value(entryDeeper, 'border-bottom'))
+  assert.equal(value(entryShallower, 'border-bottom-right-radius'), value(entryDeeper, 'border-bottom-left-radius'))
 
-  assert.equal(value(shallower, 'left'), '30.5px')
-  assert.equal(value(shallower, 'width'), value(deeper, 'width'))
-  assert.equal(value(shallower, 'border-right'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(shallower, 'border-bottom'), value(deeper, 'border-bottom'))
-  assert.equal(value(shallower, 'border-bottom-right-radius'), value(deeper, 'border-bottom-left-radius'))
+  // The outgoing half mirrors that geometry vertically and can coexist with
+  // the incoming half to draw `- * -` through one node.
+  assert.equal(value(exitDeeper, 'left'), '30.5px')
+  assert.equal(value(exitDeeper, 'width'), 'calc(var(--hc-rail-exit-distance) + var(--hc-rail-branch-width) / 2)')
+  assert.equal(value(exitDeeper, 'border-top'), value(entryDeeper, 'border-bottom'))
+  assert.equal(value(exitDeeper, 'border-right'), value(entryDeeper, 'border-left'))
+  assert.equal(value(exitDeeper, 'border-top-right-radius'), value(entryDeeper, 'border-bottom-left-radius'))
+  assert.equal(
+    value(exitShallower, 'left'),
+    'calc(30.5px - var(--hc-rail-exit-distance) - var(--hc-rail-branch-width) / 2)'
+  )
+  assert.equal(value(exitShallower, 'width'), value(exitDeeper, 'width'))
+  assert.equal(value(exitShallower, 'border-left'), value(exitDeeper, 'border-right'))
+  assert.equal(value(exitShallower, 'border-top'), value(exitDeeper, 'border-top'))
+  assert.equal(value(exitShallower, 'border-top-left-radius'), value(exitDeeper, 'border-top-right-radius'))
   assert.match(css, /--hc-rail-branch-width:\s*2px;/)
   assert.doesNotMatch(css, /--hc-rail-branch-height:/)
 })
 
 test('branched turns are row-owned and never paint or resize a child group', () => {
   const branched = [...rules.keys()].filter((selector) => selector.startsWith(branchedScope))
-  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-turn="deeper"]')))
-  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-turn="shallower"]')))
+  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-entry="deeper"]')))
+  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-entry="shallower"]')))
+  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-exit="deeper"]')))
+  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-exit="shallower"]')))
   assert.ok(branched.every((selector) => !/\.block-children(?:::before|::after|\s*>)/.test(selector)))
 })
 
