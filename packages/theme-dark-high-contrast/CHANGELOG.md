@@ -247,7 +247,7 @@ All notable changes to this project are documented here.
 
 - **Breaking.** Inserting a passage is no longer part of this theme. The
   Passage command, its reference parser, its Bible manifest and its index
-  generator now ship as [`logseq-passage`](../passage), installable on its own;
+  generator now ship as [`logseq-passage`](../plugin-passage), installable on its own;
   install it alongside the theme to keep the `/passage` and `<` commands. This
   theme still paints passage blocks exactly as it did — a passage already in
   your graph is a passage still, whether Passage is installed or not, because

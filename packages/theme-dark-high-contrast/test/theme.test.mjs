@@ -1028,7 +1028,7 @@ test('the theme is an independently staged workspace of the monorepo root', asyn
 
   assert.equal(workspace.private, true, 'the coordinator would otherwise be publishable')
   assert.ok(workspace.workspaces.includes('packages/*'), 'the package is outside the workspaces glob')
-  assert.equal(resolve(repo, 'packages', 'dark-high-contrast'), root)
+  assert.equal(resolve(repo, 'packages', 'theme-dark-high-contrast'), root)
 
   assert.match(workspace.scripts.test, /--workspaces/, 'root test does not aggregate')
   assert.match(workspace.scripts.build, /build-release\.mjs --all/, 'root build is not a single aggregate build')

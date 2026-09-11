@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url'
 import { repositoryRoot, workspace } from './release-support.mjs'
 
 const releases = {
-  anno: 'packages/anno',
-  passage: 'packages/passage',
-  theme: 'packages/dark-high-contrast'
+  anno: 'packages/plugin-anno',
+  passage: 'packages/plugin-passage',
+  theme: 'packages/theme-dark-high-contrast'
 }
 
 export async function selectRelease(tag) {

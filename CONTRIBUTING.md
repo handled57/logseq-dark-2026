@@ -18,12 +18,12 @@ not need installation or compilation at runtime.
 The root is a private coordinator. Shared inputs live at the root; product
 behavior lives in one package:
 
-- Theme behavior: `packages/dark-high-contrast/theme.css` and `index.js`.
-- Passage behavior: `packages/passage/index.js` and classic script
+- Theme behavior: `packages/theme-dark-high-contrast/theme.css` and `index.js`.
+- Passage behavior: `packages/plugin-passage/index.js` and classic script
   `bible.js`; its distributable structural manifests are one
   `resources/<abbreviation>.books.json` per translation, listed with their verse
   indexes in `resources/translations.json`.
-- Anno behavior: `packages/anno/index.js`, which owns both the import prompt
+- Anno behavior: `packages/plugin-anno/index.js`, which owns both the import prompt
   and the asset-naming rule that decides which page Logseq collects a PDF's
   highlights on.
 - Package identity and exact archive allowlist: each package's `package.json`,
@@ -55,8 +55,8 @@ are:
 npm test
 npm run build
 npm run verify:release
-npm test --workspace packages/passage
-npm run check --workspace packages/dark-high-contrast
+npm test --workspace packages/plugin-passage
+npm run check --workspace packages/theme-dark-high-contrast
 ```
 
 A targeted build runs in the selected workspace context and removes only that

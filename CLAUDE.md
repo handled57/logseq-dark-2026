@@ -2,13 +2,13 @@
 
 ## Project
 
-This repository is an npm-workspace monorepo of Logseq packages. `packages/dark-high-contrast/` holds **Dark High Contrast**, a Logseq theme for classic/file graphs on desktop. It targets Logseq 0.10.15 and adapts Visual Studio Code's Dark High Contrast palette. `packages/passage/` holds **Passage** and `packages/anno/` holds **Anno**, plugins for the same target.
+This repository is an npm-workspace monorepo of Logseq packages. `packages/theme-dark-high-contrast/` holds **Dark High Contrast**, a Logseq theme for classic/file graphs on desktop. It targets Logseq 0.10.15 and adapts Visual Studio Code's Dark High Contrast palette. `packages/plugin-passage/` holds **Passage** and `packages/plugin-anno/` holds **Anno**, plugins for the same target.
 
 The root `package.json` is a private coordinator: it declares `workspaces: ["packages/*"]`, aggregates each package's scripts, and owns no sources and no dependencies. Every package is intentionally installable without dependency installation or compilation. Keep release artifacts self-contained and package-specific, and do not add runtime network access, tracking, or remote CSS imports.
 
 ## Source of truth
 
-Paths below are relative to `packages/dark-high-contrast/` unless noted.
+Paths below are relative to `packages/theme-dark-high-contrast/` unless noted.
 
 - `theme.css` is the canonical stylesheet.
 - `index.js` is the canonical entry script for property-table hiding, `data-hc-block-type` annotations, and the collapse control it hangs on every foldable render.
@@ -19,7 +19,7 @@ Paths below are relative to `packages/dark-high-contrast/` unless noted.
 - `test/cascade.test.mjs` checks selector specificity against pinned Logseq CSS behavior.
 - `test/properties.test.mjs` behaviorally tests `index.js` against a stub host document.
 - `test/collapsible.test.mjs` drives the same entry over a stub page tree for the collapse control: which renders earn one, where it is hung, and that folding one touches nothing else.
-- `../anno/index.js` is Anno's canonical runtime: the **Anno: Import PDF** command, its prompt, and the asset-naming rule that decides which page Logseq collects a PDF's highlights on. `../anno/test/package.test.mjs` checks its structure and metadata; `../anno/test/anno.test.mjs` drives that runtime against a stub host document and file bridge.
+- `../plugin-anno/index.js` is Anno's canonical runtime: the **Anno: Import PDF** command, its prompt, and the asset-naming rule that decides which page Logseq collects a PDF's highlights on. `../plugin-anno/test/package.test.mjs` checks its structure and metadata; `../plugin-anno/test/anno.test.mjs` drives that runtime against a stub host document and file bridge.
 - Each package's `package.json#release.files` is its exact package-owned archive allowlist.
 - Root `scripts/build-release.mjs` creates extracted packages and Marketplace ZIPs in root `dist/`; aggregate builds clean once and targeted workspace builds remove only their own outputs.
 - Root `scripts/verify-release.mjs` verifies exact archive contents, metadata agreement, and byte parity with canonical sources.
@@ -119,7 +119,7 @@ git diff --check
 At the root, `npm run check` runs every workspace's tests, builds each release archive, and verifies it. Target one package with npm's workspace flag:
 
 ```sh
-npm run check --workspace packages/dark-high-contrast
+npm run check --workspace packages/theme-dark-high-contrast
 ```
 
 When an installed Logseq 0.10.15 stylesheet is available, also validate the pinned upstream selectors:

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { access, readFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
-import { resolve } from 'node:path'
+import { relative, resolve, sep } from 'node:path'
 import { test } from 'node:test'
 import { node } from './support/host-document.mjs'
 import { repositoryRoot, workspaces } from '../scripts/release-support.mjs'
@@ -58,4 +58,28 @@ test('repository documentation covers package ownership and independent migratio
       assert.ok(source.includes(phrase), `${file} does not document ${phrase}`)
     }
   }
+})
+
+test('each workspace folder carries its product prefix without renaming the package', async () => {
+  const identities = {
+    'packages/plugin-anno': 'logseq-anno',
+    'packages/plugin-passage': 'logseq-passage',
+    'packages/theme-dark-high-contrast': 'logseq-dark-high-contrast-theme'
+  }
+
+  const seen = []
+  for (const { root, pkg } of await workspaces()) {
+    const folder = relative(repositoryRoot, root).split(sep).join('/')
+    seen.push(folder)
+
+    /* The folder announces what the package is; the published name and the
+     * Logseq id it installs under are unchanged by that. */
+    const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'))
+    const prefix = manifest.theme === true ? 'packages/theme-' : 'packages/plugin-'
+    assert.ok(folder.startsWith(prefix), `${folder} does not carry the ${prefix} prefix`)
+    assert.equal(pkg.name, identities[folder], `${folder} publishes an unexpected package name`)
+    assert.equal(manifest.id, identities[folder], `${folder} installs under an unexpected id`)
+  }
+
+  assert.deepEqual(seen, Object.keys(identities))
 })
