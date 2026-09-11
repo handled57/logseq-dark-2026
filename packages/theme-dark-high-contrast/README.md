@@ -11,7 +11,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - VS Code-inspired semantic colors for links, references, properties, tasks, and code.
 - Compact workbench treatment for the header, sidebars, command palette, menus, dialogs, and settings.
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
-- Every block in the main editor hangs its bullet on one vertical rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at the size of that line, with the content column keeping its usual nesting.
+- Every block in the main editor hangs its bullet on one vertical rail in the margin left of the page, each bullet on the middle of its block's first line and every one of them the same size, with the content column keeping its usual nesting.
 - The rail's line is one color the whole way down the page, the one the **Rail color** setting names. The bullets hanging on it carry the hierarchy: a heading or a block with children takes the color of its own depth — magenta at the top level, then orange, brown, amber, teal, blue, indigo and violet — and ordinary leaf prose keeps a white bullet.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Block headings are set 20% below the sizes Logseq gives them, so a heading reads as the head of its outline rather than dominating the notes under it. Every level keeps Logseq's proportions, and page titles are unchanged.
@@ -90,10 +90,12 @@ The line every bullet hangs on is the **Rail color** setting, one color at
 every depth. That defaults to `#5b7e96`, the same `--vscode-hc-border` the
 editor, the left menu and the sidebars are drawn with.
 
-A bullet also says whether anything is folded away underneath it: a block whose
-children are showing is drawn as an empty ring, while a collapsed block and a
-block with no children of its own stay filled. Hovering a bullet adds a halo
-around it without changing what is inside it.
+A bullet is always solid in its own color, and says what it has to say in the
+rings around it: a block with children carries one ring, whether they are
+showing or folded away, and a block with none carries no ring at all. Hovering a
+block adds one more ring outside whatever its bullet already carries — a first
+ring for a leaf, a second for a block with children — and never changes what is
+inside it.
 
 A page's properties are the page's front matter rather than a block of its text,
 so they render with no bullet and no rail segment, and the rail opens at the

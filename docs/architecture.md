@@ -49,15 +49,13 @@ margin so the content hierarchy does not move. The rail is scoped to the page
 tree, stops short of embeds, queries, references, sidebars, dialogs, document
 mode, and right-side fold controls, and uses smaller offsets for narrow and
 full-width layouts. `--hc-rail-bullet-y` aligns a bullet and fold arrow with the
-first rendered line, including headings and boxed block types, and
-`--hc-rail-bullet-scale` sizes the bullet by that line's font-size multiple:
-`--hc-rail-bullet-size` and `--hc-rail-bullet-dot` derive Logseq's 16px halo and
-6px dot from it, the rings scale with it, and half of the growth is taken back
-as margin so the bullet centre stays on the rail. All three are declared on the
-row alongside `--hc-rail-bullet-y`, because a custom property substitutes
-against the element it is declared on: derived from `:root`, the two sizes would
-resolve against the root's scale and never follow a heading's. The scale
-defaults to `1`, so every surface the rail does not reach is untouched. These numbers derive from pinned
+first rendered line, including headings and boxed block types. Size does not
+follow that line: every bullet on the rail is one size, a `--hc-rail-bullet-dot`
+of 7px inside Logseq's own 16px `--hc-rail-bullet-size` halo, so the bullet
+column reads as a column and a heading is marked by color rather than by bulk.
+`--hc-rail-bullet-gap` (1px) and `--hc-rail-bullet-ring` (1.5px) are the two
+band widths every bullet state is measured out from. All four are declared on
+the row alongside `--hc-rail-bullet-y`. These numbers derive from pinned
 upstream declarations; change arithmetic, selectors, and cascade tests
 together.
 
@@ -68,7 +66,7 @@ proportions. Both of Logseq's selectors are matched — the rendered heading and
 the editor textarea that carries the level as a class — and the rendered one is
 qualified with `:not(.block-ref *)` because upstream normalizes a quoted
 heading to `1rem` at equal specificity, which this stylesheet would otherwise
-win on load order. A heading's rail bullet is measured from the same variable,
+win on load order. A heading's rail bullet is placed from the same variable,
 so the type and the bullet that hangs beside it cannot drift apart.
 
 The rail's bullets carry the hierarchy; its line does not. The line's two
@@ -88,15 +86,20 @@ deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
 pins each literal, its position in the cycle, and the 3:1 a non-text interface
 component owes the canvas.
 
-The bullet's inside is a fourth variable, `--hc-rail-bullet-fill`, which follows
-`--hc-rail-bullet-color` everywhere except on a block whose children are
-showing: `[haschild="true"]` with a `.bullet-container` Logseq has not marked
-`.bullet-closed` sets the fill to `transparent`, so an open block is a ring, a
-folded one stays filled, and a leaf is unchanged. Both the rest state and the
-hover state paint from that one variable, the hover with `!important`, because
-upstream repaints a hovered bullet's inside from `.bullet-link-wrap:hover` with
-an important declaration of its own; the halo and the scale it adds are left
-alone.
+A bullet is always solid in `--hc-rail-bullet-color`; what it carries around
+it, not its inside, reports the rest. `--hc-rail-bullet-rings` is the shadow
+list a bullet is drawn with — the black gap alone for a leaf, the gap plus a
+ring of the bullet's own color for `[haschild="true"]`, which holds whether the
+children are showing or folded, so folding a block never changes its bullet.
+`--hc-rail-bullet-edge` records how far those rings reach, and the innermost
+hovered block sets `--hc-rail-bullet-hover-rings` to one more ring starting
+there, so a leaf gains its first ring and a parent a second beyond its own; at
+rest that band is a zero-width transparent ring, so the two lists always compose
+into one valid `box-shadow`. All of them are declared on the block's own control
+column. The rest state and the hover state paint the inside from the one color,
+the hover with `!important`, because upstream repaints a hovered bullet's inside
+from `.bullet-link-wrap:hover` with an important declaration of its own; the
+halo and the scale it adds are left alone.
 
 `--hc-rail-default-color` is the line, and the only part of the rail a reader
 configures. theme.css declares it as `--vscode-hc-border`, the structural
