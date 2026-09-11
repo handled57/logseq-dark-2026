@@ -655,7 +655,6 @@ hr {
 
 :root {
   --hc-rail-branch-step: 29px;
-  --hc-rail-branch-height: calc(var(--hc-block-gap) + 16px);
   --hc-rail-branch-radius: 16px;
   --hc-rail-branch-width: 2px;
 }
@@ -1129,92 +1128,45 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   bottom: calc(-1 * var(--hc-block-gap));
 }
 
-/* In branched mode the connector leaves the side of an expanded parent's
- * bullet, rounds one top-right corner, and then runs straight down the child
- * column. The parent row owns that elbow: its ordinary downward segment becomes
- * a transparent box with a top and right border, extended through the child
- * group's reserved head so the first child's incoming line overlaps it. The
- * bullet paints over the start of the top border, making the line visibly
- * emerge from the ring rather than from its center.
- *
- * Each group reserves one short return at its foot. Its border-drawn elbow is
- * the horizontal mirror of the parent's: it crosses back from the child rail,
- * rounds the same radius, and runs down the parent rail. Nested groups reserve
- * their own return space, so several closing levels unwind one smooth step at
- * a time instead of stacking their curves on top of each other.
- * A folded parent's child group is hidden by Logseq and also fails the open
- * bullet guard here, so it contributes no connector. */
+/* Branched follows the visible tree in reading order as one continuous line.
+ * `index.js` marks only a row whose depth differs from the visible row before
+ * it and writes the whole horizontal distance into `--hc-rail-turn-distance`.
+ * That row's incoming segment then replaces the ordinary vertical stretch:
+ * it stays in the preceding row's column, rounds once, and meets the current
+ * bullet from the side. Moving into a child uses the left/bottom corner;
+ * returning to an ancestor or sibling uses its horizontal reflection. A
+ * multi-level return is one wider turn, so nested groups close without blank
+ * spacer rows or several curves occupying the same pixels. */
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
-  > .block-main-container > .block-control-wrap::after {
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-turn]
+  > .block-main-container > .block-control-wrap::before {
+  top: -10px;
+  height: calc(var(--hc-rail-bullet-y) + 10px + var(--hc-rail-branch-width) / 2);
+  box-sizing: border-box;
+  background-color: transparent;
+}
+
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-turn="deeper"]
+  > .block-main-container > .block-control-wrap::before {
+  left: calc(30.5px - var(--hc-rail-turn-distance) - var(--hc-rail-branch-width) / 2);
+  width: calc(var(--hc-rail-turn-distance) + var(--hc-rail-branch-width) / 2);
+  border-left: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
+  border-bottom: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
+  border-bottom-left-radius: var(--hc-rail-branch-radius);
+}
+
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-turn="shallower"]
+  > .block-main-container > .block-control-wrap::before {
   left: 30.5px;
-  top: calc(var(--hc-rail-bullet-y) - var(--hc-rail-branch-width) / 2);
-  bottom: calc(-1 * var(--hc-rail-branch-height));
-  width: calc(var(--hc-rail-branch-step) + var(--hc-rail-branch-width) / 2);
-  box-sizing: border-box;
-  border-top: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
+  width: calc(var(--hc-rail-turn-distance) + var(--hc-rail-branch-width) / 2);
   border-right: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-top-right-radius: var(--hc-rail-branch-radius);
-  background-color: transparent;
-}
-
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
-  > .block-children-container > .block-children {
-  position: relative;
-  padding-top: var(--hc-rail-branch-height);
-  padding-bottom: var(--hc-rail-branch-height);
-}
-
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))
-  > .block-children-container > .block-children::after {
-  content: '';
-  position: absolute;
-  left: calc(1.5px - var(--hc-rail-offset) - var(--hc-rail-branch-width) / 2);
-  width: calc(var(--hc-rail-branch-step) + var(--hc-rail-branch-width) / 2);
-  height: var(--hc-rail-branch-height);
-  box-sizing: border-box;
-  z-index: 0;
-  border-top: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-right: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-  border-top-right-radius: var(--hc-rail-branch-radius);
-  background-color: transparent;
-  pointer-events: none;
-  bottom: 2px;
-  transform: scaleX(-1);
-  transform-origin: center;
-}
-
-/* A return whose parent has another sibling at the same level owns the handoff
- * to that sibling. Its left border continues vertically across Logseq's
- * inter-block gap until the following row's incoming segment takes over. A
- * final child has no such tail: it ends inside its group and hands off directly
- * to the ancestor's return, which keeps nested turns sequential instead of
- * forked. */
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed)):has(~ .ls-block)
-  > .block-children-container > .block-children::after {
-  bottom: calc(-1 * var(--hc-block-gap));
-  height: calc(var(--hc-rail-branch-height) + var(--hc-block-gap));
-  border-right: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
-}
-
-/* The generic end-of-page rule stops the final leaf at its row. A nested final
- * leaf stops at the two-pixel foot Logseq keeps inside that row, exactly where
- * its group's return curve begins; extending it across the normal block gap
- * would leave a straight stub dangling past the curve. Only a top-level final
- * block is still the actual end of the rail. */
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *) > .block-children-container > .block-children
-  > .ls-block:not(.block-content-wrapper *):not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block))
-  > .block-main-container > .block-control-wrap::after {
-  bottom: 2px;
+  border-bottom: var(--hc-rail-branch-width) solid var(--hc-rail-default-color);
+  border-bottom-right-radius: var(--hc-rail-branch-radius);
 }
 
 /* A page's properties are its front matter rather than a block of its text, so

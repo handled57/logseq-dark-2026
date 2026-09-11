@@ -108,6 +108,9 @@ const RAIL_LAYOUT_SETTING = 'railLayout'
 const DEFAULT_RAIL_LAYOUT = 'Flat'
 const BRANCHED_RAIL_LAYOUT = 'Branched'
 const RAIL_LAYOUT_ATTR = 'data-hc-rail-layout'
+const RAIL_TURN_ATTR = 'data-hc-rail-turn'
+const RAIL_TURN_DISTANCE_PROPERTY = '--hc-rail-turn-distance'
+const RAIL_DEPTH_STEP = 29
 
 /* Leading-emoji block icons. A block whose text opens with one emoji has that
  * emoji set in a gutter to the left of the text, the way a passage sets a verse
@@ -803,10 +806,64 @@ function applyRailColor() {
 
 function applyRailLayout() {
   const layout = readSetting(RAIL_LAYOUT_SETTING, DEFAULT_RAIL_LAYOUT.toLowerCase())
+  const value = layout === BRANCHED_RAIL_LAYOUT.toLowerCase() ? 'branched' : 'flat'
   doc.body.setAttribute(
     RAIL_LAYOUT_ATTR,
-    layout === BRANCHED_RAIL_LAYOUT.toLowerCase() ? 'branched' : 'flat'
+    value
   )
+  applyRailTurns(value)
+}
+
+/* Branched is one continuous traversal line rather than a parent rail with a
+ * second child rail beside it. DOM order is the rendered tree's preorder: a
+ * parent, its visible descendants, then its next sibling. Comparing each
+ * visible block's depth with the visible block before it therefore identifies
+ * the two places where that line has to turn — into a first child, or back to
+ * an ancestor/sibling. CSS uses the distance written here to draw one rounded
+ * incoming turn without adding rows or padding to the graph.
+ *
+ * Collapsed descendants remain in some Logseq renders but have no client
+ * rectangle. Skipping those keeps the next visible sibling's return measured
+ * from the collapsed parent rather than from a hidden leaf. The lightweight
+ * test host has no layout API, so an absent `getClientRects` means rendered. */
+function applyRailTurns(layout) {
+  const blocks = [...doc.querySelectorAll('.ls-block')]
+
+  for (const block of blocks) {
+    block.removeAttribute(RAIL_TURN_ATTR)
+    block.style?.removeProperty(RAIL_TURN_DISTANCE_PROPERTY)
+  }
+
+  if (layout !== 'branched') return
+
+  let root = null
+  let previousDepth = null
+
+  for (const block of blocks) {
+    if (block.closest?.('.block-content-wrapper')) continue
+    if (typeof block.getClientRects === 'function' && block.getClientRects().length === 0) continue
+
+    const nextRoot = block.closest?.('.content') ?? doc.body
+    if (nextRoot !== root) {
+      root = nextRoot
+      previousDepth = null
+    }
+
+    let depth = 0
+    for (let parent = block.parentElement; parent && parent !== root; parent = parent.parentElement) {
+      if (parent.matches?.('.ls-block')) depth += 1
+    }
+
+    if (previousDepth !== null && depth !== previousDepth) {
+      block.setAttribute(RAIL_TURN_ATTR, depth > previousDepth ? 'deeper' : 'shallower')
+      block.style?.setProperty(
+        RAIL_TURN_DISTANCE_PROPERTY,
+        `${Math.abs(depth - previousDepth) * RAIL_DEPTH_STEP}px`
+      )
+    }
+
+    previousDepth = depth
+  }
 }
 
 function paint() {
@@ -918,6 +975,11 @@ function teardown() {
 
   doc.body.style.removeProperty(RAIL_COLOR_PROPERTY)
   doc.body.removeAttribute(RAIL_LAYOUT_ATTR)
+
+  for (const block of doc.querySelectorAll(`[${RAIL_TURN_ATTR}]`)) {
+    block.removeAttribute(RAIL_TURN_ATTR)
+    block.style?.removeProperty(RAIL_TURN_DISTANCE_PROPERTY)
+  }
 
   collapsedContent.clear()
   propertyVisibility.clear()

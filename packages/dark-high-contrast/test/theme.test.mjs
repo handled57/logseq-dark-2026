@@ -331,9 +331,11 @@ test('the optional branched rail is body-scoped and documented', async () => {
   assert.match(script, /enumChoices: \[DEFAULT_RAIL_LAYOUT, BRANCHED_RAIL_LAYOUT\]/)
   assert.match(script, /doc\.body\.setAttribute\(\s*RAIL_LAYOUT_ATTR/)
   assert.match(script, /doc\.body\.removeAttribute\(RAIL_LAYOUT_ATTR\)/)
+  assert.match(script, /const RAIL_TURN_ATTR = 'data-hc-rail-turn'/)
+  assert.match(script, /Math\.abs\(depth - previousDepth\) \* RAIL_DEPTH_STEP/)
   assert.match(css, /body\[data-hc-rail-layout="branched"\] main:not\(\.ls-fold-button-on-right\)/)
-  assert.match(css, /border-top-right-radius: var\(--hc-rail-branch-radius\)/)
-  assert.match(css, /transform: scaleX\(-1\)/)
+  assert.match(css, /border-bottom-left-radius: var\(--hc-rail-branch-radius\)/)
+  assert.match(css, /border-bottom-right-radius: var\(--hc-rail-branch-radius\)/)
   assert.match(css, /--hc-rail-branch-width: 2px/)
   assert.match(readme, /## Rail layouts/)
   assert.match(readme, /\*\*Flat\*\* is the default/)
@@ -619,19 +621,15 @@ test('every rendered block in the main editor keeps a bullet on the rail', () =>
   // them, and this is the rule that keeps them from coming back.
   assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left:\s*0\s*!important/)
 
-  // Flat layout reads `.block-children` only as the record of depth. Branched
-  // layout additionally paints a guarded child group's two curves, but never
-  // changes its display (which could reveal a folded subtree). Everything else
-  // remains on the row or in its control column.
+  // Both layouts read `.block-children` only as the record of depth. Turns are
+  // painted on the incoming half of a block's own control column, so no rail
+  // rule resizes a child group or could reveal a folded subtree.
   const painted = /^(?:\.block-children|\.block-main-container|\.block-control-wrap|\.block-control|\.bullet-link-wrap|\.bullet-container|\.bullet|label|\[data-hc-property-toggle\])(?:\.[\w-]+)*(?::(?:hover|focus-visible))?(?:::(?:before|after))?$/
   for (const [selector] of railRules) {
     for (const part of selectors(selector)) {
       const target = subject(part)
       if (target.startsWith('.block-children')) {
-        assert.ok(
-          part.startsWith('body[data-hc-rail-layout="branched"] '),
-          `a flat rail rule paints a child group: "${part.slice(0, 60)}…"`
-        )
+        assert.fail(`a rail rule paints a child group: "${part.slice(0, 60)}…"`)
       }
       assert.match(
         target,

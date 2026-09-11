@@ -348,6 +348,33 @@ function propertyRailBlock(uuid, properties, { mainClasses = [], contentClasses 
   return { host, block: blockHost, controls, table }
 }
 
+function railTree() {
+  const host = node('body')
+  const main = host.appendChild(node('main'))
+  const editor = main.appendChild(node('div', { id: 'main-content-container' }))
+  const page = editor.appendChild(node('div', { classes: ['page-blocks-inner'] }))
+  const content = page.appendChild(node('div', { classes: ['content'] }))
+
+  function appendBlock(group, { visible = true } = {}) {
+    const block = group.appendChild(node('div', {
+      classes: ['ls-block'],
+      getClientRects: () => visible ? [{}] : []
+    }))
+    const mainContainer = block.appendChild(node('div', { classes: ['block-main-container'] }))
+    mainContainer.appendChild(node('div', { classes: ['block-control-wrap'] }))
+    const wrapper = mainContainer.appendChild(node('div', { classes: ['block-content-wrapper'] }))
+    wrapper.textContent = 'Block'
+    return block
+  }
+
+  function childrenOf(block) {
+    const container = block.appendChild(node('div', { classes: ['block-children-container'] }))
+    return container.appendChild(node('div', { classes: ['block-children'] }))
+  }
+
+  return { host, content, appendBlock, childrenOf }
+}
+
 test('property buttons toggle either initial state and keep accessibility in sync', async () => {
   const hiddenFixture = propertyRailBlock('65f00000-0000-0000-0000-000000000040', { type: 'passage' })
   const hiddenContext = load({ hiddenProperties: 'type: passage' }, [
@@ -651,6 +678,64 @@ test('choosing Branched updates the host layout marker on repaint', async () => 
   context.logseq.settings.railLayout = 'Flat'
   context.paint()
   assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'flat')
+})
+
+test('Branched marks only the rows where one traversal rail changes depth', async () => {
+  const fixture = railTree()
+  const a = fixture.appendBlock(fixture.content)
+  const b = fixture.appendBlock(fixture.content)
+  const bChildren = fixture.childrenOf(b)
+  const b1 = fixture.appendBlock(bChildren)
+  const b2 = fixture.appendBlock(bChildren)
+  const c = fixture.appendBlock(fixture.content)
+  const cChildren = fixture.childrenOf(c)
+  const c1 = fixture.appendBlock(cChildren)
+  const d = fixture.appendBlock(fixture.content)
+  const context = load({ railLayout: 'Branched' }, [], {}, fixture.host)
+  await Promise.resolve()
+
+  const turn = (block) => block.getAttribute('data-hc-rail-turn')
+  const distance = (block) => block.style.getPropertyValue('--hc-rail-turn-distance')
+
+  assert.deepEqual(
+    [a, b, b1, b2, c, c1, d].map(turn),
+    [null, null, 'deeper', null, 'shallower', 'deeper', 'shallower']
+  )
+  assert.deepEqual(
+    [a, b, b1, b2, c, c1, d].map(distance),
+    ['', '', '29px', '', '29px', '29px', '29px']
+  )
+
+  context.logseq.settings.railLayout = 'Flat'
+  context.paint()
+  assert.deepEqual([a, b, b1, b2, c, c1, d].map(turn), Array(7).fill(null))
+  assert.deepEqual([a, b, b1, b2, c, c1, d].map(distance), Array(7).fill(''))
+})
+
+test('Branched returns several nesting levels in one turn and skips collapsed descendants', async () => {
+  const fixture = railTree()
+  const a = fixture.appendBlock(fixture.content)
+  const aChildren = fixture.childrenOf(a)
+  const a1 = fixture.appendBlock(aChildren)
+  const a1Children = fixture.childrenOf(a1)
+  const a11 = fixture.appendBlock(a1Children)
+  const b = fixture.appendBlock(fixture.content)
+  const hiddenChildren = fixture.childrenOf(b)
+  const hidden = fixture.appendBlock(hiddenChildren, { visible: false })
+  const c = fixture.appendBlock(fixture.content)
+  const context = load({ railLayout: 'Branched' }, [], {}, fixture.host)
+  await Promise.resolve()
+
+  assert.equal(a1.getAttribute('data-hc-rail-turn'), 'deeper')
+  assert.equal(a11.getAttribute('data-hc-rail-turn'), 'deeper')
+  assert.equal(b.getAttribute('data-hc-rail-turn'), 'shallower')
+  assert.equal(b.style.getPropertyValue('--hc-rail-turn-distance'), '58px')
+  assert.equal(hidden.getAttribute('data-hc-rail-turn'), null)
+  assert.equal(c.getAttribute('data-hc-rail-turn'), null)
+
+  for (const handler of context.logseq.unloads) await handler()
+  assert.equal(a1.getAttribute('data-hc-rail-turn'), null)
+  assert.equal(a1.style.getPropertyValue('--hc-rail-turn-distance'), '')
 })
 
 test('an unknown rail layout falls back to Flat and unloading removes the marker', async () => {

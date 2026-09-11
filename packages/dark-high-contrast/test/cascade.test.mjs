@@ -463,13 +463,12 @@ const block = `${scope} .ls-block:not(.block-content-wrapper *)`
 const row = `${block} > .block-main-container`
 const wrap = `${row} > .block-control-wrap`
 const branchedScope = `body[data-hc-rail-layout="branched"] ${scope}`
-const branchedOpen =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *)[haschild="true"]:has(> .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed))`
-const branchedGroup = `${branchedOpen} > .block-children-container > .block-children`
-const branchedSiblingGroup =
-  `${branchedOpen}:has(~ .ls-block) > .block-children-container > .block-children`
-const branchedFinalLeaf =
-  `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-children-container > .block-children > .ls-block:not(.block-content-wrapper *):not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)) > .block-main-container > .block-control-wrap::after`
+const branchedTurn =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-turn] > .block-main-container > .block-control-wrap::before`
+const branchedDeeper =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-turn="deeper"] > .block-main-container > .block-control-wrap::before`
+const branchedShallower =
+  `${branchedScope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-turn="shallower"] > .block-main-container > .block-control-wrap::before`
 
 /* The two rows that open the rail: the page's first block, and the block under
  * a page-properties block, which is the first one the reader wrote. */
@@ -598,10 +597,10 @@ test('branched layout keeps Logseq nesting while Flat remains the default geomet
   assert.equal(Number.parseFloat(step[1]), rail.indent)
 })
 
-test('expanded branched groups use matching elbows into and out of their child rail', () => {
-  const group = rule(branchedGroup)
-  const branch = rule(`${branchedOpen} > .block-main-container > .block-control-wrap::after`)
-  const outbound = rule(`${branchedGroup}::after`)
+test('branched depth changes use matching incoming turns without spacer rows', () => {
+  const turn = rule(branchedTurn)
+  const deeper = rule(branchedDeeper)
+  const shallower = rule(branchedShallower)
   const branchedLine = rule(
     `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::before, ` +
     `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::after`
@@ -612,69 +611,43 @@ test('expanded branched groups use matching elbows into and out of their child r
   assert.equal(value(branchedLine, 'left'), 'calc(30.5px - var(--hc-rail-branch-width) / 2)')
   assert.equal(value(branchedLine, 'width'), 'var(--hc-rail-branch-width)')
 
-  // The branch emerges from the parent bullet's side, rounds one corner and
-  // continues straight down the child column through the reserved group head.
-  assert.equal(value(branch, 'left'), '30.5px')
-  assert.equal(value(branch, 'top'), 'calc(var(--hc-rail-bullet-y) - var(--hc-rail-branch-width) / 2)')
-  assert.equal(value(branch, 'bottom'), 'calc(-1 * var(--hc-rail-branch-height))')
-  assert.equal(value(branch, 'width'), 'calc(var(--hc-rail-branch-step) + var(--hc-rail-branch-width) / 2)')
-  assert.equal(value(branch, 'box-sizing'), 'border-box')
-  assert.equal(value(branch, 'border-top'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(branch, 'border-right'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(branch, 'border-top-right-radius'), 'var(--hc-rail-branch-radius)')
-  assert.equal(value(branch, 'background-color'), 'transparent')
-
-  // One bounded return per group makes nested closures occur one after another
-  // instead of drawing several return curves in the same pixels.
-  assert.equal(value(group, 'padding-top'), 'var(--hc-rail-branch-height)')
-  assert.equal(value(group, 'padding-bottom'), 'var(--hc-rail-branch-height)')
-  assert.equal(value(outbound, 'height'), 'var(--hc-rail-branch-height)')
-  assert.equal(value(outbound, 'width'), 'calc(var(--hc-rail-branch-step) + var(--hc-rail-branch-width) / 2)')
-  assert.equal(value(outbound, 'left'), 'calc(1.5px - var(--hc-rail-offset) - var(--hc-rail-branch-width) / 2)')
-  assert.equal(value(outbound, 'box-sizing'), 'border-box')
-  assert.equal(value(outbound, 'border-top'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(outbound, 'border-right'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
-  assert.equal(value(outbound, 'border-top-right-radius'), 'var(--hc-rail-branch-radius)')
-  assert.equal(value(outbound, 'transform'), 'scaleX(-1)')
-  assert.equal(value(outbound, 'transform-origin'), 'center')
-  assert.equal(value(outbound, 'background-color'), 'transparent')
-  assert.equal(value(outbound, 'bottom'), '2px')
-  assert.equal(value(rule(branchedFinalLeaf), 'bottom'), '2px')
-
-  // Entry and return are the same border geometry; the return is its exact
-  // horizontal reflection rather than an independently approximated curve.
-  assert.equal(value(branch, 'width'), value(outbound, 'width'))
-  assert.equal(value(branch, 'border-top-right-radius'), value(outbound, 'border-top-right-radius'))
-  assert.match(css, /--hc-rail-branch-width:\s*2px;/)
-  assert.doesNotMatch(css, /--hc-rail-branch-out:/)
-})
-
-test('a branched return reaches its following sibling without forking nested returns', () => {
-  const outbound = rule(`${branchedSiblingGroup}::after`)
-
-  assert.equal(value(outbound, 'bottom'), 'calc(-1 * var(--hc-block-gap))')
+  // A turn consumes exactly the incoming segment that already bridges the row
+  // gap, so changing depth adds no child-group padding or blank connector row.
+  assert.equal(value(turn, 'top'), '-10px')
   assert.equal(
-    value(outbound, 'height'),
-    'calc(var(--hc-rail-branch-height) + var(--hc-block-gap))'
+    value(turn, 'height'),
+    'calc(var(--hc-rail-bullet-y) + 10px + var(--hc-rail-branch-width) / 2)'
   )
-  assert.equal(value(outbound, 'border-right'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(turn, 'box-sizing'), 'border-box')
+  assert.equal(value(turn, 'background-color'), 'transparent')
+  assert.equal(value(rule('.block-children'), 'padding-top'), 'calc(var(--hc-block-gap) + 2px)')
 
-  // The extra handoff is conditional on a same-level sibling. A final nested
-  // child therefore retains the bounded return asserted above and cannot
-  // overlap the ancestor turn that follows it.
-  assert.match(branchedSiblingGroup, /:has\(~ \.ls-block\)/)
-  assert.doesNotMatch(branchedGroup, /:has\(~ \.ls-block\)/)
+  // Into a child, the line begins one measured distance left of that child's
+  // rail and rounds into its bullet. A return is the horizontal reflection:
+  // it begins at the current bullet and reaches the preceding deeper rail.
+  assert.equal(
+    value(deeper, 'left'),
+    'calc(30.5px - var(--hc-rail-turn-distance) - var(--hc-rail-branch-width) / 2)'
+  )
+  assert.equal(value(deeper, 'width'), 'calc(var(--hc-rail-turn-distance) + var(--hc-rail-branch-width) / 2)')
+  assert.equal(value(deeper, 'border-left'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(deeper, 'border-bottom'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(deeper, 'border-bottom-left-radius'), 'var(--hc-rail-branch-radius)')
+
+  assert.equal(value(shallower, 'left'), '30.5px')
+  assert.equal(value(shallower, 'width'), value(deeper, 'width'))
+  assert.equal(value(shallower, 'border-right'), 'var(--hc-rail-branch-width) solid var(--hc-rail-default-color)')
+  assert.equal(value(shallower, 'border-bottom'), value(deeper, 'border-bottom'))
+  assert.equal(value(shallower, 'border-bottom-right-radius'), value(deeper, 'border-bottom-left-radius'))
+  assert.match(css, /--hc-rail-branch-width:\s*2px;/)
+  assert.doesNotMatch(css, /--hc-rail-branch-height:/)
 })
 
-test('folded parents cannot paint branched connectors', () => {
-  const curved = [...rules.keys()].filter(
-    (selector) => selector.startsWith(branchedScope) && /\.block-children::(?:before|after)/.test(selector)
-  )
-  assert.ok(curved.length >= 2, 'branched layout has no child-group curves')
-  for (const selector of curved) {
-    assert.match(selector, /\[haschild="true"\]/)
-    assert.match(selector, /\.bullet-container:not\(\.bullet-closed\)/)
-  }
+test('branched turns are row-owned and never paint or resize a child group', () => {
+  const branched = [...rules.keys()].filter((selector) => selector.startsWith(branchedScope))
+  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-turn="deeper"]')))
+  assert.ok(branched.some((selector) => selector.includes('[data-hc-rail-turn="shallower"]')))
+  assert.ok(branched.every((selector) => !/\.block-children(?:::before|::after|\s*>)/.test(selector)))
 })
 
 /* The rail's hierarchy colors, in the ROYGBIV order it steps through, and the

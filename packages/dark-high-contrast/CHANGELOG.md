@@ -6,11 +6,11 @@ All notable changes to this project are documented here.
 
 - Add a **Rail layout** setting. **Flat** remains the default and preserves the
   single vertical rail. **Branched** keeps each child bullet at its nesting
-  depth, carries the line through siblings, sends a rounded branch from the
-  side of each expanded parent bullet straight down the child column, and uses
-  one consistent 2px stroke across its straight rails and elbows. The return
-  is an exact horizontal reflection of the parent-to-child curve. Nested groups
-  add one branch and return at each level; folded groups draw no connector.
+  depth and uses one consistent 2px traversal line across straight rails and
+  rounded turns. The incoming line curves right into a first child or left into
+  the next ancestor/sibling bullet; multi-level returns use one wider curve.
+  It leaves no parallel parent rail beside children, adds no blank connector
+  rows, and skips collapsed descendants.
   Both layouts retain the rail color, depth-colored bullets,
   open-ring and hover states, first-line alignment, exclusions, and the narrow
   and full-width offsets.
