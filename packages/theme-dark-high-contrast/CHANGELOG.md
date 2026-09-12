@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 2.14.0 - 2026-09-12
+
+- Extend an admonition or passage's accent-colored icon divider down through
+  its own visible property table, so the table reads as still inside the
+  bracket the icon opens rather than a separate element sitting underneath.
+
 ## 2.13.1 - 2026-09-12
 
 - Fix the property-visibility toggle's dot turning white on hover. It answers

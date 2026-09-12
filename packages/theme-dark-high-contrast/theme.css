@@ -2124,6 +2124,7 @@ textarea.block-editor:focus {
  * still much narrower than the 2rem tail below, so it stays plainly attached to
  * the box it names rather than drifting towards the next block. */
 .block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties {
+  position: relative;
   order: 1;
   margin-left: calc(4.25rem + 1px);
   margin-top: 0.75rem;
@@ -2137,6 +2138,58 @@ textarea.block-editor:focus {
  * table. */
 .block-content:has(> .block-properties:not([data-hc-hidden])) > .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage) {
   margin-bottom: 0;
+}
+
+/* The divider continues down through the table describing the box.
+ *
+ * `--hc-admonition-accent` is declared on the box itself (`.admonitionblock`
+ * or `.passage`), a descendant of `.block-body`. `.block-properties` is
+ * `.block-body`'s sibling, not its descendant, so the variable never reaches
+ * it through inheritance; it is redeclared here on their shared
+ * `.block-content` ancestor, scoped to the same box-kind and
+ * visible-property-table condition as the repositioning rules above. */
+.block-content:has(> .block-body > .admonitionblock.tip):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: var(--vscode-hc-focus);
+}
+
+.block-content:has(> .block-body > .admonitionblock.note):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: #ebbc00;
+}
+
+.block-content:has(> .block-body > .admonitionblock.important):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: #eb9091;
+}
+
+.block-content:has(> .block-body > .admonitionblock:is(.caution, .warning)):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: #fa934e;
+}
+
+.block-content:has(> .block-body > .admonitionblock.pinned):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: currentColor;
+}
+
+.block-content:has(> .block-body > .passage):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: var(--vscode-hc-cyan);
+}
+
+/* The line itself sits at the same offset as the box's own divider: the 1px
+ * transparent edge the box carries, plus the icon column's 1rem `pr-4` and
+ * the 2rem icon, landing the same 4px (0.25rem) bar at the same x-position.
+ * `left` is measured from the table's own left edge, `calc(4.25rem + 1px)`
+ * to the right of that position (the table's `margin-left` above), so the
+ * pseudo-element's negative offset is the difference between the two:
+ * `-(1.25rem + 1px)`. Vertically, the table's own `margin-top: 0.75rem` and
+ * 1px border are cancelled by the same amount so the bar starts exactly
+ * where the box's border-right stops, then `bottom: -1px` carries it past
+ * the table's own bottom border to its full visible height. */
+.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties::before {
+  content: "";
+  position: absolute;
+  top: calc(-0.75rem - 1px);
+  bottom: -1px;
+  left: calc(-1.25rem - 1px);
+  width: 4px;
+  background-color: var(--hc-admonition-accent);
 }
 
 /* Leading emoji as a block icon --------------------------------------------

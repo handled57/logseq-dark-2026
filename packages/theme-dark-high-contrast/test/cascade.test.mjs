@@ -92,6 +92,12 @@ const pairings = [
     upstream: '.block-properties',
     theme:
       '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties'
+  },
+  {
+    surface: 'the divider bar drawn against a property table',
+    upstream: '.block-properties',
+    theme:
+      '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties::before'
   }
 ]
 
@@ -306,6 +312,53 @@ test('the moved property table lines up with the box text and takes the box tail
   assert.ok(spacingMetrics[0].includes('margin:2rem 0'), 'the pinned box tail is no longer 2rem')
   assert.match(table, /margin-bottom:\s*2rem;/)
   assert.match(css, /> \.block-body > :is\([^{]*\.passage\) \{\s*\n\s*margin-bottom:\s*0;/)
+})
+
+test('the divider through the property table lines up with the box\'s own divider', () => {
+  const declarations = (selector) => {
+    const start = css.indexOf(`\n${selector} {`)
+    assert.ok(start >= 0, `${selector} is missing`)
+    return css.slice(start, css.indexOf('}', start))
+  }
+
+  const scope =
+    '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties'
+  const bar = declarations(`${scope}::before`)
+
+  // The bar sits at the same x-position as the box's own 4px divider: 1rem
+  // `pr-4` plus the 2rem icon, offset back from the table's own left edge by
+  // its `margin-left: calc(4.25rem + 1px)`.
+  assert.match(bar, /left:\s*calc\(-1\.25rem - 1px\);/)
+  assert.match(bar, /width:\s*4px;/)
+
+  // The top cancels the table's own `margin-top: 0.75rem` and 1px border, so
+  // the bar starts exactly where the box's divider stops; the bottom reaches
+  // 1px past the table's own border to its full visible height.
+  assert.match(bar, /top:\s*calc\(-0\.75rem - 1px\);/)
+  assert.match(bar, /bottom:\s*-1px;/)
+  assert.match(bar, /background-color:\s*var\(--hc-admonition-accent\);/)
+
+  // The table becomes the positioning context the bar is measured against.
+  assert.match(declarations(scope), /position:\s*relative;/)
+
+  // Every accent the box itself carries is redeclared on the shared
+  // `.block-content` ancestor so the sibling table can read it too.
+  for (const [kind, accent] of [
+    ['.admonitionblock.tip', 'var(--vscode-hc-focus)'],
+    ['.admonitionblock.note', '#ebbc00'],
+    ['.admonitionblock.important', '#eb9091'],
+    ['.admonitionblock:is(.caution, .warning)', '#fa934e'],
+    ['.admonitionblock.pinned', 'currentColor'],
+    ['.passage', 'var(--vscode-hc-cyan)']
+  ]) {
+    const selector = `.block-content:has(> .block-body > ${kind}):has(> .block-properties:not([data-hc-hidden]))`
+    const rule = declarations(selector)
+    assert.match(
+      rule,
+      new RegExp(`--hc-admonition-accent:\\s*${accent.replace(/[().*+?^$|[\]\\]/g, '\\$&')};`),
+      `${kind}: --hc-admonition-accent is not redeclared as ${accent}`
+    )
+  }
 })
 
 /* Both layouts hang every block's bullet on one vertical line. Every other distance the
