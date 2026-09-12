@@ -981,6 +981,9 @@ test('the property toggle is a stable cyan rail control revealed by hover or foc
   assert.match(css, /\[data-hc-property-toggle\]:focus-visible \{[\s\S]*?outline:\s*2px solid var\(--vscode-hc-focus\);/)
   assert.match(css, /forced-colors:\s*active\)\s*\{[\s\S]*?\[data-hc-property-toggle\] \{[\s\S]*?color:\s*ButtonText;/)
   assert.doesNotMatch(css, /\[data-hc-property-toggle[^\]]*\][^{]*\{[^}]*(?:transition|animation):/)
+  // Upstream's generic `button:hover` repaints button text white with
+  // `!important`; the toggle answers it so hovering never bleaches its dot.
+  assert.match(css, /\[data-hc-property-toggle\]:hover \{\s*color:\s*var\(--vscode-hc-cyan\)\s*!important;/)
 })
 
 test('workbench chrome is bordered in the contrast border, not white', () => {

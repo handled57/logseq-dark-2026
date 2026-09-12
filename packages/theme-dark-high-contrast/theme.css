@@ -859,6 +859,14 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   cursor: pointer;
 }
 
+/* Upstream's generic `button:hover` repaints every button's text white,
+ * `!important`. Answered here so the dot, painted in `currentColor`, keeps
+ * its resting cyan while hovered rather than flashing white. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]:hover {
+  color: var(--vscode-hc-cyan) !important;
+}
+
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]::before {
   content: '';

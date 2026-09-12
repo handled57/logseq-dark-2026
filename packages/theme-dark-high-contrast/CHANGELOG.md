@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 2.13.1 - 2026-09-12
+
+- Fix the property-visibility toggle's dot turning white on hover. It answers
+  the generic hovered-button color upstream repaints with `!important`, and
+  keeps its resting cyan instead.
+
 ## 2.13.0 - 2026-09-11
 
 - Use the full available main-content width on desktop viewports.

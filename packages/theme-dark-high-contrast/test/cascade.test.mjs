@@ -1004,6 +1004,19 @@ test('the property toggle rides beside the bullet without changing rail geometry
   assert.ok(px(control, 'left') > 30, 'the property control is not right of the rail line')
 })
 
+test('the property toggle keeps its cyan color under upstream\'s hovered-button white', () => {
+  const selector = `${wrap} > [data-hc-property-toggle]`
+  const generic = rule('button:hover, .button:hover, .ui__button:hover, .form-button:hover')
+  assert.match(generic, /color:\s*var\(--vscode-hc-white\)\s*!important/)
+
+  const hovered = rule(`${selector}:hover`)
+  assert.equal(value(hovered, 'color'), 'var(--vscode-hc-cyan) !important')
+  assert.ok(
+    compare(specificity(`${selector}:hover`), specificity('button:hover')) > 0,
+    'the toggle does not out-rank the generic hovered-button color'
+  )
+})
+
 test('the rail out-ranks the bullet suppression it answers', () => {
   const visible = `${wrap} .bullet-container`
   assert.match(rule(visible), /opacity:\s*1\s*!important/)
