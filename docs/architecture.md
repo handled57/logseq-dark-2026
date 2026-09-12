@@ -34,7 +34,7 @@ rather than copying this setting automatically.
 
 ## Theme cascade and bullet rail
 
-`packages/dark-high-contrast/theme.css` is the canonical palette and stylesheet.
+`packages/theme-dark-high-contrast/theme.css` is the canonical palette and stylesheet.
 Logseq often resolves a color through `--lx-*`, then `--ls-*`, then `--rx-*`,
 and per-accent rules can outrank a simple theme declaration. Palette changes
 therefore preserve exact High Contrast constants and enough selector specificity
@@ -52,17 +52,12 @@ the bullet positions without moving the content. The rail is scoped to the page
 tree, stops short of embeds, queries, references, sidebars, dialogs, document
 mode, and right-side fold controls, and uses smaller offsets for narrow and
 full-width layouts. `--hc-rail-bullet-y` aligns a bullet and fold arrow with the
-first rendered line, including headings and boxed block types, and
-`--hc-rail-bullet-scale` sizes the bullet by that line's font-size multiple:
-`--hc-rail-bullet-size` and `--hc-rail-bullet-dot` derive Logseq's 16px halo and
-6px dot from it, the rings scale with it, and half of the growth is taken back
-as margin so the bullet centre stays on the rail. All three are declared on the
-row alongside `--hc-rail-bullet-y`, because a custom property substitutes
-against the element it is declared on: derived from `:root`, the two sizes would
-resolve against the root's scale and never follow a heading's. The scale
-defaults to `1`, so every surface the rail does not reach is untouched. These numbers derive from pinned
-upstream declarations; change arithmetic, selectors, and cascade tests
-together.
+first rendered line, including headings and boxed block types. Size does not
+follow that line: every bullet on the rail is one size, a `--hc-rail-bullet-dot`
+of 10px inside Logseq's own 16px `--hc-rail-bullet-size` transparent control, so the bullet
+column reads as a column and a heading is marked by color rather than by bulk.
+Both sizes are declared on the row alongside `--hc-rail-bullet-y`.
+Keep arithmetic, selectors, and cascade tests synchronized.
 
 `index.js` reflects the **Rail layout** enum onto `body` as
 `data-hc-rail-layout="flat|branched"` on every paint and removes it on unload.
@@ -89,16 +84,19 @@ proportions. Both of Logseq's selectors are matched — the rendered heading and
 the editor textarea that carries the level as a class — and the rendered one is
 qualified with `:not(.block-ref *)` because upstream normalizes a quoted
 heading to `1rem` at equal specificity, which this stylesheet would otherwise
-win on load order. A heading's rail bullet is measured from the same variable,
+win on load order. A heading's rail bullet is placed from the same variable,
 so the type and the bullet that hangs beside it cannot drift apart.
 
-The rail's bullets carry the hierarchy; its line does not. The line's two
+In Branched, every bullet, including leaves, copies its own depth color into
+`--hc-rail-bullet-color`, and both line pseudo-elements use that same variable.
+Consecutive same-depth endpoints therefore match along the entire connector.
+In Flat, the rail's bullets carry the hierarchy; its line does not. The line's two
 pseudo-elements paint in `--hc-rail-default-color` at every depth, so the whole
 rail is the one color a reader configures. `--hc-rail-depth-color` is declared
 once per nesting level beside that level's `--hc-rail-indent`, cycling the eight
-ROYGBIV tokens `--hc-rail-depth-1`…`--hc-rail-depth-8` so adjacent levels never
+brightness-ordered tokens `--hc-rail-depth-1`…`--hc-rail-depth-8` so adjacent levels never
 share a hue and the cycle starts again below the eighth — depth 9 is depth 1's
-magenta. A row that carries the hierarchy — Logseq's own `haschild="true"`,
+amber. A row that carries the hierarchy — Logseq's own `haschild="true"`,
 which holds while a block is folded, or a first line that renders or is being
 typed as a heading — copies that color into `--hc-rail-bullet-color`; every
 other row keeps a white bullet. That variable is declared on a block's own
@@ -109,17 +107,14 @@ deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
 pins each literal, its position in the cycle, and the 3:1 a non-text interface
 component owes the canvas.
 
-The bullet's inside is a fourth variable, `--hc-rail-bullet-fill`, which follows
-`--hc-rail-bullet-color` everywhere except on a block whose children are
-showing: `[haschild="true"]` with a `.bullet-container` Logseq has not marked
-`.bullet-closed` sets the fill to `transparent`, so an open block is a ring, a
-folded one stays filled, and a leaf is unchanged. Both the rest state and the
-hover state paint from that one variable, the hover with `!important`, because
-upstream repaints a hovered bullet's inside from `.bullet-link-wrap:hover` with
-an important declaration of its own; the halo and the scale it adds are left
-alone.
+Parents have a crisp 2px ring with a 2px gap; expanded parents hide the central dot, in the bullet color. An opaque black parent control masks the rail inside the ring and gap; the ring itself is fully opaque. There are no blurred shadows.
+`--hc-rail-bullet-fill` resolves to `--hc-rail-bullet-color` for leaves and
+collapsed parents. An expanded parent overrides the fill to transparent on its
+bullet container, preserving the ring and ordered-list label.
+Rest and hover use the same fill; the hover declaration is important to
+override Logseq's own important hover fill.
 
-`--hc-rail-default-color` is the line, and the only part of the rail a reader
+`--hc-rail-default-color` is the Flat line, and the only part of the rail a reader
 configures. theme.css declares it as `--vscode-hc-border`, the structural
 border the editor, the left menu and the sidebars are drawn with, and `index.js`
 writes the **Rail color** setting over it as an inline custom property,
@@ -251,7 +246,7 @@ removes every control along with the attributes.
 
 ## Passage parser and local text
 
-`packages/passage/bible.js` is a classic browser script loaded before
+`packages/plugin-passage/bible.js` is a classic browser script loaded before
 `index.js`. It deliberately avoids module imports or a build step and exposes
 the parser/formatter surface the entry consumes.
 
@@ -275,10 +270,14 @@ for manual testing. Verification rejects missing or unexpected ZIP members.
 ## Shared release infrastructure
 
 `scripts/release-support.mjs` discovers npm workspaces from `packages/*` and
-normalizes their package metadata and output paths. Each package owns the exact
-list in `package.json#release.files`. `build-release.mjs` copies those canonical
-sources into `dist/<package-name>/`, then adds the root `LICENSE` and the single
-vendored SDK from `vendor/logseq/lsplugin.user.js` and creates the ZIP.
+normalizes their package metadata and output paths. A workspace folder is named
+for what the package is — `packages/theme-*` for a theme, `packages/plugin-*`
+for a plugin — and nothing downstream reads that name: archives, package names,
+Logseq ids and release tags all come from the package's own metadata. Each
+package owns the exact list in `package.json#release.files`. `build-release.mjs`
+copies those canonical sources into `dist/<package-name>/`, then adds the root
+`LICENSE` and the single vendored SDK from `vendor/logseq/lsplugin.user.js` and
+creates the ZIP.
 
 `verify-release.mjs` reads the archive directly and proves:
 

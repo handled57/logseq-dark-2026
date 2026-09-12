@@ -240,19 +240,19 @@ function literal(name) {
 }
 
 test('the rail hierarchy is the eight colors, in order, and stays legible on black', () => {
-  // The cycle the rail steps through, in ROYGBIV order, with the palette token
+  // The cycle the rail steps through, from brightest to darkest, with the palette token
   // each level reads it through. These are not the VS Code palette's own hues:
   // they are chosen to stay apart from one another for a reader with a common
   // color vision deficiency, which a literal red-to-violet sweep does not.
   const cycle = [
-    ['magenta', '--hc-rail-magenta', '#dc267f'],
-    ['orange', '--hc-rail-orange', '#ea5c00'],
-    ['brown', '--hc-rail-brown', '#994f00'],
     ['amber', '--hc-rail-amber', '#ffb000'],
-    ['teal', '--hc-rail-teal', '#40b0a6'],
     ['blue', '--hc-rail-blue', '#75beff'],
+    ['teal', '--hc-rail-teal', '#40b0a6'],
     ['indigo', '--hc-rail-indigo', '#b180d7'],
-    ['violet', '--hc-rail-violet', '#b66dff']
+    ['violet', '--hc-rail-violet', '#b66dff'],
+    ['orange', '--hc-rail-orange', '#ea5c00'],
+    ['magenta', '--hc-rail-magenta', '#dc267f'],
+    ['brown', '--hc-rail-brown', '#994f00']
   ]
 
   cycle.forEach(([name, token, hex], index) => {
@@ -271,6 +271,11 @@ test('the rail hierarchy is the eight colors, in order, and stays legible on bla
     )
   })
 
+  for (let i = 1; i < cycle.length; i += 1) {
+    assert.ok(contrast(cycle[i - 1][2], '#000000') > contrast(cycle[i][2], '#000000'),
+      'higher hierarchy levels must be brighter')
+  }
+
   // Seven of the eight also carry the 4.5:1 a word set in them would need. The
   // brown is the one that does not, at 3.47:1, and no text is ever set in it.
   const legible = cycle.filter(([, , hex]) => contrast(hex, '#000000') >= 4.5)
@@ -284,13 +289,13 @@ test('the rail hierarchy is the eight colors, in order, and stays legible on bla
     assert.notEqual(cycle[index][2], cycle[(index + 1) % cycle.length][2])
   }
 
-  // The cycle is exactly eight deep: a ninth level starts it over at magenta
+  // The cycle is exactly eight deep: a ninth level starts it over at amber
   // rather than reading a color the palette does not carry.
   assert.doesNotMatch(css, /--hc-rail-depth-9\s*:/, 'the cycle is longer than eight colors')
   assert.match(
     css,
     /\.block-children \.block-children \.block-children \.block-children \.block-children \.block-children \.block-children \.block-children \.ls-block[^{}]*\{[^{}]*--hc-rail-depth-color: var\(--hc-rail-depth-1\)/,
-    'the ninth nesting level does not start the cycle over at magenta'
+    'the ninth nesting level does not start the cycle over at amber'
   )
 })
 
@@ -1048,7 +1053,7 @@ test('the theme is an independently staged workspace of the monorepo root', asyn
 
   assert.equal(workspace.private, true, 'the coordinator would otherwise be publishable')
   assert.ok(workspace.workspaces.includes('packages/*'), 'the package is outside the workspaces glob')
-  assert.equal(resolve(repo, 'packages', 'dark-high-contrast'), root)
+  assert.equal(resolve(repo, 'packages', 'theme-dark-high-contrast'), root)
 
   assert.match(workspace.scripts.test, /--workspaces/, 'root test does not aggregate')
   assert.match(workspace.scripts.build, /build-release\.mjs --all/, 'root build is not a single aggregate build')

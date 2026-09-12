@@ -5,7 +5,7 @@ per chapter it spans, and — where you have built a local text index — the ve
 text itself.
 
 Passage is a plugin, not a theme. It writes ordinary Logseq markup and styles
-nothing. The [Dark High Contrast](../dark-high-contrast) theme paints passage
+nothing. The [Dark High Contrast](../theme-dark-high-contrast) theme paints passage
 blocks as a sibling of Logseq's named admonitions, but neither package needs the
 other: the shape they agree on is written down in
 [`docs/contracts/passage-v1.md`](../../docs/contracts/passage-v1.md).
@@ -329,8 +329,8 @@ No dependency installation or compilation is needed to use the plugin.
 ## Development
 
 ```sh
-npm test --workspace packages/passage            # the package's own suites
-npm run check --workspace packages/passage       # test, build and verify the ZIP
+npm test --workspace packages/plugin-passage            # the package's own suites
+npm run check --workspace packages/plugin-passage       # test, build and verify the ZIP
 ```
 
 ### Testing against the built plugin

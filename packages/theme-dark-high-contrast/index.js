@@ -138,7 +138,8 @@ const settingsSchema = [
     default: DEFAULT_RAIL_COLOR,
     title: 'Rail color',
     description:
-      'The color of the bullet rail beside a page\'s blocks. The whole line is drawn in it, at ' +
+      'The color of the Flat bullet rail beside a page\'s blocks. Branched rails match their ' +
+      'depth-colored bullets. In Flat, the whole line is drawn in this color, at ' +
       'every nesting level. Defaults to the border color used around the editor, the left menu ' +
       'and the sidebars. Leave empty to keep that border color. The eight colors the bullets ' +
       'carry the hierarchy in are unaffected.'

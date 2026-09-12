@@ -6,20 +6,20 @@ import { repositoryRoot } from '../scripts/release-support.mjs'
 import { selectRelease } from '../scripts/select-release.mjs'
 
 test('package tags select one version-matched release archive', async () => {
-  assert.deepEqual(await selectRelease('theme-v2.10.0'), {
-    archive: 'dist/logseq-dark-high-contrast-theme-2.10.0.zip',
-    release_name: 'Dark High Contrast 2.10.0',
-    workspace: 'packages/dark-high-contrast'
+  assert.deepEqual(await selectRelease('theme-v2.12.0'), {
+    archive: 'dist/logseq-dark-high-contrast-theme-2.12.0.zip',
+    release_name: 'Dark High Contrast 2.12.0',
+    workspace: 'packages/theme-dark-high-contrast'
   })
   assert.deepEqual(await selectRelease('passage-v0.8.0'), {
     archive: 'dist/logseq-passage-0.8.0.zip',
     release_name: 'Passage 0.8.0',
-    workspace: 'packages/passage'
+    workspace: 'packages/plugin-passage'
   })
   assert.deepEqual(await selectRelease('anno-v0.2.0'), {
     archive: 'dist/logseq-anno-0.2.0.zip',
     release_name: 'Anno 0.2.0',
-    workspace: 'packages/anno'
+    workspace: 'packages/plugin-anno'
   })
 })
 

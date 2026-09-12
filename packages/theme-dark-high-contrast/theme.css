@@ -58,17 +58,17 @@ html[data-theme][data-color]:root body,
   --hc-rail-indigo: #b180d7;
   --hc-rail-violet: #b66dff;
 
-  /* The bullets' hierarchy colors in ROYGBIV order, one hue per nesting level,
-   * magenta for a top-level block. The eight repeat below the eighth level —
-   * the ninth is magenta again — so no two adjacent levels ever share a hue. */
-  --hc-rail-depth-1: var(--hc-rail-magenta);
-  --hc-rail-depth-2: var(--hc-rail-orange);
-  --hc-rail-depth-3: var(--hc-rail-brown);
-  --hc-rail-depth-4: var(--hc-rail-amber);
-  --hc-rail-depth-5: var(--hc-rail-teal);
-  --hc-rail-depth-6: var(--hc-rail-blue);
-  --hc-rail-depth-7: var(--hc-rail-indigo);
-  --hc-rail-depth-8: var(--hc-rail-violet);
+  /* The bullets' hierarchy colors from brightest to darkest, one hue per level,
+   * amber for a top-level block. The eight repeat below the eighth level —
+   * the ninth is amber again — so no two adjacent levels ever share a hue. */
+  --hc-rail-depth-1: var(--hc-rail-amber);
+  --hc-rail-depth-2: var(--hc-rail-blue);
+  --hc-rail-depth-3: var(--hc-rail-teal);
+  --hc-rail-depth-4: var(--hc-rail-indigo);
+  --hc-rail-depth-5: var(--hc-rail-violet);
+  --hc-rail-depth-6: var(--hc-rail-orange);
+  --hc-rail-depth-7: var(--hc-rail-magenta);
+  --hc-rail-depth-8: var(--hc-rail-brown);
 
   /* The rail line: the color every block paints its stretch of rail with, at
    * every depth. It is the structural border the editor, the left menu and the
@@ -609,13 +609,46 @@ hr {
   background-color: transparent !important;
 }
 
+/* Page title alignment
+ *
+ * The page title starts where the text under it does. Logseq leaves the title
+ * at the page's own left edge, pulls the block tree 20px left of that with an
+ * inline margin on `.page-blocks-inner`, and then holds every block's text
+ * 44px right of the tree: the 22px box the fold arrow is drawn in, the 16px
+ * bullet, and the 6px gutter between the bullet and the text. A block's text
+ * therefore starts 24px right of the page, while the title, whose box is laid
+ * 6px left of the page and pads its text 8px inside that, starts 2px right of
+ * it — 22px short of the prose it heads.
+ *
+ * The rail moves the bullet out of that column but not the column itself,
+ * which leaves the title the one line on the page that starts nowhere: the
+ * rail stands well to its left and the text it heads sits to its right. The
+ * title is handed the difference here, on its own box rather than on the text
+ * inside it, so the background the title is hovered and edited in travels with
+ * it.
+ *
+ * Logseq's own `-6px` is restated rather than added to, because the indent is
+ * measured to the text: the box lands 8px left of the column and its padding
+ * carries the text onto it. Document mode and the right-hand fold layout
+ * re-measure the tree, and the rail steps aside for both, so the title keeps
+ * Logseq's alignment there. A page in the sidebar, a zoomed block and a
+ * whiteboard render no title row at all. */
+:root {
+  --hc-title-indent: 24px;
+}
+
+main:not(.ls-fold-button-on-right)
+  #main-content-container:not(:has(.page-blocks-inner .content.doc-mode)) .ls-page-title {
+  margin-left: calc(var(--hc-title-indent) - 8px);
+}
+
 /* Bullet rail
  *
  * Every block in the primary editor hangs its bullet on a line in the margin
  * left of the page tree, the way a transcript hangs its entries on a thread.
  * Flat mode (the default) collects every bullet onto one vertical line;
  * Branched mode leaves one 29px horizontal step per expanded nesting level and
- * joins those columns with rounded turns. Only the bullet moves:
+ * connects consecutive same-depth bullets with vertical rails. Only the bullet moves:
  * `.block-control-wrap` is pulled left by the indentation Logseq has already
  * applied to the block and by the width of the margin the rail stands in, and
  * the same distance is handed back as margin on its other side, so the content
@@ -671,23 +704,20 @@ hr {
 
 /* The row is the stacking context the line is painted behind the bullets in,
  * and it carries where this block's bullet belongs — half of the 24px line an
- * ordinary block renders — and how large it is drawn: a bullet reads at the
- * weight of the line it hangs beside, so a first line set larger than ordinary
- * prose takes a bullet larger by the same multiple. Ordinary prose is the
- * baseline at 1, which is exactly the 16px bullet and 6px dot Logseq draws.
+ * ordinary block renders.
  *
- * The two sizes are declared beside the scale rather than on `:root` because a
- * custom property substitutes the properties of the element it is declared on:
- * read from the root they would resolve against the root's scale once and never
- * follow a heading's. */
+ * Every bullet on the rail is drawn at one size, whatever its first line is set
+ * in: the column reads as one column, and a heading is marked by the color of
+ * its bullet rather than by a bullet larger than its neighbors'. Only where a
+ * bullet sits follows the line it hangs beside. The dot is 9px inside Logseq's
+ * own 16px control and has no rings in any state. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container {
   isolation: isolate;
 
   --hc-rail-bullet-y: 12px;
-  --hc-rail-bullet-scale: 1;
-  --hc-rail-bullet-size: calc(16px * var(--hc-rail-bullet-scale));
-  --hc-rail-bullet-dot: calc(6px * var(--hc-rail-bullet-scale));
+  --hc-rail-bullet-size: 16px;
+  --hc-rail-bullet-dot: 10px;
 }
 
 /* A code block or a table is a box of its own, set off from the row by 1rem.
@@ -717,12 +747,10 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 
 /* A heading opens its block a long way below the row's top: the theme gives it
  * a margin of its own font size, and its line is half again as tall as that.
- * Both are proportions of the heading's font size, so each level's bullet drops
- * by 1.75 times its own size, and is drawn that many times the size of an
- * ordinary bullet. That size is Logseq's multiple for the level taken to
- * `--hc-heading-scale`, and the bullet reads the same scale rather than a
- * number of its own, so retuning the type moves the bullets with it. The second
- * selector
+ * The drop is a proportion of the heading's font size, so each level's bullet
+ * falls by 1.75 times its own size — Logseq's multiple for the level taken to
+ * `--hc-heading-scale`, so retuning the type moves the bullets with it. The
+ * bullet itself is the same size here as anywhere else. The second selector
  * is the same heading in the editor, where Logseq renders it as a textarea
  * carrying the level as a class, so the bullet holds still while it is typed
  * in. Headings quoted inside a block reference or an embedded tree are not this
@@ -732,7 +760,6 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h1) {
   --hc-rail-bullet-y: calc(3.5em * var(--hc-heading-scale));
-  --hc-rail-bullet-scale: calc(2 * var(--hc-heading-scale));
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -740,7 +767,6 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h2) {
   --hc-rail-bullet-y: calc(2.625em * var(--hc-heading-scale));
-  --hc-rail-bullet-scale: calc(1.5 * var(--hc-heading-scale));
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -748,7 +774,6 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h3) {
   --hc-rail-bullet-y: calc(2.1em * var(--hc-heading-scale));
-  --hc-rail-bullet-scale: calc(1.2 * var(--hc-heading-scale));
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -756,7 +781,6 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h4) {
   --hc-rail-bullet-y: calc(1.75em * var(--hc-heading-scale));
-  --hc-rail-bullet-scale: calc(1 * var(--hc-heading-scale));
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -764,7 +788,6 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h5) {
   --hc-rail-bullet-y: calc(1.4525em * var(--hc-heading-scale));
-  --hc-rail-bullet-scale: calc(0.83 * var(--hc-heading-scale));
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -772,7 +795,6 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper .h6) {
   --hc-rail-bullet-y: calc(1.3125em * var(--hc-heading-scale));
-  --hc-rail-bullet-scale: calc(0.75 * var(--hc-heading-scale));
 }
 
 /* The control column spans its row, so the line can run the height of it, and
@@ -791,13 +813,14 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   --hc-rail-indent: var(--hc-rail-offset);
 
   /* What this block's own depth is colored in, what its bullet is drawn in,
-   * and what fills the inside of that bullet. A block that carries the
-   * hierarchy — a heading, or a block with children — takes its depth's color
-   * for its bullet; every other block keeps a white one. The fill follows the
-   * bullet's own color, so the two only part where a block's children are
-   * showing and its bullet is hollowed into a ring. The line itself is not
-   * here: every stretch of it paints in `--hc-rail-default-color`, whatever
-   * the block's depth, so the rail is one color the reader chose. */
+   * what fills that bullet. A block that carries
+   * the hierarchy — a heading, or a block with children — takes its depth's
+   * color for its bullet; other Flat blocks keep a white one. Branched overrides
+   * every bullet with its depth color below. The fill is that
+   * same color for leaves and collapsed parents; expanded parents hide it. The line
+   * in Flat paints in
+   * `--hc-rail-default-color`, whatever the block's depth, so the rail is one
+   * color the reader chose. */
   --hc-rail-depth-color: var(--hc-rail-depth-1);
   --hc-rail-bullet-color: var(--vscode-hc-white);
   --hc-rail-bullet-fill: var(--hc-rail-bullet-color);
@@ -818,19 +841,15 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   margin-top: calc(var(--hc-rail-bullet-y) - 12px);
 }
 
-/* Half the bullet, so its center lands on the rail's line for this row, and
- * half of whatever the bullet grew by taken off either side, so a bullet drawn
- * for a large first line grows around the rail rather than off it. Upstream
- * hangs an ordered list's bullet off a relative box shifted 3px left; that
- * would take the bullet off the rail and become what the number below is
+/* Half the bullet, so its center lands on the rail's line for this row.
+ * Upstream hangs an ordered list's bullet off a relative box shifted 3px left;
+ * that would take the bullet off the rail and become what the number below is
  * measured from, so it is put back in flow. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > .bullet-link-wrap {
   position: static;
   left: auto;
   margin-top: calc(var(--hc-rail-bullet-y) - var(--hc-rail-bullet-size) / 2);
-  margin-left: calc((16px - var(--hc-rail-bullet-size)) / 2);
-  margin-right: calc((16px - var(--hc-rail-bullet-size)) / 2);
 }
 
 /* A property-bearing block carries a second dot immediately right of its
@@ -889,16 +908,14 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
  * empty blocks — are part of the rail, so the suppression rules above are
  * answered here. They still hold everywhere the rail does not reach.
  *
- * The bullet is also drawn at the size of the line it hangs beside: this halo,
- * the dot inside it and the two rings around that dot all take the first line's
- * font-size multiple, so an ordinary block keeps exactly the 16px bullet with
- * the 6px dot Logseq draws, and a heading's bullet reads at the weight of its
- * own heading. */
+ * A bullet is a solid 10px dot inside Logseq's own 16px control.
+ * Parents keep a crisp ring; expanded parents hide the dot inside it. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container {
   opacity: 1 !important;
   width: var(--hc-rail-bullet-size);
   height: var(--hc-rail-bullet-size);
+  background-color: transparent;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -906,20 +923,20 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   width: var(--hc-rail-bullet-dot);
   height: var(--hc-rail-bullet-dot);
   flex: none;
+  outline: none;
   background-color: var(--hc-rail-bullet-fill);
-  box-shadow: 0 0 0 calc(1px * var(--hc-rail-bullet-scale)) var(--vscode-hc-black),
-    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--hc-rail-bullet-color);
+  box-shadow: none;
 }
 
 /* Pointing at a bullet leaves its inside alone. Upstream repaints it in the
  * stock bullet gray — with `!important`, from `.bullet-link-wrap:hover` — which
- * would take a depth's color off the one bullet the reader is looking at and
- * fill in the ring a block with children showing is drawn as. Both are answered
- * here, in the block's own fill, at a specificity no upstream rule reaches. The
- * halo and the scale upstream adds on hover are untouched. */
+ * would take a depth's color off the one bullet the reader is looking at, and
+ * change its solid fill. Answer both that fill and the upstream hover scale
+ * so the dot keeps its color and size. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap:hover .bullet-container .bullet {
   background-color: var(--hc-rail-bullet-fill) !important;
+  transform: none;
 }
 
 /* An ordered list's marker is a label inside its bullet. The bullet rides the
@@ -930,7 +947,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container.as-order-list {
   width: var(--hc-rail-bullet-size);
   padding-left: 0;
-  background-color: rgb(255 255 255 / 12%);
+  background-color: transparent;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -939,8 +956,28 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   height: var(--hc-rail-bullet-dot);
   border-radius: 9999px;
   background-color: var(--hc-rail-bullet-fill);
-  box-shadow: 0 0 0 calc(1px * var(--hc-rail-bullet-scale)) var(--vscode-hc-black),
-    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--hc-rail-bullet-color);
+  box-shadow: none;
+}
+
+/* An opaque canvas-colored disc masks the rail through the center and ring gap. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container {
+  background-color: var(--vscode-hc-black);
+  border-radius: 50%;
+}
+
+/* Hide only the fill of an expanded parent's dot, preserving its ring and controls. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed) {
+  --hc-rail-bullet-fill: transparent;
+}
+
+/* Parents keep a sharp ring in both fold states, without a glow. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container .bullet {
+  opacity: 1;
+  outline: 2px solid var(--hc-rail-bullet-color);
+  outline-offset: 2px;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -1058,13 +1095,14 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::after {
   left: calc(30.5px - var(--hc-rail-branch-width) / 2);
   width: var(--hc-rail-branch-width);
+  background-color: var(--hc-rail-bullet-color);
 }
 
 /* The blocks that carry the hierarchy take their depth's color for their
  * bullet: a block that opens with a heading, and a block with children of its
  * own, which is Logseq's own `haschild` and so stays true while the block is
- * folded. Ordinary leaf prose keeps its white bullet. The line under both is
- * the same either way. A block reads its own depth here, never its parent's:
+ * folded. Ordinary leaf prose keeps its white bullet in Flat. A block reads
+ * its own depth here, never its parent's:
  * the variable is declared on the block's own control column, which no
  * descendant block sits inside. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -1076,17 +1114,12 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   --hc-rail-bullet-color: var(--hc-rail-depth-color);
 }
 
-/* A block whose children are showing is drawn as an empty ring: the bullet
- * keeps its color in the two rings around it and gives up its inside, so the
- * one thing a bullet says at a glance is whether there is anything folded away
- * under it. Logseq marks a block that has children with `haschild` and closes
- * its bullet with `bullet-closed` when they are folded, so a bullet without
- * that class and with `haschild` is a block standing open. A collapsed block
- * and a block with no children of its own are untouched — both stay filled. */
-main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container
-  > .block-control-wrap:has(.bullet-container:not(.bullet-closed)) {
-  --hc-rail-bullet-fill: transparent;
+/* Matching endpoints: every Branched bullet, including leaves, uses its own
+ * depth color, which both halves of the same-depth connector share. */
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  --hc-rail-bullet-color: var(--hc-rail-depth-color);
 }
 
 /* The line. Each block paints the stretch of rail its own row is responsible
@@ -1094,7 +1127,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
  * that center across the whole gap below it, to the top of the next row, where
  * the next block's segment starts. The downward reach is the gap itself, so the
  * rail stays unbroken however far apart the blocks are spaced.
- * Every stretch is drawn in `--hc-rail-default-color`, the one color the theme
+ * In Flat, every stretch is drawn in `--hc-rail-default-color`, the one color the theme
  * lets a reader set, so the rail runs the page in a single color however deep
  * the tree goes; the hierarchy is left to the bullets hanging on it. Painted
  * behind the bullets, and never in front of a click. */
@@ -1180,25 +1213,6 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   .ls-block:not(.block-content-wrapper *):not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)):not(.ls-block:has(~ .ls-block) *)
   > .block-main-container > .block-control-wrap::after {
   bottom: 0;
-}
-
-/* Hovering a block lights its own bullet in that bullet's own color — white
- * for ordinary prose, its own depth's hue for a heading or a parent — so the
- * block under the pointer is easy to find out in the margin at every level.
- * The block the pointer is actually over is the innermost hovered one; an
- * ancestor holding it keeps its bullet plain. */
-main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *):hover:not(:has(.ls-block:hover))
-  > .block-main-container > .block-control-wrap .bullet-container .bullet {
-  box-shadow: 0 0 0 calc(1px * var(--hc-rail-bullet-scale)) var(--vscode-hc-black),
-    0 0 0 calc(2px * var(--hc-rail-bullet-scale)) var(--hc-rail-bullet-color),
-    0 0 0 calc(5px * var(--hc-rail-bullet-scale)) color-mix(in srgb, var(--hc-rail-bullet-color) 30%, transparent);
-}
-
-main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *):hover:not(:has(.ls-block:hover))
-  > .block-main-container > .block-control-wrap .bullet-container {
-  background-color: color-mix(in srgb, var(--hc-rail-bullet-color) 30%, transparent);
 }
 
 .page-reference,
