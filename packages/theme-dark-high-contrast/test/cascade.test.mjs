@@ -982,6 +982,23 @@ test('the rail out-ranks the bullet suppression it answers', () => {
   }
 })
 
+test('rail controls suppress background halos and hover enlargement', () => {
+  const container = `${wrap} .bullet-container`
+  assert.equal(value(rule(container), 'background-color'), 'transparent')
+  for (const competing of [
+    '.bullet-container:not(.typed-list)',
+    '.bullet-container:not(.typed-list).bullet-closed',
+    '.bullet-link-wrap:hover > .bullet-container'
+  ]) {
+    assert.ok(compare(specificity(container), specificity(competing)) > 0,
+      `rail transparency must override ${competing}`)
+  }
+  const hovered = `${wrap}:hover .bullet-container .bullet`
+  assert.equal(value(rule(hovered), 'transform'), 'none')
+  assert.ok(compare(specificity(hovered),
+    specificity('.bullet-link-wrap:hover > .bullet-container:not(.typed-list) .bullet')) > 0)
+})
+
 test('rail bullets have no rings at rest or on hover', () => {
   assert.doesNotMatch(css, /--hc-rail-bullet-(?:gap|ring|edge)/)
   for (const [selector, body] of rules) {

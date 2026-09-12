@@ -807,7 +807,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   --hc-rail-indent: var(--hc-rail-offset);
 
   /* What this block's own depth is colored in, what its bullet is drawn in,
-   * what fills that bullet, and what is drawn around it. A block that carries
+   * what fills that bullet. A block that carries
    * the hierarchy — a heading, or a block with children — takes its depth's
    * color for its bullet; every other block keeps a white one. The fill is that
    * same color in every folded, expanded and hovered state. The line
@@ -908,6 +908,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   opacity: 1 !important;
   width: var(--hc-rail-bullet-size);
   height: var(--hc-rail-bullet-size);
+  background-color: transparent;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -922,12 +923,12 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 /* Pointing at a bullet leaves its inside alone. Upstream repaints it in the
  * stock bullet gray — with `!important`, from `.bullet-link-wrap:hover` — which
  * would take a depth's color off the one bullet the reader is looking at, and
- * fill in the one standing open. It is answered here, from the same fill the
- * bullet carries at rest, at a specificity no upstream rule reaches. The halo
- * and the scale upstream adds on hover are untouched. */
+ * change its solid fill. Answer both that fill and the upstream hover scale
+ * so the dot keeps its color and size. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap:hover .bullet-container .bullet {
   background-color: var(--hc-rail-bullet-fill) !important;
+  transform: none;
 }
 
 /* An ordered list's marker is a label inside its bullet. The bullet rides the

@@ -6,7 +6,8 @@ All notable changes to this project are documented here.
 
 - Draw every rail bullet as a solid 9px dot, uniformly sized across headings,
   prose, expanded parents and folded parents. Preserve first-line alignment.
-- Remove all bullet rings and shadows, including on hover. Keep existing colors.
+- Remove all bullet rings, shadows and container halos, including on hover.
+  Prevent hover enlargement. Keep existing colors.
 
 ## 2.10.0 - 2026-09-10
 

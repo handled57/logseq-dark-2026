@@ -51,7 +51,7 @@ mode, and right-side fold controls, and uses smaller offsets for narrow and
 full-width layouts. `--hc-rail-bullet-y` aligns a bullet and fold arrow with the
 first rendered line, including headings and boxed block types. Size does not
 follow that line: every bullet on the rail is one size, a `--hc-rail-bullet-dot`
-of 9px inside Logseq's own 16px `--hc-rail-bullet-size` halo, so the bullet
+of 9px inside Logseq's own 16px `--hc-rail-bullet-size` transparent control, so the bullet
 column reads as a column and a heading is marked by color rather than by bulk.
 Both sizes are declared on the row alongside `--hc-rail-bullet-y`.
 Keep arithmetic, selectors, and cascade tests synchronized.

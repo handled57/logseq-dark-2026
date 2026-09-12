@@ -91,7 +91,8 @@ every depth. That defaults to `#5b7e96`, the same `--vscode-hc-border` the
 editor, the left menu and the sidebars are drawn with.
 
 Every rail bullet is a small, solid 9px dot, including expanded and folded
-parents. There are no rings, including on hover.
+parents. The surrounding control is transparent, with no halo or rings, and
+hovering keeps the dot the same size.
 
 A page's properties are the page's front matter rather than a block of its text,
 so they render with no bullet and no rail segment, and the rail opens at the
