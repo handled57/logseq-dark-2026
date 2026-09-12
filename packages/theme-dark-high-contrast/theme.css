@@ -909,7 +909,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
  * answered here. They still hold everywhere the rail does not reach.
  *
  * A bullet is a solid 10px dot inside Logseq's own 16px control.
- * Collapsed parents keep an outer ring; expanded parents use a dot-sized ring. */
+ * Collapsed parents keep an outer ring; expanded parents use a 12px ring. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container {
   opacity: 1 !important;
@@ -980,10 +980,10 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   outline-offset: 2px;
 }
 
-/* Inset the expanded parent's ring so its outside stays at the 10px dot edge. */
+/* Inset the expanded parent's 2px stroke by 1px for a 12px outer diameter. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed) .bullet {
-  outline-offset: -2px;
+  outline-offset: -1px;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)

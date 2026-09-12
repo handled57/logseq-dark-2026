@@ -1059,16 +1059,16 @@ test('parent ring interiors mask the rail in both fold states', () => {
   }
 })
 
-test('collapsed parents keep the outer ring and expanded rings match the dot diameter', () => {
+test('collapsed parents keep the outer ring and expanded rings have a 12px outer diameter', () => {
   const closed = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container .bullet`
   assert.equal(value(rule(closed), 'outline'), '2px solid var(--hc-rail-bullet-color)')
   assert.equal(value(rule(closed), 'outline-offset'), '2px')
   const expanded = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed)`
   assert.equal(value(rule(expanded), '--hc-rail-bullet-fill'), 'transparent')
   const inset = rule(`${expanded} .bullet`)
-  assert.equal(value(inset, 'outline-offset'), '-2px')
-  assert.equal(rail.dot + 2 * (2 + px(inset, 'outline-offset')), rail.dot,
-    'expanded ring outer diameter must equal the leaf dot diameter')
+  assert.equal(value(inset, 'outline-offset'), '-1px')
+  assert.equal(rail.dot + 2 * (2 + px(inset, 'outline-offset')), 12,
+    'expanded ring outer diameter must be 12px')
   assert.ok(compare(specificity(`${expanded} .bullet`), specificity(closed)) > 0)
   assert.equal(value(rule(`${wrap} .bullet-container .bullet`), 'outline'), 'none')
   for (const competing of [`${wrap} .bullet-container .bullet`, `${wrap} .bullet-container.typed-list .bullet`, `${wrap}:hover .bullet-container .bullet`]) {

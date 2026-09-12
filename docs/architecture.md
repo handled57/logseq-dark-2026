@@ -106,7 +106,7 @@ deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
 pins each literal, its position in the cycle, and the 3:1 a non-text interface
 component owes the canvas.
 
-Collapsed parents have a crisp 2px outer ring with a 2px gap. Expanded parents use a hollow 2px ring in the bullet color with a 10px outer diameter matching a leaf dot. An opaque black parent control masks the rail inside the ring and gap; the ring itself is fully opaque. There are no blurred shadows.
+Collapsed parents have a crisp 2px outer ring with a 2px gap. Expanded parents use a hollow 2px ring in the bullet color with a 12px outer diameter. An opaque black parent control masks the rail inside the ring and gap; the ring itself is fully opaque. There are no blurred shadows.
 `--hc-rail-bullet-fill` resolves to `--hc-rail-bullet-color` for leaves and
 collapsed parents. An expanded parent overrides the fill to transparent on its
 bullet container, preserving the ring and ordered-list label.
