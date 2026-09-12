@@ -4,13 +4,9 @@ All notable changes to this project are documented here.
 
 ## 2.11.0 - 2026-09-11
 
-- Draw every bullet on the rail at one size, about the size of a second-level
-  heading's dot, whatever its block's first line is set in. Where a bullet sits
-  still follows that line, so a heading's bullet stays on the middle of it; only
-  its bulk is gone, and a heading is marked by the color of its bullet instead.
-- Keep every rail bullet solid in its own color, whether its children are
-  expanded or folded. Remove permanent parent rings for a small dot appearance.
-- Add one ring on hover to highlight the innermost block's bullet.
+- Draw every rail bullet as a solid 9px dot, uniformly sized across headings,
+  prose, expanded parents and folded parents. Preserve first-line alignment.
+- Remove all bullet rings and shadows, including on hover. Keep existing colors.
 
 ## 2.10.0 - 2026-09-10
 

@@ -51,13 +51,10 @@ mode, and right-side fold controls, and uses smaller offsets for narrow and
 full-width layouts. `--hc-rail-bullet-y` aligns a bullet and fold arrow with the
 first rendered line, including headings and boxed block types. Size does not
 follow that line: every bullet on the rail is one size, a `--hc-rail-bullet-dot`
-of 7px inside Logseq's own 16px `--hc-rail-bullet-size` halo, so the bullet
+of 9px inside Logseq's own 16px `--hc-rail-bullet-size` halo, so the bullet
 column reads as a column and a heading is marked by color rather than by bulk.
-`--hc-rail-bullet-gap` (1px) and `--hc-rail-bullet-ring` (1.5px) are the two
-band widths every bullet state is measured out from. All four are declared on
-the row alongside `--hc-rail-bullet-y`. These numbers derive from pinned
-upstream declarations; change arithmetic, selectors, and cascade tests
-together.
+Both sizes are declared on the row alongside `--hc-rail-bullet-y`.
+Keep arithmetic, selectors, and cascade tests synchronized.
 
 Block headings are not Logseq's size. `--hc-heading-scale` takes every level to
 one fraction of the multiple Logseq sets it in, and each heading rule scales
@@ -86,10 +83,7 @@ deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
 pins each literal, its position in the cycle, and the 3:1 a non-text interface
 component owes the canvas.
 
-`--hc-rail-bullet-rings` draws only a black gap separating the solid dot from
-the rail. Parents and leaves have no permanent colored ring.
-`--hc-rail-bullet-edge` records that gap; the innermost hovered block sets
-`--hc-rail-bullet-hover-rings` to one colored ring outside it.
+Bullets have no rings or shadows in any state.
 `--hc-rail-bullet-fill` always resolves to `--hc-rail-bullet-color`, including
 expanded parents. These variables live on each block's own control column.
 Rest and hover use the same fill; the hover declaration is important to
