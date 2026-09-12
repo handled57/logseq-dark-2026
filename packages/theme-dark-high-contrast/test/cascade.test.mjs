@@ -698,73 +698,24 @@ test('a heading and a block with children take their depth color; ordinary prose
   )
 })
 
-test('a block with children carries a ring, and standing open empties it out', () => {
-  // Logseq marks a block that has children with `haschild`, and keeps the mark
-  // while they are folded away, so a block that holds a tree is ringed either
-  // way.
-  const parent = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap`
-  assert.equal(
-    declaration(rule(parent), '--hc-rail-bullet-rings'),
-    '0 0 0 var(--hc-rail-bullet-gap) var(--vscode-hc-black), ' +
-      '0 0 0 calc(var(--hc-rail-bullet-gap) + var(--hc-rail-bullet-ring)) var(--hc-rail-bullet-color)',
-    'a block with children is not ringed in its own color'
-  )
-
-  // What the ring holds is the one thing folding changes: a block standing open
-  // over its children is emptied out to the page's black, and folding it fills
-  // it back in. Logseq marks the folded state on the bullet's own container,
-  // inside the control column the fill is declared on.
-  const open = `${parent}:has(.bullet-container:not(.bullet-closed))`
-  assert.equal(value(rule(open), '--hc-rail-bullet-fill'), 'var(--vscode-hc-black)')
-  assert.ok(
-    compare(specificity(open), specificity(parent)) > 0,
-    'a block standing open does not out-rank the filled bullet it replaces'
-  )
-  assert.ok(
-    compare(specificity(open), specificity(wrap)) > 0,
-    'a block standing open does not out-rank the defaults it replaces'
-  )
-
-  // Every bullet on the rail is painted from that one variable, so the emptied
-  // state reaches all of them and no rule paints a bullet a color of its own.
-  let filled = 0
+test('all rail bullets stay solid without permanent colored rings', () => {
   for (const [selector, body] of rules) {
-    for (const part of splitSelectors(selector)) {
-      if (!part.startsWith(scope) || !plain(part).endsWith('.bullet')) continue
-      if (!/background-color:/.test(body)) continue
-      filled += 1
-      assert.match(
-        value(body, 'background-color'),
-        /^var\(--hc-rail-bullet-fill\)( !important)?$/,
-        `a bullet on the rail is painted "${value(body, 'background-color')}" rather than from its own fill`
-      )
+    if (!selector.startsWith(scope)) continue
+    if (/--hc-rail-bullet-fill:/.test(body)) {
+      assert.equal(value(body, '--hc-rail-bullet-fill'), 'var(--hc-rail-bullet-color)',
+        'expanded and folded bullets must keep their own solid color')
+    }
+    if (/--hc-rail-bullet-rings:/.test(body)) {
+      assert.equal(value(body, '--hc-rail-bullet-rings'),
+        '0 0 0 var(--hc-rail-bullet-gap) var(--vscode-hc-black)',
+        'no permanent colored ring should surround a dot')
+    }
+    if (splitSelectors(selector).some(part => plain(part).endsWith('.bullet')) &&
+        /background-color:/.test(body)) {
+      assert.match(value(body, 'background-color'),
+        /^var\(--hc-rail-bullet-fill\)( !important)?$/)
     }
   }
-  assert.ok(filled >= 3, `only ${filled} of the rail's bullets declare what they are filled with`)
-
-  // Folding is read nowhere else: a leaf is never ringed at rest, and the ring
-  // a parent carries is the same whether its children are showing or not.
-  assert.deepEqual(
-    [...rules.keys()].filter(
-      (selector) => selector.startsWith(scope) && selector.includes('.bullet-closed') && !selector.startsWith(parent)
-    ),
-    [],
-    'the rail reads the folded state somewhere other than the bullet it empties'
-  )
-  assert.ok(
-    !/--hc-rail-bullet-rings:/.test(rule(open)),
-    'standing open changes the rings around the bullet as well as its inside'
-  )
-
-  // The ring is also how far the bullet reaches, which is where hover starts.
-  assert.equal(
-    value(rule(parent), '--hc-rail-bullet-edge'),
-    'calc(var(--hc-rail-bullet-gap) + var(--hc-rail-bullet-ring))'
-  )
-  assert.ok(
-    compare(specificity(parent), specificity(wrap)) > 0,
-    'the block with children does not out-rank the plain bullet it replaces'
-  )
 })
 
 test('page properties carry no bullet and no rail, and the rail opens under them', () => {
@@ -1045,7 +996,7 @@ test('hovering a block adds one ring to its own bullet and no other', () => {
   // whatever the bullet already carries rather than over it: it starts at
   // `--hc-rail-bullet-edge`, is held off by the same black gap the bullet
   // stands on the rail line in, and is the width of every other ring. A leaf
-  // gains its first ring, a block with children a second beyond its own.
+  // gains one ring, as does a block with children.
   const hovered = `${block}:hover:not(:has(.ls-block:hover)) > .block-main-container > .block-control-wrap`
   assert.equal(
     declaration(rule(hovered), '--hc-rail-bullet-hover-rings'),

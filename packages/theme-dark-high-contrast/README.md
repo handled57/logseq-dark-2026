@@ -90,13 +90,9 @@ The line every bullet hangs on is the **Rail color** setting, one color at
 every depth. That defaults to `#5b7e96`, the same `--vscode-hc-border` the
 editor, the left menu and the sidebars are drawn with.
 
-A bullet says what it has to say in the ring around it: a block with children
-carries one, whether they are showing or folded away, and a block with none
-carries no ring at all. A block standing open over its children is emptied out
-to that ring alone; folding it fills the bullet back in, so a filled ring is a
-row holding something you cannot see. Hovering a block adds one more ring
-outside whatever its bullet already carries — a first ring for a leaf, a second
-for a block with children — and never changes what is inside it.
+Every rail bullet is a small, solid 7px dot, including expanded and folded
+parents. There are no permanent colored rings. Hovering the innermost block
+adds one ring in its bullet's color without changing the solid fill.
 
 A page's properties are the page's front matter rather than a block of its text,
 so they render with no bullet and no rail segment, and the rail opens at the
@@ -360,7 +356,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 - On desktop, ordinary pages use 80% of the available main column. Logseq's full-width route remains full width.
 - Every rendered block in the main editor keeps a bullet, and every bullet stands in the same column: Logseq's own bullet is pulled left by the indentation its nesting level applied plus the margin the rail stands in, so the content column keeps the hierarchy Logseq renders. A line runs behind the bullets, from the centre of the first bullet to the end of the last block, each block painting the stretch of it its own row covers.
 - A bullet sits on the middle of its block's first line of text, wherever that line begins. A heading's bullet drops by 1.75 times the size that heading is set in, both in view and while the heading is being typed; a quote, a passage, an admonition, a code block and a table drop their bullet into the box the block opens with. A block whose first line is a picture keeps its bullet at the top of the block.
-- A bullet is drawn at the size of the line it hangs beside. Ordinary prose is the baseline, and a first line set larger than that takes a proportionally larger bullet: a heading's bullet — halo, dot and rings alike — is drawn at the multiple that heading level is set in, so an `h1` bullet is 1.6 times an ordinary one and an `h6` bullet three fifths of it. The bullet grows around the rail rather than off it, so its centre stays on the line, and a block whose first line is ordinary text — including one opening with a quote, a passage, an admonition, a code block or a table — keeps exactly the bullet it had.
+- Every rail bullet is a solid 7px dot inside a 16px control, regardless of heading size or whether its children are expanded. Only hover adds a colored ring.
 - A bullet folds and unfolds its block on a left click, so the rail reads as a control column rather than a set of links; navigating into a block moves to **Open** on the bullet's context menu. Whiteboard bullets keep Logseq's own gestures.
 - The line is one color from the first bullet to the last block, whatever the depth of the blocks beside it: the **Rail color** setting, `#5b7e96` by default. Set it in **Plugins → Dark High Contrast → Settings**, or leave it empty to keep that default.
 - A block that carries the hierarchy — one whose first line is a heading, or one with children of its own — draws its bullet in the color of its depth: magenta at the top level, then orange, brown, amber, teal, blue, indigo and violet, repeating below the eighth level. A child's bullet is always the child's color, never its parent's, and a folded parent keeps its color while its children are out of the DOM. Ordinary leaf prose keeps the white bullet it has always had. The full mapping is in [Bullet-rail hierarchy colors](#bullet-rail-hierarchy-colors).
