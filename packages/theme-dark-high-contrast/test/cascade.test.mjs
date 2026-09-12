@@ -599,7 +599,7 @@ test('both rail layouts share the same bullet column', () => {
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?--hc-rail-offset: 48px;/)
 })
 
-test('branched rails hide both segments at depth changes and retain the opening cap', () => {
+test('branched rails hide both segments at depth changes and add no opening cap', () => {
   const controls = `${branchedScope} .ls-block:not(.block-content-wrapper *)`
   const before = ' > .block-main-container > .block-control-wrap::before'
   const after = ' > .block-main-container > .block-control-wrap::after'
@@ -608,7 +608,7 @@ test('branched rails hide both segments at depth changes and retain the opening 
     controls + '[data-hc-rail-exit="none"]' + after
   )
   assert.equal(value(breaks, 'display'), 'none !important')
-  assert.equal(value(rule(controls + '[data-hc-rail-entry="start"]' + before), 'display'), 'block !important')
+  assert.equal(rules.has(controls + '[data-hc-rail-entry="start"]' + before), false)
   const lines = rule(controls + before + ', ' + controls + after)
   assert.equal(value(lines, 'width'), 'var(--hc-rail-branch-width)')
   assert.equal(value(lines, 'left'), 'calc(30.5px - var(--hc-rail-branch-width) / 2)')
@@ -931,7 +931,7 @@ test('a parent and its first child stand as far apart as two siblings do', () =>
   assert.equal(value(rule('.ls-block'), 'margin-bottom'), 'var(--hc-block-gap)')
 })
 
-test('the rail line runs from the first bullet to the end of the last block', () => {
+test('the rail line runs from the first bullet to the last bullet', () => {
   const line = rule(`${wrap}::before, ${wrap}::after`)
   // The fold arrow, then half a bullet: the center of the bullet Logseq draws.
   assert.equal(px(line, 'left'), rail.arrow + rail.bullet / 2)
@@ -962,16 +962,10 @@ test('the rail line runs from the first bullet to the end of the last block', ()
   // The rail starts at a bullet center: the first rendered block draws nothing
   // above its own bullet.
   assert.match(rule(railStart), /display:\s*none/)
-  // It ends with the last rendered block rather than past it: that block's tail
-  // stops at its own foot instead of overdrawing into the space below.
+  // The final rendered block draws nothing below its own bullet.
   assert.equal(
-    px(
-      rule(
-        `${block}:not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)):not(.ls-block:has(~ .ls-block) *) > .block-main-container > .block-control-wrap::after`
-      ),
-      'bottom'
-    ),
-    0
+    value(rule(`${block}:not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)):not(.ls-block:has(~ .ls-block) *) > .block-main-container > .block-control-wrap::after`), 'display'),
+    'none'
   )
 })
 

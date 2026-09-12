@@ -8,6 +8,8 @@ All notable changes to this project are documented here.
   their 2px stroke and the existing collapsed-parent styling.
 - Hide Logseq's expand/collapse arrows beside rail bullets; bullets remain the
   control for folding blocks.
+- End every rail segment at a bullet, removing the Branched opening cap and the
+  Flat tail below the final bullet.
 
 ## 2.12.0 - 2026-09-11
 

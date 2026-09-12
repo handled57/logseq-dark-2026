@@ -1152,7 +1152,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 }
 
 /* Break both halves at a depth change; only consecutive same-depth blocks
- * share a vertical segment. The first visible block retains the opening cap. */
+ * share a vertical segment. */
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="none"]
@@ -1162,13 +1162,6 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="none"]
   > .block-main-container > .block-control-wrap::after {
   display: none !important;
-}
-
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="start"]
-  > .block-main-container > .block-control-wrap::before {
-  display: block !important;
 }
 
 /* A page's properties are its front matter rather than a block of its text, so
@@ -1202,12 +1195,11 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   display: none;
 }
 
-/* It runs to the end of the last rendered block — the leaf that no block, and
- * no block's ancestor, follows — rather than past it into the space below. */
+/* The rail ends at the center of the last rendered bullet. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *):not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)):not(.ls-block:has(~ .ls-block) *)
   > .block-main-container > .block-control-wrap::after {
-  bottom: 0;
+  display: none;
 }
 
 .page-reference,

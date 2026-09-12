@@ -32,12 +32,10 @@ Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
 - **Branched** aligns bullets in the same column as Flat. A 2px
   vertical rail connects only consecutive visible blocks at the same depth.
   Every depth change leaves a gap, with no curves or horizontal connectors.
-  The first visible block has a short opening rail above it; the final block
-  has no trailing rail. Collapsed descendants are skipped and block spacing
-  stays unchanged.
+  Every segment begins and ends at a bullet. Collapsed descendants are skipped
+  and block spacing stays unchanged.
 
 ```markdown
-|
 *        Block A
 
 *          Block A.1
@@ -390,11 +388,11 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 ## Intentional layout choices
 
 - On desktop, ordinary pages use 80% of the available main column. Logseq's full-width route remains full width.
-- Every rendered block in the main editor keeps a bullet, and every bullet stands in the same column: Logseq's own bullet is pulled left by the indentation its nesting level applied plus the margin the rail stands in, so the content column keeps the hierarchy Logseq renders. A line runs behind the bullets, from the centre of the first bullet to the end of the last block, each block painting the stretch of it its own row covers.
+- Every rendered block in the main editor keeps a bullet, and every bullet stands in the same column: Logseq's own bullet is pulled left by the indentation its nesting level applied plus the margin the rail stands in, so the content column keeps the hierarchy Logseq renders. A line runs behind the bullets from the centre of the first bullet to the centre of the last, so every visible segment begins and ends at a bullet.
 - A bullet sits on the middle of its block's first line of text, wherever that line begins. A heading's bullet drops by 1.75 times the size that heading is set in, both in view and while the heading is being typed; a quote, a passage, an admonition, a code block and a table drop their bullet into the box the block opens with. A block whose first line is a picture keeps its bullet at the top of the block.
 - Every rail bullet uses a 10px dot inside a 16px control, regardless of heading size or whether its children are expanded. Collapsed parents add a 2px outer ring with a 2px gap; expanded parents use a hollow 2px ring with a 13px outer diameter.
 - A bullet folds and unfolds its block on a left click, so the rail reads as a control column rather than a set of links; the redundant expand/collapse arrow beside it is hidden. Navigating into a block moves to **Open** on the bullet's context menu. Whiteboard bullets keep Logseq's own gestures.
-- The line is one color from the first bullet to the last block, whatever the depth of the blocks beside it: the **Rail color** setting, `#5b7e96` by default. Set it in **Plugins → Dark High Contrast → Settings**, or leave it empty to keep that default.
+- The line is one color from the first bullet to the last bullet, whatever the depth of the blocks beside it: the **Rail color** setting, `#5b7e96` by default. Set it in **Plugins → Dark High Contrast → Settings**, or leave it empty to keep that default.
 - A block that carries the hierarchy — one whose first line is a heading, or one with children of its own — draws its bullet in the color of its depth: amber at the top level, then blue, teal, indigo, violet, orange, magenta and brown, repeating below the eighth level. A child's bullet is always the child's color, never its parent's, and a folded parent keeps its color while its children are out of the DOM. Ordinary leaf prose keeps the white bullet it has always had. The full mapping is in [Bullet-rail hierarchy colors](#bullet-rail-hierarchy-colors).
 - Hovering a block preserves its bullet shape, size and color.
 - Block headings are set to `--hc-heading-scale`, `0.8` by default, of the size Logseq gives each level: `1.6em` for an `h1`, then `1.2em`, `0.96em`, `0.8em`, `0.664em` and `0.6em`. Each level scales Logseq's own multiple, so the levels keep their proportions to one another, and the sizes hold in the page view and in the editor alike. The margin above a heading is still its own font size, so the spacing comes down with the type; a heading quoted inside a block reference keeps Logseq's normalization, and page titles are untouched. A graph that wants a different scale — or Logseq's original sizes, at `1` — can set the variable in `custom.css`, and the rail's heading bullets follow it.
