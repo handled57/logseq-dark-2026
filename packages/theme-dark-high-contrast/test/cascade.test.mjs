@@ -608,29 +608,16 @@ test('branched rails hide both segments at depth changes and add no opening cap'
 
 test('branched rails and both endpoint bullets share their own depth color', () => {
   const branchedWrap = `${branchedScope} .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap`
-  assert.equal(value(rule(branchedWrap), '--hc-rail-bullet-color'), 'var(--hc-rail-depth-color)')
   const branchedLines = `${branchedWrap}::before, ${branchedWrap}::after`
   assert.equal(value(rule(branchedLines), 'background-color'), 'var(--hc-rail-bullet-color)')
-  assert.ok(compare(specificity(branchedWrap), specificity(wrap)) > 0)
-  assert.ok(compare(specificity(`${branchedWrap}::before`), specificity(`${wrap}::before`)) > 0)
-  // Flat retains its configured color and white leaf bullets after switching back.
-  assert.equal(value(rule(wrap), '--hc-rail-bullet-color'), 'var(--vscode-hc-white)')
+  // Every bullet already carries its own depth color by default, so Branched
+  // needs no override of its own to match; only the line color differs.
+  assert.equal(value(rule(wrap), '--hc-rail-bullet-color'), 'var(--hc-rail-depth-color)')
   assert.equal(value(rule(`${wrap}::before, ${wrap}::after`), 'background-color'), 'var(--hc-rail-default-color)')
 })
 
-/* The rail's hierarchy colors, in the brightness order it steps through, and the
- * guard the heading rules already qualify themselves by. */
+/* The rail's hierarchy colors, in the brightness order it steps through. */
 const spectrum = 8
-const headingGuard = ':not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)'
-
-/* The three rows that carry the hierarchy: a block Logseq marks as having
- * children, a block whose first line renders as a heading, and that same
- * heading while it is being typed. */
-const qualifying = [
-  `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap`,
-  `${scope} .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper :is(h1, h2, h3, h4, h5, h6)${headingGuard}) > .block-control-wrap`,
-  `${scope} .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper :is(.h1, .h2, .h3, .h4, .h5, .h6)) > .block-control-wrap`
-]
 
 test('every nesting level takes the next color of the spectrum', () => {
   // A top-level block opens the spectrum at red, and is the level every deeper
@@ -669,23 +656,13 @@ test('every nesting level takes the next color of the spectrum', () => {
   assert.ok(!/--hc-rail-depth-9:/.test(css), 'the spectrum is longer than the eight colors the levels cycle through')
 })
 
-test('a heading and a block with children take their depth color; ordinary prose does not', () => {
-  // Ordinary prose keeps its white bullet — never a hierarchy color.
+test('every bullet takes its own depth color, heading or not', () => {
+  // Ordinary prose takes its depth color exactly like a heading or a block
+  // with children would — bullet color reads nesting depth alone.
   const defaults = rule(wrap)
-  assert.equal(value(defaults, '--hc-rail-bullet-color'), 'var(--vscode-hc-white)')
+  assert.equal(value(defaults, '--hc-rail-bullet-color'), 'var(--hc-rail-depth-color)')
   assert.equal(value(defaults, '--hc-rail-bullet-fill'), 'var(--hc-rail-bullet-color)')
-
-  // A block that carries the hierarchy hands its depth's color to its bullet,
-  // and to its bullet only: the line under it is the reader's own color.
-  const carried = rule(qualifying.join(', '))
-  assert.equal(value(carried, '--hc-rail-bullet-color'), 'var(--hc-rail-depth-color)')
-  assert.doesNotMatch(carried, /--hc-rail-line-color:/)
-  for (const selector of qualifying) {
-    assert.ok(
-      compare(specificity(selector), specificity(wrap)) > 0,
-      `"${selector.slice(-72)}" does not out-rank the defaults it replaces`
-    )
-  }
+  assert.doesNotMatch(rule(wrap), /--hc-rail-line-color:/)
 
   // The line is the one color the theme lets a reader set, whatever the block's
   // depth; only the bullet reads the hierarchy.

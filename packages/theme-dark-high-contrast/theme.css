@@ -691,10 +691,10 @@ main:not(.ls-fold-button-on-right)
  * ordinary block renders.
  *
  * Every bullet on the rail is drawn at one size, whatever its first line is set
- * in: the column reads as one column, and a heading is marked by the color of
- * its bullet rather than by a bullet larger than its neighbors'. Only where a
- * bullet sits follows the line it hangs beside. The dot is 9px inside Logseq's
- * own 16px control and has no rings in any state. */
+ * in: the column reads as one column, and the hierarchy is marked by each
+ * bullet's own depth color rather than by a bullet larger than its
+ * neighbors'. Only where a bullet sits follows the line it hangs beside. The
+ * dot is 9px inside Logseq's own 16px control and has no rings in any state. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container {
   isolation: isolate;
@@ -797,16 +797,13 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   --hc-rail-indent: var(--hc-rail-offset);
 
   /* What this block's own depth is colored in, what its bullet is drawn in,
-   * what fills that bullet. A block that carries
-   * the hierarchy — a heading, or a block with children — takes its depth's
-   * color for its bullet; other Flat blocks keep a white one. Branched overrides
-   * every bullet with its depth color below. The fill is that
-   * same color for leaves and collapsed parents; expanded parents hide it. The line
-   * in Flat paints in
-   * `--hc-rail-default-color`, whatever the block's depth, so the rail is one
-   * color the reader chose. */
+   * what fills that bullet. Every bullet, in both layouts, takes its own
+   * depth's color — heading and has-children status decide nothing here. The
+   * fill is that same color for leaves and collapsed parents; expanded
+   * parents hide it. The line in Flat paints in `--hc-rail-default-color`,
+   * whatever the block's depth, so the rail is one color the reader chose. */
   --hc-rail-depth-color: var(--hc-rail-depth-1);
-  --hc-rail-bullet-color: var(--vscode-hc-white);
+  --hc-rail-bullet-color: var(--hc-rail-depth-color);
   --hc-rail-bullet-fill: var(--hc-rail-bullet-color);
 }
 
@@ -1075,30 +1072,6 @@ body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   left: calc(30.5px - var(--hc-rail-branch-width) / 2);
   width: var(--hc-rail-branch-width);
   background-color: var(--hc-rail-bullet-color);
-}
-
-/* The blocks that carry the hierarchy take their depth's color for their
- * bullet: a block that opens with a heading, and a block with children of its
- * own, which is Logseq's own `haschild` and so stays true while the block is
- * folded. Ordinary leaf prose keeps its white bullet in Flat. A block reads
- * its own depth here, never its parent's:
- * the variable is declared on the block's own control column, which no
- * descendant block sits inside. */
-main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap,
-main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .block-content-wrapper :is(h1, h2, h3, h4, h5, h6):not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)) > .block-control-wrap,
-main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *) > .block-main-container:has(> .editor-wrapper :is(.h1, .h2, .h3, .h4, .h5, .h6)) > .block-control-wrap {
-  --hc-rail-bullet-color: var(--hc-rail-depth-color);
-}
-
-/* Matching endpoints: every Branched bullet, including leaves, uses its own
- * depth color, which both halves of the same-depth connector share. */
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
-  --hc-rail-bullet-color: var(--hc-rail-depth-color);
 }
 
 /* The line. Each block paints the stretch of rail its own row is responsible

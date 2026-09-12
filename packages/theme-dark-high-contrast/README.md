@@ -12,7 +12,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Compact workbench treatment for the header, sidebars, command palette, menus, dialogs, and settings.
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
 - Every block in the main editor hangs its bullet on a rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at a uniform size. **Flat** keeps one vertical rail; **Connect the dots** aligns all bullets in one column and joins consecutive same-depth blocks with vertical rails. The content column keeps its usual nesting in both layouts.
-- In **Connect the dots**, every bullet and its connecting rail share the color of their depth. In **Flat**, the line uses the **Rail color** setting; headings and parents have depth-colored bullets and ordinary leaf bullets stay white.
+- Every bullet, in both layouts, is colored by its own nesting depth. In **Connect the dots**, the connecting rail shares that color too. In **Flat**, the line uses the **Rail color** setting regardless of depth.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Block headings are set 20% below the sizes Logseq gives them, so a heading reads as the head of its outline rather than dominating the notes under it. Every level keeps Logseq's proportions, and page titles are unchanged.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
@@ -91,11 +91,12 @@ whiteboards and dialogs remain outside the rail.
 
 ### Bullet-rail hierarchy colors
 
-Every heading, and every block with children, draws its bullet in the color of
-its own depth. Depth 1 is a top-level block. The eight colors repeat below the
-eighth level — depth 9 is amber again. Both layouts cap a block deeper than
-depth 13 at that final rail position and keep the depth-13 color below that tested
-color range. Connect the dots lines share these colors; Flat uses the configured rail color.
+Every bullet, in both layouts, draws in the color of its own nesting depth —
+heading status and whether a block has children play no part in it. Depth 1 is
+a top-level block. The eight colors repeat below the eighth level — depth 9 is
+amber again. Both layouts cap a block deeper than depth 13 at that final rail
+position and keep the depth-13 color below that tested color range. Connect
+the dots lines share these colors; Flat uses the configured rail color.
 
 | Depth | Color | Tokens |
 | --- | --- | --- |
@@ -115,8 +116,8 @@ set in them — a bullet is a non-text interface component, so each one clears
 the 3:1 that asks for; seven of the eight clear 4.5:1 as well, and the brown, at
 3.47:1, is used only for bullets and Connect the dots rails.
 
-In Flat, blocks that carry no hierarchy of their own — ordinary prose without
-children — keep a white bullet. In Connect the dots, these also use their depth color.
+In both layouts, ordinary prose without children uses its depth color too —
+there is no longer a plain white bullet in either layout.
 
 In Flat, the line every bullet hangs on is the **Rail color** setting, one color at
 every depth. That defaults to `#5b7e96`, the same `--vscode-hc-border` the
@@ -393,7 +394,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 - Every rail bullet uses a 10px dot inside a 16px control, regardless of heading size or whether its children are expanded. Collapsed parents add a 2px outer ring with a 2px gap; expanded parents use a hollow 2px ring with a 13px outer diameter.
 - A bullet folds and unfolds its block on a left click, so the rail reads as a control column rather than a set of links; the redundant expand/collapse arrow beside it is hidden. Navigating into a block moves to **Open** on the bullet's context menu. Whiteboard bullets keep Logseq's own gestures.
 - The line is one color from the first bullet to the last bullet, whatever the depth of the blocks beside it: the **Rail color** setting, `#5b7e96` by default. Set it in **Plugins → Dark High Contrast → Settings**, or leave it empty to keep that default.
-- A block that carries the hierarchy — one whose first line is a heading, or one with children of its own — draws its bullet in the color of its depth: amber at the top level, then blue, teal, indigo, violet, orange, magenta and brown, repeating below the eighth level. A child's bullet is always the child's color, never its parent's, and a folded parent keeps its color while its children are out of the DOM. Ordinary leaf prose keeps the white bullet it has always had. The full mapping is in [Bullet-rail hierarchy colors](#bullet-rail-hierarchy-colors).
+- Every bullet draws in the color of its own nesting depth: amber at the top level, then blue, teal, indigo, violet, orange, magenta and brown, repeating below the eighth level. Heading status and whether a block has children play no part in the choice. A child's bullet is always the child's color, never its parent's, and a folded parent keeps its color while its children are out of the DOM. The full mapping is in [Bullet-rail hierarchy colors](#bullet-rail-hierarchy-colors).
 - Hovering a block preserves its bullet shape, size and color.
 - Block headings are set to `--hc-heading-scale`, `0.8` by default, of the size Logseq gives each level: `1.6em` for an `h1`, then `1.2em`, `0.96em`, `0.8em`, `0.664em` and `0.6em`. Each level scales Logseq's own multiple, so the levels keep their proportions to one another, and the sizes hold in the page view and in the editor alike. The margin above a heading is still its own font size, so the spacing comes down with the type; a heading quoted inside a block reference keeps Logseq's normalization, and page titles are untouched. A graph that wants a different scale — or Logseq's original sizes, at `1` — can set the variable in `custom.css`, and the rail's heading bullets follow it.
 - How far left the rail stands is one number, `--hc-rail-offset`. It defaults to `.8em`, following the surrounding type size. A graph can retune it in `custom.css`.

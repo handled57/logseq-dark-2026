@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here.
 
+## 2.14.0 - 2026-09-12
+
+- Color every bullet, in both rail layouts, by its own nesting depth alone.
+  Heading status and Logseq's `haschild` no longer decide bullet color —
+  only whether a ring is drawn around it. There is no longer a plain white
+  leaf bullet in either layout.
+
 ## 2.13.0 - 2026-09-11
 
 - Use the full available main-content width on desktop viewports.

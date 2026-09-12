@@ -88,21 +88,20 @@ heading to `1rem` at equal specificity, which this stylesheet would otherwise
 win on load order. A heading's rail bullet is placed from the same variable,
 so the type and the bullet that hangs beside it cannot drift apart.
 
-In Connect the dots, every bullet, including leaves, copies its own depth color into
-`--hc-rail-bullet-color`, and both line pseudo-elements use that same variable.
-Consecutive same-depth endpoints therefore match along the entire connector.
-In Flat, the rail's bullets carry the hierarchy; its line does not. The line's two
-pseudo-elements paint in `--hc-rail-default-color` at every depth, so the whole
-rail is the one color a reader configures. `--hc-rail-depth-color` is declared
-once per nesting level beside that level's `--hc-rail-indent`, cycling the eight
-brightness-ordered tokens `--hc-rail-depth-1`…`--hc-rail-depth-8` so adjacent levels never
-share a hue and the cycle starts again below the eighth — depth 9 is depth 1's
-amber. A row that carries the hierarchy — Logseq's own `haschild="true"`,
-which holds while a block is folded, or a first line that renders or is being
-typed as a heading — copies that color into `--hc-rail-bullet-color`; every
-other row keeps a white bullet. That variable is declared on a block's own
-control column, which no descendant block sits inside, so a child's bullet
-always takes the child's depth rather than its parent's. All eight hues are the rail's own additions to
+Every bullet, in both layouts, copies its own depth color into
+`--hc-rail-bullet-color` by default — heading status and Logseq's own
+`haschild="true"` decide nothing about that color, only about the ring drawn
+around a row (below). In Connect the dots, both line pseudo-elements also read
+that same variable, so consecutive same-depth endpoints match along the
+entire connector. In Flat, the line does not: its two pseudo-elements paint in
+`--hc-rail-default-color` at every depth, so the whole rail is the one color a
+reader configures. `--hc-rail-depth-color` is declared once per nesting level
+beside that level's `--hc-rail-indent`, cycling the eight brightness-ordered
+tokens `--hc-rail-depth-1`…`--hc-rail-depth-8` so adjacent levels never share
+a hue and the cycle starts again below the eighth — depth 9 is depth 1's
+amber. `--hc-rail-bullet-color` is declared on a block's own control column,
+which no descendant block sits inside, so a child's bullet always takes the
+child's depth rather than its parent's. All eight hues are the rail's own additions to
 the VS Code palette, chosen to stay apart under the common color vision
 deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
 pins each literal, its position in the cycle, and the 3:1 a non-text interface

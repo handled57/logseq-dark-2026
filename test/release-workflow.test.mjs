@@ -6,9 +6,9 @@ import { repositoryRoot } from '../scripts/release-support.mjs'
 import { selectRelease } from '../scripts/select-release.mjs'
 
 test('package tags select one version-matched release archive', async () => {
-  assert.deepEqual(await selectRelease('theme-v2.13.0'), {
-    archive: 'dist/logseq-dark-high-contrast-theme-2.13.0.zip',
-    release_name: 'Dark High Contrast 2.13.0',
+  assert.deepEqual(await selectRelease('theme-v2.14.0'), {
+    archive: 'dist/logseq-dark-high-contrast-theme-2.14.0.zip',
+    release_name: 'Dark High Contrast 2.14.0',
     workspace: 'packages/theme-dark-high-contrast'
   })
   assert.deepEqual(await selectRelease('passage-v0.8.0'), {
