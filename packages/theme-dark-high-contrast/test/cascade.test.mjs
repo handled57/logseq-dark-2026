@@ -1066,8 +1066,9 @@ test('collapsed parents keep the outer ring and expanded rings have a 12px outer
   const expanded = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed)`
   assert.equal(value(rule(expanded), '--hc-rail-bullet-fill'), 'transparent')
   const inset = rule(`${expanded} .bullet`)
-  assert.equal(value(inset, 'outline-offset'), '-1px')
-  assert.equal(rail.dot + 2 * (2 + px(inset, 'outline-offset')), 12,
+  assert.equal(value(inset, 'outline-width'), '3px')
+  assert.equal(value(inset, 'outline-offset'), '-2px')
+  assert.equal(rail.dot + 2 * (px(inset, 'outline-width') + px(inset, 'outline-offset')), 12,
     'expanded ring outer diameter must be 12px')
   assert.ok(compare(specificity(`${expanded} .bullet`), specificity(closed)) > 0)
   assert.equal(value(rule(`${wrap} .bullet-container .bullet`), 'outline'), 'none')
