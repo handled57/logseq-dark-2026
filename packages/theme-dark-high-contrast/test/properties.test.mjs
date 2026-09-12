@@ -348,6 +348,33 @@ function propertyRailBlock(uuid, properties, { mainClasses = [], contentClasses 
   return { host, block: blockHost, controls, table }
 }
 
+function railTree() {
+  const host = node('body')
+  const main = host.appendChild(node('main'))
+  const editor = main.appendChild(node('div', { id: 'main-content-container' }))
+  const page = editor.appendChild(node('div', { classes: ['page-blocks-inner'] }))
+  const content = page.appendChild(node('div', { classes: ['content'] }))
+
+  function appendBlock(group, { visible = true } = {}) {
+    const block = group.appendChild(node('div', {
+      classes: ['ls-block'],
+      getClientRects: () => visible ? [{}] : []
+    }))
+    const mainContainer = block.appendChild(node('div', { classes: ['block-main-container'] }))
+    mainContainer.appendChild(node('div', { classes: ['block-control-wrap'] }))
+    const wrapper = mainContainer.appendChild(node('div', { classes: ['block-content-wrapper'] }))
+    wrapper.textContent = 'Block'
+    return block
+  }
+
+  function childrenOf(block) {
+    const container = block.appendChild(node('div', { classes: ['block-children-container'] }))
+    return container.appendChild(node('div', { classes: ['block-children'] }))
+  }
+
+  return { host, content, appendBlock, childrenOf }
+}
+
 test('property buttons toggle either initial state and keep accessibility in sync', async () => {
   const hiddenFixture = propertyRailBlock('65f00000-0000-0000-0000-000000000040', { type: 'passage' })
   const hiddenContext = load({ hiddenProperties: 'type: passage' }, [
@@ -628,6 +655,96 @@ test('unloading takes the rail color back off the host root', async () => {
   for (const handler of context.logseq.unloads) await handler()
 
   assert.equal(context.hostStyle.properties.has(RAIL_PROPERTY), false)
+})
+
+test('the rail layout setting offers Flat by default and Branched as an alternative', async () => {
+  const context = await render({}, [])
+  const setting = context.logseq.schema.find(({ key }) => key === 'railLayout')
+
+  assert.ok(setting, 'the theme offers no rail layout setting')
+  assert.equal(setting.type, 'enum')
+  assert.equal(setting.enumPicker, 'select')
+  assert.deepEqual([...setting.enumChoices], ['Flat', 'Branched'])
+  assert.equal(setting.default, 'Flat')
+  assert.equal(setting.title, 'Rail layout')
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'flat')
+})
+
+test('choosing Branched updates the host layout marker on repaint', async () => {
+  const context = await render({ railLayout: 'Branched' }, [])
+
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'branched')
+
+  context.logseq.settings.railLayout = 'Flat'
+  context.paint()
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'flat')
+})
+
+test('Branched connects consecutive same-depth rows and breaks at every depth change', async () => {
+  const fixture = railTree()
+  const a = fixture.appendBlock(fixture.content)
+  const children = fixture.childrenOf(a)
+  const a1 = fixture.appendBlock(children)
+  const a2 = fixture.appendBlock(children)
+  const a21 = fixture.appendBlock(fixture.childrenOf(a2))
+  const b = fixture.appendBlock(fixture.content)
+  const c = fixture.appendBlock(fixture.content)
+  const blocks = [a, a1, a2, a21, b, c]
+  const context = load({ railLayout: 'Branched' }, [], {}, fixture.host)
+  await Promise.resolve()
+  const entry = () => blocks.map(block => block.getAttribute('data-hc-rail-entry'))
+  const exit = () => blocks.map(block => block.getAttribute('data-hc-rail-exit'))
+  assert.deepEqual(entry(), ['start', 'none', 'connected', 'none', 'none', 'connected'])
+  assert.deepEqual(exit(), ['none', 'connected', 'none', 'none', 'connected', 'none'])
+
+  // Collapsing A.2 removes its hidden child's segments on repaint.
+  a21.getClientRects = () => []
+  context.paint()
+  assert.deepEqual(entry(), ['start', 'none', 'connected', null, 'none', 'connected'])
+  assert.deepEqual(exit(), ['none', 'connected', 'none', null, 'connected', 'none'])
+
+  context.logseq.settings.railLayout = 'Flat'
+  context.paint()
+  assert.deepEqual(entry(), Array(6).fill(null))
+  assert.deepEqual(exit(), Array(6).fill(null))
+  context.logseq.settings.railLayout = 'Branched'
+  context.paint()
+  for (const handler of context.logseq.unloads) await handler()
+  assert.deepEqual(entry(), Array(6).fill(null))
+  assert.deepEqual(exit(), Array(6).fill(null))
+})
+
+test('Branched ignores front matter and embedded or hidden blocks in each content root', async () => {
+  const fixture = railTree()
+  const front = fixture.appendBlock(fixture.content)
+  front.classList.add('pre-block')
+  const a = fixture.appendBlock(fixture.content)
+  const hidden = fixture.appendBlock(fixture.childrenOf(a), { visible: false })
+  const embed = fixture.appendBlock(a.querySelector('.block-content-wrapper'))
+  const b = fixture.appendBlock(fixture.content)
+  const other = fixture.host.appendChild(node('div', { classes: ['content'] }))
+  const lone = fixture.appendBlock(other)
+  load({ railLayout: 'Branched' }, [], {}, fixture.host)
+  await Promise.resolve()
+  assert.equal(a.getAttribute('data-hc-rail-entry'), 'start')
+  assert.equal(a.getAttribute('data-hc-rail-exit'), 'connected')
+  assert.equal(b.getAttribute('data-hc-rail-entry'), 'connected')
+  assert.equal(b.getAttribute('data-hc-rail-exit'), 'none')
+  assert.equal(lone.getAttribute('data-hc-rail-entry'), 'start')
+  assert.equal(lone.getAttribute('data-hc-rail-exit'), 'none')
+  for (const block of [front, hidden, embed]) {
+    assert.equal(block.getAttribute('data-hc-rail-entry'), null)
+    assert.equal(block.getAttribute('data-hc-rail-exit'), null)
+  }
+})
+
+test('an unknown rail layout falls back to Flat and unloading removes the marker', async () => {
+  const context = await render({ railLayout: 'diagonal' }, [])
+
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'flat')
+
+  for (const handler of context.logseq.unloads) await handler()
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), null)
 })
 
 function bulletBlock({ raw = '', text = '', special = false, renderedSelector = '', wrapperSelector = '', uuid = '' } = {}) {

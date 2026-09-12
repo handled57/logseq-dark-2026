@@ -644,13 +644,15 @@ main:not(.ls-fold-button-on-right)
 
 /* Bullet rail
  *
- * Every block in the primary editor hangs its bullet on one vertical line in
- * the margin left of the page tree, the way a transcript hangs its entries on a
- * thread. Only the bullet moves: `.block-control-wrap` is pulled left by the
- * indentation Logseq has already applied to the block and by the width of the
- * margin the rail stands in, and the same distance is handed back as margin on
- * its other side, so the content column keeps the 29px-per-level hierarchy it
- * renders with untouched.
+ * Every block in the primary editor hangs its bullet on a line in the margin
+ * left of the page tree, the way a transcript hangs its entries on a thread.
+ * Flat mode (the default) collects every bullet onto one vertical line;
+ * Branched mode leaves one 29px horizontal step per expanded nesting level and
+ * connects consecutive same-depth bullets with vertical rails. Only the bullet moves:
+ * `.block-control-wrap` is pulled left by the indentation Logseq has already
+ * applied to the block and by the width of the margin the rail stands in, and
+ * the same distance is handed back as margin on its other side, so the content
+ * column keeps the 29px-per-level hierarchy it renders with untouched.
  *
  * Logseq indents with `.block-children-container { margin-left: 29px }`, which
  * accumulates through the box tree and cannot be read back in CSS. Counting the
@@ -682,6 +684,10 @@ main:not(.ls-fold-button-on-right)
  * are given less of it. */
 :root {
   --hc-rail-offset: 80px;
+}
+
+:root {
+  --hc-rail-branch-width: 2px;
 }
 
 @media (max-width: 1100px) {
@@ -809,9 +815,10 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   /* What this block's own depth is colored in, what its bullet is drawn in,
    * what fills that bullet. A block that carries
    * the hierarchy — a heading, or a block with children — takes its depth's
-   * color for its bullet; every other block keeps a white one. The fill is that
+   * color for its bullet; other Flat blocks keep a white one. Branched overrides
+   * every bullet with its depth color below. The fill is that
    * same color for leaves and collapsed parents; expanded parents hide it. The line
-   * itself is not here: every stretch of it paints in
+   * in Flat paints in
    * `--hc-rail-default-color`, whatever the block's depth, so the rail is one
    * color the reader chose. */
   --hc-rail-depth-color: var(--hc-rail-depth-1);
@@ -902,7 +909,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
  * answered here. They still hold everywhere the rail does not reach.
  *
  * A bullet is a solid 10px dot inside Logseq's own 16px control.
- * Parents keep a crisp ring; expanded parents hide the dot inside it. */
+ * Collapsed parents keep an outer ring; expanded parents use a dot-sized ring. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container {
   opacity: 1 !important;
@@ -959,18 +966,24 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   border-radius: 50%;
 }
 
-/* Hide only the fill of an expanded parent's dot, preserving its ring and controls. */
+/* Hollow the expanded parent's dot without changing its controls. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed) {
   --hc-rail-bullet-fill: transparent;
 }
 
-/* Parents keep a sharp ring in both fold states, without a glow. */
+/* Collapsed parents keep a sharp outer ring, without a glow. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container .bullet {
   opacity: 1;
   outline: 2px solid var(--hc-rail-bullet-color);
   outline-offset: 2px;
+}
+
+/* Inset the expanded parent's ring so its outside stays at the 10px dot edge. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed) .bullet {
+  outline-offset: -2px;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -1064,11 +1077,23 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   --hc-rail-depth-color: var(--hc-rail-depth-5);
 }
 
+/* Branched vertical segments share a 2px width on the original rail axis. */
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::before,
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::after {
+  left: calc(30.5px - var(--hc-rail-branch-width) / 2);
+  width: var(--hc-rail-branch-width);
+  background-color: var(--hc-rail-bullet-color);
+}
+
 /* The blocks that carry the hierarchy take their depth's color for their
  * bullet: a block that opens with a heading, and a block with children of its
  * own, which is Logseq's own `haschild` and so stays true while the block is
- * folded. Ordinary leaf prose keeps its white bullet. The line under both is
- * the same either way. A block reads its own depth here, never its parent's:
+ * folded. Ordinary leaf prose keeps its white bullet in Flat. A block reads
+ * its own depth here, never its parent's:
  * the variable is declared on the block's own control column, which no
  * descendant block sits inside. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -1080,12 +1105,20 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   --hc-rail-bullet-color: var(--hc-rail-depth-color);
 }
 
+/* Matching endpoints: every Branched bullet, including leaves, uses its own
+ * depth color, which both halves of the same-depth connector share. */
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
+  --hc-rail-bullet-color: var(--hc-rail-depth-color);
+}
+
 /* The line. Each block paints the stretch of rail its own row is responsible
  * for: up from the gap above the row to the center of its bullet, and down from
  * that center across the whole gap below it, to the top of the next row, where
  * the next block's segment starts. The downward reach is the gap itself, so the
  * rail stays unbroken however far apart the blocks are spaced.
- * Every stretch is drawn in `--hc-rail-default-color`, the one color the theme
+ * In Flat, every stretch is drawn in `--hc-rail-default-color`, the one color the theme
  * lets a reader set, so the rail runs the page in a single color however deep
  * the tree goes; the hierarchy is left to the bullets hanging on it. Painted
  * behind the bullets, and never in front of a click. */
@@ -1112,6 +1145,26 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap::after {
   top: var(--hc-rail-bullet-y);
   bottom: calc(-1 * var(--hc-block-gap));
+}
+
+/* Break both halves at a depth change; only consecutive same-depth blocks
+ * share a vertical segment. The first visible block retains the opening cap. */
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="none"]
+  > .block-main-container > .block-control-wrap::before,
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="none"]
+  > .block-main-container > .block-control-wrap::after {
+  display: none !important;
+}
+
+body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
+  #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="start"]
+  > .block-main-container > .block-control-wrap::before {
+  display: block !important;
 }
 
 /* A page's properties are its front matter rather than a block of its text, so

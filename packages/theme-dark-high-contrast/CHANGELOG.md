@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## 2.12.0 - 2026-09-11
+
+- Show expanded parents as hollow 2px rings with a 10px outer diameter, matching
+  leaf dots. Remove their outer ring; collapsed parents keep their solid dot,
+  2px gap and outer ring.
+
+- Add a **Rail layout** setting. **Flat** remains the default and preserves the
+  single vertical rail. **Branched** aligns every bullet in one
+  column and draws 2px vertical rails only between consecutive visible blocks at
+  the same depth. Depth changes leave gaps, with no curves or horizontal arms.
+  The first block keeps an opening rail above it and the last has no trailing
+  rail. Hidden descendants are skipped and ordinary block spacing is retained.
+  Branched rails and all their bullets share the depth color, including leaf
+  bullets, so both endpoints match. Flat retains the Rail color setting.
+  Both layouts share parent styling, first-line alignment, exclusions, and the
+  narrow and full-width offsets.
+
 ## 2.11.0 - 2026-09-11
 
 - Use uniform 10px dots across headings and prose. Preserve first-line alignment.

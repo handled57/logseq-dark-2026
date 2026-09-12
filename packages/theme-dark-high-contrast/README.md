@@ -11,8 +11,8 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - VS Code-inspired semantic colors for links, references, properties, tasks, and code.
 - Compact workbench treatment for the header, sidebars, command palette, menus, dialogs, and settings.
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
-- Every block in the main editor hangs its bullet on one vertical rail in the margin left of the page, each bullet on the middle of its block's first line and every one of them the same size, with the content column keeping its usual nesting.
-- The rail's line is one color the whole way down the page, the one the **Rail color** setting names. The bullets hanging on it carry the hierarchy: a heading or a block with children takes the color of its own depth — amber at the top level, then blue, teal, indigo, violet, orange, magenta and brown — and ordinary leaf prose keeps a white bullet.
+- Every block in the main editor hangs its bullet on a rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at a uniform size. **Flat** keeps one vertical rail; **Branched** aligns all bullets in one column and joins consecutive same-depth blocks with vertical rails. The content column keeps its usual nesting in both layouts.
+- In **Branched**, every bullet and its connecting rail share the color of their depth. In **Flat**, the line uses the **Rail color** setting; headings and parents have depth-colored bullets and ordinary leaf bullets stay white.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Block headings are set 20% below the sizes Logseq gives them, so a heading reads as the head of its outline rather than dominating the notes under it. Every level keeps Logseq's proportions, and page titles are unchanged.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
@@ -22,6 +22,41 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Sets the emoji a block opens with in a gutter of its own, left of the block's text, so it reads as that block's icon and the lines under it stay in one column. The emoji is left exactly where it is written.
 - Left-clicking a block bullet expands or collapses that block rather than opening it. Shift-click still opens the block in the sidebar, and right-clicking offers **Open**, immediately above **Open in sidebar**, to open the block in the main editor.
 - No build runtime, tracking, remote imports, or network access.
+
+## Rail layouts
+
+Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
+
+- **Flat** is the default. It moves every bullet onto the same vertical line,
+  preserving the theme's original rail.
+- **Branched** aligns bullets in the same column as Flat. A 2px
+  vertical rail connects only consecutive visible blocks at the same depth.
+  Every depth change leaves a gap, with no curves or horizontal connectors.
+  The first visible block has a short opening rail above it; the final block
+  has no trailing rail. Collapsed descendants are skipped and block spacing
+  stays unchanged.
+
+```markdown
+|
+*        Block A
+
+*          Block A.1
+|
+*          Block A.2
+
+*             Block A.2.1
+
+*        Block B
+|
+*        Block C
+```
+
+Changing the setting repaints the current page immediately. In Branched, every
+bullet uses its depth color and each rail matches both endpoint bullets. The
+Rail color setting applies to Flat. Parent rings, hover behavior, headings and
+special-block alignment are shared by both layouts. The ordinary/full-width and narrow-window
+offsets still apply, and document mode, embeds, queries, references, sidebars,
+whiteboards and dialogs remain outside the rail.
 
 ## Color palette
 
@@ -60,10 +95,9 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 
 Every heading, and every block with children, draws its bullet in the color of
 its own depth. Depth 1 is a top-level block. The eight colors repeat below the
-eighth level — depth 9 is amber again — and a block deeper than depth 13, the
-twelfth level below the top and the last one the rail places, hangs from that
-level's rail position and keeps its color. The line itself takes none of these:
-it is one color the whole way down the page.
+eighth level — depth 9 is amber again. Both layouts cap a block deeper than
+depth 13 at that final rail position and keep the depth-13 color below that tested
+color range. Branched lines share these colors; Flat uses the configured rail color.
 
 | Depth | Color | Tokens |
 | --- | --- | --- |
@@ -81,17 +115,18 @@ they are chosen to stay apart from one another for a reader with a common color
 vision deficiency, which a literal red-to-violet sweep does not. No text is ever
 set in them — a bullet is a non-text interface component, so each one clears
 the 3:1 that asks for; seven of the eight clear 4.5:1 as well, and the brown, at
-3.47:1, is used only as a bullet.
+3.47:1, is used only for bullets and Branched rails.
 
-Blocks that carry no hierarchy of their own — ordinary prose without children —
-keep a white bullet.
+In Flat, blocks that carry no hierarchy of their own — ordinary prose without
+children — keep a white bullet. In Branched, these also use their depth color.
 
-The line every bullet hangs on is the **Rail color** setting, one color at
+In Flat, the line every bullet hangs on is the **Rail color** setting, one color at
 every depth. That defaults to `#5b7e96`, the same `--vscode-hc-border` the
 editor, the left menu and the sidebars are drawn with.
 
-Rail dots are 10px. Parents retain a crisp 2px ring in the dot color with a 2px
-gap. Collapsed parents show the solid dot; expanded parents hide it.
+Rail dots are 10px. Collapsed parents add a crisp 2px outer ring in the dot
+color with a 2px gap. Expanded parents use a hollow 2px ring with a 10px
+outer diameter, matching a leaf dot, and no outer ring.
 An opaque black backing hides the rail inside parent rings, including the gap.
 There is no glow; hovering keeps the dot the same size.
 
@@ -357,11 +392,11 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 - On desktop, ordinary pages use 80% of the available main column. Logseq's full-width route remains full width.
 - Every rendered block in the main editor keeps a bullet, and every bullet stands in the same column: Logseq's own bullet is pulled left by the indentation its nesting level applied plus the margin the rail stands in, so the content column keeps the hierarchy Logseq renders. A line runs behind the bullets, from the centre of the first bullet to the end of the last block, each block painting the stretch of it its own row covers.
 - A bullet sits on the middle of its block's first line of text, wherever that line begins. A heading's bullet drops by 1.75 times the size that heading is set in, both in view and while the heading is being typed; a quote, a passage, an admonition, a code block and a table drop their bullet into the box the block opens with. A block whose first line is a picture keeps its bullet at the top of the block.
-- Every rail bullet uses a 10px dot inside a 16px control, regardless of heading size or whether its children are expanded. Parents retain a 2px ring with a 2px gap; expanded parents hide the dot.
+- Every rail bullet uses a 10px dot inside a 16px control, regardless of heading size or whether its children are expanded. Collapsed parents add a 2px outer ring with a 2px gap; expanded parents use a hollow ring with the same 10px outer diameter as a leaf dot.
 - A bullet folds and unfolds its block on a left click, so the rail reads as a control column rather than a set of links; navigating into a block moves to **Open** on the bullet's context menu. Whiteboard bullets keep Logseq's own gestures.
 - The line is one color from the first bullet to the last block, whatever the depth of the blocks beside it: the **Rail color** setting, `#5b7e96` by default. Set it in **Plugins → Dark High Contrast → Settings**, or leave it empty to keep that default.
 - A block that carries the hierarchy — one whose first line is a heading, or one with children of its own — draws its bullet in the color of its depth: amber at the top level, then blue, teal, indigo, violet, orange, magenta and brown, repeating below the eighth level. A child's bullet is always the child's color, never its parent's, and a folded parent keeps its color while its children are out of the DOM. Ordinary leaf prose keeps the white bullet it has always had. The full mapping is in [Bullet-rail hierarchy colors](#bullet-rail-hierarchy-colors).
-- Hovering a block keeps its bullet solid, with the same size and color.
+- Hovering a block preserves its bullet shape, size and color.
 - Block headings are set to `--hc-heading-scale`, `0.8` by default, of the size Logseq gives each level: `1.6em` for an `h1`, then `1.2em`, `0.96em`, `0.8em`, `0.664em` and `0.6em`. Each level scales Logseq's own multiple, so the levels keep their proportions to one another, and the sizes hold in the page view and in the editor alike. The margin above a heading is still its own font size, so the spacing comes down with the type; a heading quoted inside a block reference keeps Logseq's normalization, and page titles are untouched. A graph that wants a different scale — or Logseq's original sizes, at `1` — can set the variable in `custom.css`, and the rail's heading bullets follow it.
 - How far left the rail stands is one number, `--hc-rail-offset`. It defaults to 80px, drops to 48px on a window narrower than 1100px, and to 24px on the full-width route, where the only space left of the tree is the scroll container's own padding. A graph that wants the rail nearer its text can set it in `custom.css`.
 - A page's title starts where the text under it does. Logseq holds the title at the page's own left edge and its blocks a fold arrow, a bullet and a gutter further right, so the title reads as hanging off the prose it heads; the title is indented to that column instead, and the box it is highlighted and edited in travels with it. The column is `--hc-title-indent`, 24px by default, measured from the page's left edge, so a graph that has retuned the tree can set it in `custom.css`. Document mode and Logseq's right-hand fold button re-measure the tree, so the title keeps Logseq's alignment there, as does a journal heading on the Journals route.

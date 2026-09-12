@@ -99,6 +99,17 @@ const RAIL_COLOR_SETTING = 'defaultRailColor'
 const DEFAULT_RAIL_COLOR = '#5B7E96'
 const RAIL_COLOR_PROPERTY = '--hc-rail-default-color'
 
+/* Both layouts align bullets in one column. Branched connects only consecutive
+ * visible blocks at the same depth. The stylesheet owns the geometry; the entry only
+ * reflects the live setting onto the host body, where a settings change can
+ * switch layouts without reloading the theme. */
+const RAIL_LAYOUT_SETTING = 'railLayout'
+const DEFAULT_RAIL_LAYOUT = 'Flat'
+const BRANCHED_RAIL_LAYOUT = 'Branched'
+const RAIL_LAYOUT_ATTR = 'data-hc-rail-layout'
+const RAIL_ENTRY_ATTR = 'data-hc-rail-entry'
+const RAIL_EXIT_ATTR = 'data-hc-rail-exit'
+
 /* Leading-emoji block icons. A block whose text opens with one emoji has that
  * emoji set in a gutter to the left of the text, the way a passage sets a verse
  * number, so it reads as the block's icon. Nothing is rewritten: the emoji is
@@ -126,10 +137,22 @@ const settingsSchema = [
     default: DEFAULT_RAIL_COLOR,
     title: 'Rail color',
     description:
-      'The color of the bullet rail beside a page\'s blocks. The whole line is drawn in it, at ' +
+      'The color of the Flat bullet rail beside a page\'s blocks. Branched rails match their ' +
+      'depth-colored bullets. In Flat, the whole line is drawn in this color, at ' +
       'every nesting level. Defaults to the border color used around the editor, the left menu ' +
       'and the sidebars. Leave empty to keep that border color. The eight colors the bullets ' +
       'carry the hierarchy in are unaffected.'
+  },
+  {
+    key: RAIL_LAYOUT_SETTING,
+    type: 'enum',
+    enumChoices: [DEFAULT_RAIL_LAYOUT, BRANCHED_RAIL_LAYOUT],
+    enumPicker: 'select',
+    default: DEFAULT_RAIL_LAYOUT,
+    title: 'Rail layout',
+    description:
+      'Both layouts align bullets in one column. Flat keeps one continuous rail. ' +
+      'Branched draws vertical rails only between consecutive blocks at the same depth.'
   },
   {
     key: BLOCK_ICONS_SETTING,
@@ -780,10 +803,60 @@ function applyRailColor() {
   else style.removeProperty(RAIL_COLOR_PROPERTY)
 }
 
+function applyRailLayout() {
+  const layout = readSetting(RAIL_LAYOUT_SETTING, DEFAULT_RAIL_LAYOUT.toLowerCase())
+  const value = layout === BRANCHED_RAIL_LAYOUT.toLowerCase() ? 'branched' : 'flat'
+  doc.body.setAttribute(
+    RAIL_LAYOUT_ATTR,
+    value
+  )
+  applyRailPath(value)
+}
+
+/* Connect only consecutive visible rows at the same depth. Hidden descendants
+ * and embedded trees do not participate; each content root has its own path. */
+function applyRailPath(layout) {
+  const blocks = [...doc.querySelectorAll('.ls-block')]
+
+  for (const block of blocks) {
+    block.removeAttribute(RAIL_ENTRY_ATTR)
+    block.removeAttribute(RAIL_EXIT_ATTR)
+  }
+
+  if (layout !== 'branched') return
+
+  const paths = new Map()
+
+  for (const block of blocks) {
+    if (block.closest?.('.block-content-wrapper') || block.matches?.('.pre-block')) continue
+    if (typeof block.getClientRects === 'function' && block.getClientRects().length === 0) continue
+
+    const root = block.closest?.('.content') ?? doc.body
+
+    let depth = 0
+    for (let parent = block.parentElement; parent && parent !== root; parent = parent.parentElement) {
+      if (parent.matches?.('.ls-block')) depth += 1
+    }
+
+    if (!paths.has(root)) paths.set(root, [])
+    paths.get(root).push({ block, depth })
+  }
+
+  for (const path of paths.values()) {
+    path.forEach(({ block, depth }, index) => {
+      block.setAttribute(RAIL_ENTRY_ATTR, index === 0 ? 'start' :
+        path[index - 1].depth === depth ? 'connected' : 'none')
+      block.setAttribute(RAIL_EXIT_ATTR,
+        path[index + 1]?.depth === depth ? 'connected' : 'none')
+    })
+  }
+}
+
 function paint() {
   const active = rules()
 
   applyRailColor()
+  applyRailLayout()
 
   /* Turning the setting off answers here as well as in the pass below, so a
    * block whose source cannot be read back still gives its mark up. */
@@ -887,6 +960,12 @@ function teardown() {
   doc.removeEventListener('keydown', togglePropertiesOnKey, true)
 
   doc.body.style.removeProperty(RAIL_COLOR_PROPERTY)
+  doc.body.removeAttribute(RAIL_LAYOUT_ATTR)
+
+  for (const block of doc.querySelectorAll('.ls-block')) {
+    block.removeAttribute(RAIL_ENTRY_ATTR)
+    block.removeAttribute(RAIL_EXIT_ATTR)
+  }
 
   collapsedContent.clear()
   propertyVisibility.clear()
