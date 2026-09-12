@@ -671,7 +671,8 @@ test('a heading and a block with children take their depth color; ordinary prose
     if (!/(?:^|;|\n)\s*--hc-rail-(?:depth-color|bullet-color|bullet-fill):/.test(body)) continue
     for (const part of splitSelectors(selector)) {
       assert.ok(
-        plain(part).endsWith('.block-control-wrap'),
+        plain(part).endsWith('.block-control-wrap') ||
+          plain(part).endsWith('.block-control-wrap .bullet-container'),
         `a hierarchy color is declared where a descendant block inherits it: "${part.slice(0, 60)}…"`
       )
     }
@@ -697,12 +698,13 @@ test('a heading and a block with children take their depth color; ordinary prose
   )
 })
 
-test('all rail bullets retain their solid fill', () => {
+test('only expanded parents hide their dot fill', () => {
   for (const [selector, body] of rules) {
     if (!selector.startsWith(scope)) continue
     if (/--hc-rail-bullet-fill:/.test(body)) {
-      assert.equal(value(body, '--hc-rail-bullet-fill'), 'var(--hc-rail-bullet-color)',
-        'expanded and folded bullets must keep their own solid color')
+      assert.equal(value(body, '--hc-rail-bullet-fill'),
+        selector.includes('[haschild="true"]') && selector.includes('.bullet-container:not(.bullet-closed)')
+          ? 'transparent' : 'var(--hc-rail-bullet-color)')
     }
     if (splitSelectors(selector).some(part => plain(part).endsWith('.bullet')) &&
         /background-color:/.test(body)) {
@@ -999,13 +1001,15 @@ test('rail controls suppress background halos and hover enlargement', () => {
     specificity('.bullet-link-wrap:hover > .bullet-container:not(.typed-list) .bullet')) > 0)
 })
 
-test('only collapsed parents get a crisp ring, including on hover', () => {
-  const closed = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container.bullet-closed .bullet`
-  assert.equal(value(rule(closed), 'outline'), '1px solid var(--hc-rail-bullet-color)')
+test('parents retain a 2px ring and 2px gap in both fold states', () => {
+  const closed = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container .bullet`
+  assert.equal(value(rule(closed), 'outline'), '2px solid var(--hc-rail-bullet-color)')
   assert.equal(value(rule(closed), 'outline-offset'), '2px')
+  const expanded = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed)`
+  assert.equal(value(rule(expanded), '--hc-rail-bullet-fill'), 'transparent')
   assert.equal(value(rule(`${wrap} .bullet-container .bullet`), 'outline'), 'none')
   for (const competing of [`${wrap} .bullet-container .bullet`, `${wrap} .bullet-container.typed-list .bullet`, `${wrap}:hover .bullet-container .bullet`]) {
-    assert.ok(compare(specificity(closed), specificity(competing)) > 0)
+    assert.ok(compare(specificity(closed), specificity(competing)) >= 0)
   }
   assert.doesNotMatch(css, /--hc-rail-bullet-(?:gap|ring|edge)/)
   for (const [selector, body] of rules) {

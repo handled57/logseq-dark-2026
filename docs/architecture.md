@@ -83,9 +83,10 @@ deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
 pins each literal, its position in the cycle, and the 3:1 a non-text interface
 component owes the canvas.
 
-Only collapsed parents have a crisp 1px ring with a 2px gap, in the bullet color. There are no blurred shadows.
-`--hc-rail-bullet-fill` always resolves to `--hc-rail-bullet-color`, including
-expanded parents. These variables live on each block's own control column.
+Parents have a crisp 2px ring with a 2px gap; expanded parents hide the central dot, in the bullet color. There are no blurred shadows.
+`--hc-rail-bullet-fill` resolves to `--hc-rail-bullet-color` for leaves and
+collapsed parents. An expanded parent overrides the fill to transparent on its
+bullet container, preserving the ring and ordered-list label.
 Rest and hover use the same fill; the hover declaration is important to
 override Logseq's own important hover fill.
 

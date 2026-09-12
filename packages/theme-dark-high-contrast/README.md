@@ -90,8 +90,8 @@ The line every bullet hangs on is the **Rail color** setting, one color at
 every depth. That defaults to `#5b7e96`, the same `--vscode-hc-border` the
 editor, the left menu and the sidebars are drawn with.
 
-Every rail bullet is a small, solid 10px dot, including expanded and folded
-parents. Collapsed parents add a crisp 1px ring in the dot color with a 2px gap.
+Rail dots are 10px. Parents retain a crisp 2px ring in the dot color with a 2px
+gap. Collapsed parents show the solid dot; expanded parents hide it.
 The surrounding control is transparent, with no glow; hovering keeps the dot the same size.
 
 A page's properties are the page's front matter rather than a block of its text,
@@ -356,7 +356,7 @@ The plugin never edits or replaces a graph's `custom.css` automatically.
 - On desktop, ordinary pages use 80% of the available main column. Logseq's full-width route remains full width.
 - Every rendered block in the main editor keeps a bullet, and every bullet stands in the same column: Logseq's own bullet is pulled left by the indentation its nesting level applied plus the margin the rail stands in, so the content column keeps the hierarchy Logseq renders. A line runs behind the bullets, from the centre of the first bullet to the end of the last block, each block painting the stretch of it its own row covers.
 - A bullet sits on the middle of its block's first line of text, wherever that line begins. A heading's bullet drops by 1.75 times the size that heading is set in, both in view and while the heading is being typed; a quote, a passage, an admonition, a code block and a table drop their bullet into the box the block opens with. A block whose first line is a picture keeps its bullet at the top of the block.
-- Every rail bullet is a solid 10px dot inside a 16px control, regardless of heading size or whether its children are expanded. Only collapsed parents add a crisp ring.
+- Every rail bullet uses a 10px dot inside a 16px control, regardless of heading size or whether its children are expanded. Parents retain a 2px ring with a 2px gap; expanded parents hide the dot.
 - A bullet folds and unfolds its block on a left click, so the rail reads as a control column rather than a set of links; navigating into a block moves to **Open** on the bullet's context menu. Whiteboard bullets keep Logseq's own gestures.
 - The line is one color from the first bullet to the last block, whatever the depth of the blocks beside it: the **Rail color** setting, `#5b7e96` by default. Set it in **Plugins → Dark High Contrast → Settings**, or leave it empty to keep that default.
 - A block that carries the hierarchy — one whose first line is a heading, or one with children of its own — draws its bullet in the color of its depth: amber at the top level, then blue, teal, indigo, violet, orange, magenta and brown, repeating below the eighth level. A child's bullet is always the child's color, never its parent's, and a folded parent keeps its color while its children are out of the DOM. Ordinary leaf prose keeps the white bullet it has always had. The full mapping is in [Bullet-rail hierarchy colors](#bullet-rail-hierarchy-colors).

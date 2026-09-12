@@ -4,9 +4,9 @@ All notable changes to this project are documented here.
 
 ## 2.11.0 - 2026-09-11
 
-- Draw every rail bullet as a solid 10px dot, uniformly sized across headings,
-  prose, expanded parents and folded parents. Preserve first-line alignment.
-- Add a crisp ring only to collapsed parents. Remove container halos and glow,
+- Use uniform 10px dots across headings and prose. Preserve first-line alignment.
+- Give parents a 2px ring with a 2px gap in both fold states. Collapsed parents
+  show the central dot; expanded parents hide it. Remove container halos and glow,
   and prevent hover enlargement.
 - Order hierarchy colors from brightest to darkest, starting with amber, blue
   and teal at the top levels.
