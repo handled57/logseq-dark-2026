@@ -386,7 +386,7 @@ test('focused layout and nested-block behavior remain part of the theme', () => 
   assert.match(css, /\.ls-block:has\(> \.block-main-container > \.block-content-wrapper :is\([^)]*\[style\*="text-align: center"\][^)]*\)\)[\s\S]*?> \.block-main-container > \.block-control-wrap \.bullet-container:not\(\.typed-list\)\s*\{[\s\S]*?opacity:\s*0\s*!important/)
   assert.doesNotMatch(css, /\.ls-block:hover:has\(\.ls-block:hover\)/)
   assert.doesNotMatch(css, /\.ls-block:(?:hover|focus-within)\s*> \.block-main-container > \.block-control-wrap \.bullet-container:not\(\.typed-list\)/)
-  assert.match(css, /\.ls-block:hover:not\(:has\(\.ls-block:hover\)\)/)
+  assert.match(css, /\.ls-block[^{]*:hover:not\(:has\(\.ls-block:hover\)\)/)
   assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left:\s*0\s*!important[\s\S]*?background-color:\s*transparent\s*!important/)
 })
 
@@ -432,20 +432,17 @@ test('block hover leaves the block surface unchanged', () => {
     'the raised fill must not be shared with a hover selector'
   )
 
-  /* The property table still drops its border on the hovered block, so the
-   * panel and the block read as one surface. Losing the fill did not change
-   * that, but the rule has to carry the innermost-hover guard: without it an
-   * ancestor's own table went borderless whenever a child was hovered. */
-  const propertyBorder = rules.find(
+  /* The property table is a bordered panel distinct from the block's own
+   * text. Hovering the block must not touch that border. */
+  const propertyBorderCleared = rules.some(
     ([selector, body]) =>
       selector.includes('.ls-block:hover') &&
       selector.includes('.block-properties') &&
-      /border-color:\s*transparent/.test(body)
+      /border(?:-color)?\s*:\s*transparent/.test(body)
   )
-  assert.ok(propertyBorder, 'the hovered block hides its property table border')
   assert.ok(
-    propertyBorder[0].includes(':hover:not(:has(.ls-block:hover))'),
-    'only the innermost hovered block hides its property table border'
+    !propertyBorderCleared,
+    'hovering a block must not clear its property table border'
   )
 })
 

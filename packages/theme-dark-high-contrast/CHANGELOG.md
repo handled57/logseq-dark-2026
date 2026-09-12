@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 2.13.1 - 2026-09-12
+
+- Keep a block's property table border visible while hovering the block,
+  instead of dropping it to transparent.
+
 ## 2.13.0 - 2026-09-11
 
 - Use the full available main-content width on desktop viewports.
