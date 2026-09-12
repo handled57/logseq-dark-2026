@@ -333,7 +333,7 @@ test('the optional branched rail is body-scoped and documented', async () => {
   const readme = await readFile(resolve(root, 'README.md'), 'utf8')
 
   assert.match(script, /const DEFAULT_RAIL_LAYOUT = 'Flat'/)
-  assert.match(script, /enumChoices: \[DEFAULT_RAIL_LAYOUT, BRANCHED_RAIL_LAYOUT\]/)
+  assert.match(script, /enumChoices: \[DEFAULT_RAIL_LAYOUT, CONNECT_DOTS_RAIL_LAYOUT\]/)
   assert.match(script, /doc\.body\.setAttribute\(\s*RAIL_LAYOUT_ATTR/)
   assert.match(script, /doc\.body\.removeAttribute\(RAIL_LAYOUT_ATTR\)/)
   assert.match(script, /const RAIL_ENTRY_ATTR = 'data-hc-rail-entry'/)
@@ -342,7 +342,7 @@ test('the optional branched rail is body-scoped and documented', async () => {
   assert.match(css, /--hc-rail-branch-width: 2px/)
   assert.match(readme, /## Rail layouts/)
   assert.match(readme, /\*\*Flat\*\* is the default/)
-  assert.match(readme, /\*\*Branched\*\* aligns bullets in the same column as Flat/)
+  assert.match(readme, /\*\*Connect the dots\*\* aligns bullets in the same column as Flat/)
 })
 
 test('classic and ShUI theme contracts cover every planned surface', () => {

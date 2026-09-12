@@ -46,7 +46,7 @@ The main-editor bullet rail repositions Logseq's own bullet; it never clones
 one. Flat layout is the default: for each nesting level, the control column
 moves left by that level's `29px` indentation plus `--hc-rail-offset`, then
 returns the same distance as margin so every bullet lands on one column and the
-content hierarchy does not move. Branched layout uses the same depth compensation, aligning all bullets in
+content hierarchy does not move. Connect the dots layout uses the same depth compensation, aligning all bullets in
 one column without moving the content. The rail is scoped to the page
 tree, stops short of embeds, queries, references, sidebars, dialogs, document
 mode, and right-side fold controls, and uses smaller offsets for narrow and
@@ -62,16 +62,15 @@ Keep arithmetic, selectors, and cascade tests synchronized.
 
 `index.js` reflects the **Rail layout** enum onto `body` as
 `data-hc-rail-layout="flat|branched"` on every paint and removes it on unload.
-The flat geometry is the unqualified stylesheet fallback. Branched rules are
+The flat geometry is the unqualified stylesheet fallback. Connect the dots rules are
 qualified by the body attribute, so changing settings switches the current
 page without reinstalling or reloading the theme. On each paint, the runtime
 groups visible blocks by their content root in DOM reading order, excluding
 front matter, embedded blocks, and descendants with no client rectangles.
-Each row receives `data-hc-rail-entry="start|connected|none"` and
-`data-hc-rail-exit="connected|none"`. Only adjacent visible rows at the same
+Each row receives rail entry and exit markers. Only adjacent visible rows at the same
 depth connect. Both halves at a depth change are hidden, so no rail spans an
-expanded subtree or crosses between nesting columns. The opening row has a
-short rail above its bullet; the last row has no trailing segment.
+expanded subtree or crosses between nesting columns. Every segment begins and
+ends at a bullet, and empty rows interrupt the path.
 
 CSS hides the corresponding control-column pseudo-element for each `none`
 marker. All surviving segments are vertical, 2px wide, and centered on the
@@ -88,7 +87,7 @@ heading to `1rem` at equal specificity, which this stylesheet would otherwise
 win on load order. A heading's rail bullet is placed from the same variable,
 so the type and the bullet that hangs beside it cannot drift apart.
 
-In Branched, every bullet, including leaves, copies its own depth color into
+In Connect the dots, every bullet, including leaves, copies its own depth color into
 `--hc-rail-bullet-color`, and both line pseudo-elements use that same variable.
 Consecutive same-depth endpoints therefore match along the entire connector.
 In Flat, the rail's bullets carry the hierarchy; its line does not. The line's two

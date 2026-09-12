@@ -8,9 +8,11 @@ All notable changes to this project are documented here.
   their 2px stroke and the existing collapsed-parent styling.
 - Hide Logseq's expand/collapse arrows beside rail bullets; bullets remain the
   control for folding blocks.
-- End every rail segment at a bullet, removing the Branched opening cap and the
+- End every rail segment at a bullet, removing the Connect the dots opening cap and the
   Flat tail below the final bullet.
 - Leave empty blocks without a rail segment in both layouts.
+- Rename the **Branched** rail-layout choice to **Connect the dots**, while
+  preserving existing saved selections.
 
 ## 2.12.0 - 2026-09-11
 

@@ -11,8 +11,8 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - VS Code-inspired semantic colors for links, references, properties, tasks, and code.
 - Compact workbench treatment for the header, sidebars, command palette, menus, dialogs, and settings.
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
-- Every block in the main editor hangs its bullet on a rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at a uniform size. **Flat** keeps one vertical rail; **Branched** aligns all bullets in one column and joins consecutive same-depth blocks with vertical rails. The content column keeps its usual nesting in both layouts.
-- In **Branched**, every bullet and its connecting rail share the color of their depth. In **Flat**, the line uses the **Rail color** setting; headings and parents have depth-colored bullets and ordinary leaf bullets stay white.
+- Every block in the main editor hangs its bullet on a rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at a uniform size. **Flat** keeps one vertical rail; **Connect the dots** aligns all bullets in one column and joins consecutive same-depth blocks with vertical rails. The content column keeps its usual nesting in both layouts.
+- In **Connect the dots**, every bullet and its connecting rail share the color of their depth. In **Flat**, the line uses the **Rail color** setting; headings and parents have depth-colored bullets and ordinary leaf bullets stay white.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Block headings are set 20% below the sizes Logseq gives them, so a heading reads as the head of its outline rather than dominating the notes under it. Every level keeps Logseq's proportions, and page titles are unchanged.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
@@ -29,7 +29,7 @@ Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
 
 - **Flat** is the default. It moves every bullet onto the same vertical line,
   preserving the theme's original rail.
-- **Branched** aligns bullets in the same column as Flat. A 2px
+- **Connect the dots** aligns bullets in the same column as Flat. A 2px
   vertical rail connects only consecutive visible blocks at the same depth.
   Every depth change leaves a gap, with no curves or horizontal connectors.
   Every segment begins and ends at a bullet. Empty blocks interrupt the rail;
@@ -49,7 +49,7 @@ Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
 *        Block C
 ```
 
-Changing the setting repaints the current page immediately. In Branched, every
+Changing the setting repaints the current page immediately. In Connect the dots, every
 bullet uses its depth color and each rail matches both endpoint bullets. The
 Rail color setting applies to Flat. Parent rings, hover behavior, headings and
 special-block alignment are shared by both layouts. The ordinary/full-width and narrow-window
@@ -95,7 +95,7 @@ Every heading, and every block with children, draws its bullet in the color of
 its own depth. Depth 1 is a top-level block. The eight colors repeat below the
 eighth level — depth 9 is amber again. Both layouts cap a block deeper than
 depth 13 at that final rail position and keep the depth-13 color below that tested
-color range. Branched lines share these colors; Flat uses the configured rail color.
+color range. Connect the dots lines share these colors; Flat uses the configured rail color.
 
 | Depth | Color | Tokens |
 | --- | --- | --- |
@@ -113,10 +113,10 @@ they are chosen to stay apart from one another for a reader with a common color
 vision deficiency, which a literal red-to-violet sweep does not. No text is ever
 set in them — a bullet is a non-text interface component, so each one clears
 the 3:1 that asks for; seven of the eight clear 4.5:1 as well, and the brown, at
-3.47:1, is used only for bullets and Branched rails.
+3.47:1, is used only for bullets and Connect the dots rails.
 
 In Flat, blocks that carry no hierarchy of their own — ordinary prose without
-children — keep a white bullet. In Branched, these also use their depth color.
+children — keep a white bullet. In Connect the dots, these also use their depth color.
 
 In Flat, the line every bullet hangs on is the **Rail color** setting, one color at
 every depth. That defaults to `#5b7e96`, the same `--vscode-hc-border` the

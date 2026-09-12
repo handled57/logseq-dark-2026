@@ -99,13 +99,14 @@ const RAIL_COLOR_SETTING = 'defaultRailColor'
 const DEFAULT_RAIL_COLOR = '#5B7E96'
 const RAIL_COLOR_PROPERTY = '--hc-rail-default-color'
 
-/* Both layouts align bullets in one column. Branched connects only consecutive
+/* Both layouts align bullets in one column. Connect the dots joins only consecutive
  * visible blocks at the same depth. The stylesheet owns the geometry; the entry only
  * reflects the live setting onto the host body, where a settings change can
  * switch layouts without reloading the theme. */
 const RAIL_LAYOUT_SETTING = 'railLayout'
 const DEFAULT_RAIL_LAYOUT = 'Flat'
-const BRANCHED_RAIL_LAYOUT = 'Branched'
+const CONNECT_DOTS_RAIL_LAYOUT = 'Connect the dots'
+const LEGACY_BRANCHED_RAIL_LAYOUT = 'Branched'
 const RAIL_LAYOUT_ATTR = 'data-hc-rail-layout'
 const RAIL_ENTRY_ATTR = 'data-hc-rail-entry'
 const RAIL_EXIT_ATTR = 'data-hc-rail-exit'
@@ -138,7 +139,7 @@ const settingsSchema = [
     default: DEFAULT_RAIL_COLOR,
     title: 'Rail color',
     description:
-      'The color of the Flat bullet rail beside a page\'s blocks. Branched rails match their ' +
+      'The color of the Flat bullet rail beside a page\'s blocks. Connect the dots rails match their ' +
       'depth-colored bullets. In Flat, the whole line is drawn in this color, at ' +
       'every nesting level. Defaults to the border color used around the editor, the left menu ' +
       'and the sidebars. Leave empty to keep that border color. The eight colors the bullets ' +
@@ -147,13 +148,13 @@ const settingsSchema = [
   {
     key: RAIL_LAYOUT_SETTING,
     type: 'enum',
-    enumChoices: [DEFAULT_RAIL_LAYOUT, BRANCHED_RAIL_LAYOUT],
+    enumChoices: [DEFAULT_RAIL_LAYOUT, CONNECT_DOTS_RAIL_LAYOUT],
     enumPicker: 'select',
     default: DEFAULT_RAIL_LAYOUT,
     title: 'Rail layout',
     description:
       'Both layouts align bullets in one column. Flat keeps one continuous rail. ' +
-      'Branched draws vertical rails only between consecutive blocks at the same depth.'
+      'Connect the dots draws vertical rails only between consecutive blocks at the same depth.'
   },
   {
     key: BLOCK_ICONS_SETTING,
@@ -815,7 +816,8 @@ function applyRailColor() {
 
 function applyRailLayout() {
   const layout = readSetting(RAIL_LAYOUT_SETTING, DEFAULT_RAIL_LAYOUT.toLowerCase())
-  const value = layout === BRANCHED_RAIL_LAYOUT.toLowerCase() ? 'branched' : 'flat'
+  const value = [CONNECT_DOTS_RAIL_LAYOUT, LEGACY_BRANCHED_RAIL_LAYOUT]
+    .map((choice) => choice.toLowerCase()).includes(layout) ? 'branched' : 'flat'
   doc.body.setAttribute(
     RAIL_LAYOUT_ATTR,
     value
