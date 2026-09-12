@@ -522,25 +522,11 @@ function added(expression, variable) {
 }
 
 test('the rail stands in the margin Logseq leaves left of the page', () => {
-  const base = css.match(/\n:root \{\n  --hc-rail-offset: ([\d.]+)px;\n\}/)
+  const base = css.match(/\n:root \{\n  --hc-rail-offset: ([\d.]+)em;\n\}/)
   assert.ok(base, 'the rail has no offset to stand in the margin by')
   const offset = Number.parseFloat(base[1])
   assert.ok(offset > 0, 'the rail does not stand left of the content column')
-
-  // A full-width page has only the scroll container's own padding left of the
-  // tree, so the whole control column — the fold arrow included — has to fit
-  // inside it.
-  const fullWidth = px(
-    rule('#main-content-container > .cp__sidebar-main-content[data-is-full-width="true"]'),
-    '--hc-rail-offset'
-  )
-  assert.ok(fullWidth <= rail.pagePad, 'a full-width page draws its rail outside the scroll container')
-  assert.ok(fullWidth < offset, 'a full-width page is given the same rail as a page with margins')
-
-  // A narrow window leaves less beside the page, so the rail asks for less.
-  const narrow = css.match(/@media \(max-width: (\d+)px\) \{\s*:root \{\s*--hc-rail-offset: (\d+)px;/)
-  assert.ok(narrow, 'the rail does not give way on a narrow window')
-  assert.ok(Number.parseInt(narrow[2], 10) < offset, 'a narrow window is given the full rail offset')
+  assert.equal(offset, 0.8, 'the default rail offset follows the surrounding type size')
 })
 
 test('rail bullets replace the native fold arrows without moving their column', () => {
@@ -595,8 +581,7 @@ test('both rail layouts share the same bullet column', () => {
       assert.ok(!declarations.includes(`${property}:`), `${selector}: ${property}`)
     }
   }
-  assert.equal(px(rule('#main-content-container > .cp__sidebar-main-content[data-is-full-width="true"]'), '--hc-rail-offset'), 24)
-  assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?--hc-rail-offset: 48px;/)
+  assert.doesNotMatch(css, /\.cp__sidebar-main-content[^{}]*\{[^{}]*--hc-rail-offset:/)
 })
 
 test('branched rails hide both segments at depth changes and add no opening cap', () => {
@@ -930,7 +915,7 @@ test('a parent and its first child stand as far apart as two siblings do', () =>
   // the head of the next. A parent and its first child have no margin between
   // them at all: the child hangs in a nested group, and only the head of its
   // own row is padded. So the group opens on the gap plus the padding the
-  // parent's foot would have contributed, and the outline a hovered or selected
+  // parent's foot would have contributed, and the outline a selected
   // block takes stands clear either way instead of being drawn through the
   // border above it.
   assert.equal(value(rule('.block-children'), 'padding-top'), `calc(var(--hc-block-gap) + ${rowPad}px)`)

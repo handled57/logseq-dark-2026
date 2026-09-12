@@ -79,13 +79,13 @@ html[data-theme][data-color]:root body,
    * the root element would never reach a block. */
   --hc-rail-default-color: var(--vscode-hc-border);
 
-  /* How far the outline a block takes on hover, on selection and under
-   * Logseq's own highlight stands off the text it encloses, so the block reads
+  /* How far the outline a selected block, an edited block and Logseq's own
+   * highlight stands off the text it encloses, so the block reads
    * as a bordered card rather than as a line ruled through its paragraph.
    * Logseq sizes a block's content box itself and lays it out border-box, so
    * the room is taken outside that box — as an outline offset, and as the
    * spread of the shadow that carries a selected block's fill out to meet it —
-   * and nothing the block holds moves or rewraps when it is hovered.
+   * and nothing the block holds moves or rewraps when its state changes.
    * `--hc-block-gap` is the space left between two blocks: it clears two of
    * those paddings, so two blocks selected one after the other keep their
    * outlines apart. */
@@ -527,11 +527,11 @@ hr {
   background: var(--vscode-hc-black);
 }
 
-/* Keep the primary editor centered at 80% of the available desktop canvas. */
+/* Use the whole primary editor canvas on desktop. */
 @media (min-width: 768px) {
-  #main-content-container > .cp__sidebar-main-content:not([data-is-full-width="true"]) {
-    width: 80%;
-    max-width: 80%;
+  #main-content-container > .cp__sidebar-main-content {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 }
 
@@ -558,8 +558,8 @@ hr {
 }
 
 /* Selection and Logseq's own highlight are deliberate, persistent states, so
- * they carry the raised fill. Hover is transient and only outlines the block
- * the pointer is over; filling it too made scanning a page flash gray. The
+ * they carry the raised fill and outline. Hover is transient and leaves the
+ * block surface unchanged. The
  * shadow is the same fill spread out over the padding the outline stands off
  * by, so a selected block is filled to its border rather than to its text. */
 .ls-block.selected > .flex > .block-content-wrapper,
@@ -568,7 +568,6 @@ hr {
   box-shadow: 0 0 0 var(--hc-block-outline-pad) var(--ls-block-highlight-color);
 }
 
-.ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper,
 .ls-block.selected > .flex > .block-content-wrapper,
 .block-highlight {
   outline: 1px solid var(--vscode-hc-border);
@@ -678,28 +677,13 @@ main:not(.ls-fold-button-on-right)
  * measures, so both opt out. */
 
 /* How far left of the content column the rail stands. Every distance below is
- * measured from this one number, so a graph that wants the rail nearer its text
- * can retune it from `custom.css`. It has to fit inside the margin Logseq
- * leaves left of the page, which is why a full-width page and a narrow window
- * are given less of it. */
+ * measured from this one number, so a graph can retune it from `custom.css`. */
 :root {
-  --hc-rail-offset: 80px;
+  --hc-rail-offset: .8em;
 }
 
 :root {
   --hc-rail-branch-width: 2px;
-}
-
-@media (max-width: 1100px) {
-  :root {
-    --hc-rail-offset: 48px;
-  }
-}
-
-/* A full-width page keeps only the scroll container's own padding left of the
- * tree, so the rail stands in that. */
-#main-content-container > .cp__sidebar-main-content[data-is-full-width="true"] {
-  --hc-rail-offset: 24px;
 }
 
 /* The row is the stacking context the line is painted behind the bullets in,
@@ -1840,9 +1824,9 @@ select:focus {
 }
 
 /* A block editor uses one orange border, matching the rest of the workbench,
- * and stands it off the text on the same padding the hover and selection
- * outlines take, so a block wears the same border in the same place whether it
- * is being read or written. It is an outline rather than a border for the same
+ * and stands it off the text on the same padding the selection and highlight
+ * outlines take, so the editing border occupies the same place as
+ * selection. It is an outline rather than a border for the same
  * reason those are: a border comes out of the textarea's own box, which would
  * narrow the text by a pixel the moment the block opened for editing. */
 .editor-inner textarea:focus,

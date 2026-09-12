@@ -380,8 +380,7 @@ test('workbench selectors and accessibility fallbacks are present', () => {
 })
 
 test('focused layout and nested-block behavior remain part of the theme', () => {
-  assert.match(css, /\.cp__sidebar-main-content:not\(\[data-is-full-width="true"\]\)/)
-  assert.match(css, /width:\s*80%/)
+  assert.match(css, /@media \(min-width: 768px\)[\s\S]*?#main-content-container > \.cp__sidebar-main-content\s*\{[\s\S]*?width:\s*100%\s*!important;[\s\S]*?max-width:\s*100%\s*!important;/)
   assert.match(css, /\.ls-block\[data-hc-hide-bullet\] > \.block-main-container > \.block-control-wrap \.bullet-container:not\(\.typed-list\)\s*\{[\s\S]*?opacity:\s*0\s*!important/)
   assert.match(css, /\.ls-block:has\(> \.block-main-container > \.block-content-wrapper:is\([^)]*\[style\*="text-align: center"\][^)]*\)\)[\s\S]*?> \.block-main-container > \.block-control-wrap \.bullet-container:not\(\.typed-list\)/)
   assert.match(css, /\.ls-block:has\(> \.block-main-container > \.block-content-wrapper :is\([^)]*\[style\*="text-align: center"\][^)]*\)\)[\s\S]*?> \.block-main-container > \.block-control-wrap \.bullet-container:not\(\.typed-list\)\s*\{[\s\S]*?opacity:\s*0\s*!important/)
@@ -391,10 +390,9 @@ test('focused layout and nested-block behavior remain part of the theme', () => 
   assert.match(css, /\.block-children,[\s\S]*?\.block-children-left-border\s*\{[\s\S]*?border-left:\s*0\s*!important[\s\S]*?background-color:\s*transparent\s*!important/)
 })
 
-/* Hovering a block outlines it but must not fill it. The gray raised fill is
- * reserved for the deliberate, persistent states: a selected block and
- * Logseq's own `.block-highlight`. */
-test('block hover outlines without painting a background', () => {
+/* Hovering a block must neither outline nor fill it. The raised surface is
+ * reserved for deliberate, persistent states. */
+test('block hover leaves the block surface unchanged', () => {
   const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)]
     .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
 
@@ -414,12 +412,13 @@ test('block hover outlines without painting a background', () => {
   )
   assert.deepEqual(hoverFill, [], 'hovering a block must not set a background')
 
-  const hoverOutline = rules.find(
+  const hoverBorder = rules.filter(
     ([selector, body]) =>
-      selector.includes('.ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper') &&
-      /outline:\s*1px solid var\(--vscode-hc-border\)/.test(body)
+      selector.includes('.ls-block:hover') &&
+      paints(selector) &&
+      /(?:^|[;{\s])(?:border|outline)(?:-[\w-]+)?\s*:/.test(body)
   )
-  assert.ok(hoverOutline, 'the hovered block keeps its outline')
+  assert.deepEqual(hoverBorder, [], 'hovering a block must not set a border or outline')
 
   const persistentFill = rules.find(
     ([selector, body]) =>
@@ -454,7 +453,7 @@ test('block hover outlines without painting a background', () => {
  * box out border-box and sizes it itself, so the room has to be taken outside
  * that box: an outline offset and the spread of the fill's shadow, never
  * padding, which would rewrap the block's text under the pointer. */
-test('the block outline stands off the text on a padding of its own', () => {
+test('persistent block outlines stand off the text on a padding of their own', () => {
   const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)]
     .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
 
@@ -464,8 +463,10 @@ test('the block outline stands off the text on a padding of its own', () => {
     'the padding is a variable a graph can retune'
   )
 
-  const outline = rules.find(([selector]) =>
-    selector.includes('.ls-block:hover:not(:has(.ls-block:hover)) > .flex > .block-content-wrapper')
+  const outline = rules.find(([selector, body]) =>
+    selector.includes('.ls-block.selected > .flex > .block-content-wrapper') &&
+    selector.includes('.block-highlight') &&
+    /outline-offset:/.test(body)
   )
   assert.match(
     outline[1],
@@ -516,7 +517,7 @@ test('the block outline stands off the text on a padding of its own', () => {
   assert.match(
     editing[1],
     /outline:\s*1px solid var\(--vscode-hc-focus\) !important/,
-    'the editing border is an outline of the same weight as the hover outline'
+    'the editing border is an outline of the same weight as persistent outlines'
   )
   assert.match(
     editing[1],
