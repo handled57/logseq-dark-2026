@@ -909,7 +909,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
  * answered here. They still hold everywhere the rail does not reach.
  *
  * A bullet is a solid 10px dot inside Logseq's own 16px control.
- * Parents keep a crisp ring; expanded parents hide the dot inside it. */
+ * Collapsed parents keep an outer ring; expanded parents use a dot-sized ring. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container {
   opacity: 1 !important;
@@ -966,18 +966,24 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   border-radius: 50%;
 }
 
-/* Hide only the fill of an expanded parent's dot, preserving its ring and controls. */
+/* Hollow the expanded parent's dot without changing its controls. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed) {
   --hc-rail-bullet-fill: transparent;
 }
 
-/* Parents keep a sharp ring in both fold states, without a glow. */
+/* Collapsed parents keep a sharp outer ring, without a glow. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container .bullet {
   opacity: 1;
   outline: 2px solid var(--hc-rail-bullet-color);
   outline-offset: 2px;
+}
+
+/* Inset the expanded parent's ring so its outside stays at the 10px dot edge. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed) .bullet {
+  outline-offset: -2px;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
