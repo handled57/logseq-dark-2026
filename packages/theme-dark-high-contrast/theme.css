@@ -834,11 +834,14 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   padding-right: 6px;
 }
 
-/* The fold arrow rides beside its bullet rather than at the top of a tall
- * block. Its box is 22px, so half of the 24px control box centers it. */
+/* The bullet is the fold control on the rail. Keep Logseq's 22px arrow box in
+ * the layout so the bullet remains in its established column, but hide and
+ * disable the redundant arrow itself. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > .block-control {
   margin-top: calc(var(--hc-rail-bullet-y) - 12px);
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Half the bullet, so its center lands on the rail's line for this row.

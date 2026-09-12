@@ -543,6 +543,13 @@ test('the rail stands in the margin Logseq leaves left of the page', () => {
   assert.ok(Number.parseInt(narrow[2], 10) < offset, 'a narrow window is given the full rail offset')
 })
 
+test('rail bullets replace the native fold arrows without moving their column', () => {
+  const arrow = rule(`${wrap} > .block-control`)
+  assert.equal(value(arrow, 'visibility'), 'hidden')
+  assert.equal(value(arrow, 'pointer-events'), 'none')
+  assert.match(value(arrow, 'margin-top'), /var\(--hc-rail-bullet-y\)/)
+})
+
 test('the rail takes back exactly the indentation each nesting level applied', () => {
   // Pulled left by everything the level indented plus the margin the rail
   // stands in, and handed back on the other side so the content column does not

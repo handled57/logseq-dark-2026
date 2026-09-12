@@ -6,6 +6,8 @@ All notable changes to this project are documented here.
 
 - Increase expanded parent rings from 10px to 13px in outer diameter, retaining
   their 2px stroke and the existing collapsed-parent styling.
+- Hide Logseq's expand/collapse arrows beside rail bullets; bullets remain the
+  control for folding blocks.
 
 ## 2.12.0 - 2026-09-11
 
