@@ -342,7 +342,7 @@ test('the optional branched rail is body-scoped and documented', async () => {
   assert.match(css, /--hc-rail-branch-width: 2px/)
   assert.match(readme, /## Rail layouts/)
   assert.match(readme, /\*\*Flat\*\* is the default/)
-  assert.match(readme, /\*\*Branched\*\* leaves one 29px horizontal step/)
+  assert.match(readme, /\*\*Branched\*\* aligns bullets in the same column as Flat/)
 })
 
 test('classic and ShUI theme contracts cover every planned surface', () => {

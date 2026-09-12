@@ -308,8 +308,7 @@ test('the moved property table lines up with the box text and takes the box tail
   assert.match(css, /> \.block-body > :is\([^{]*\.passage\) \{\s*\n\s*margin-bottom:\s*0;/)
 })
 
-/* Flat mode hangs every block's bullet on one vertical line; Branched mode
- * keeps Logseq's 29px step at every nesting level. Every other distance the
+/* Both layouts hang every block's bullet on one vertical line. Every other distance the
  * rail moves a bullet by is Logseq's own: the 22px fold arrow the bullet sits
  * behind, the 16px bullet, the 24px control box the bullet is centered in, the
  * 2rem the scroll container keeps left of the page, and the size Logseq gives
@@ -580,18 +579,15 @@ test('the rail takes back exactly the indentation each nesting level applied', (
   }
 })
 
-test('branched layout keeps Logseq nesting while Flat remains the default geometry', () => {
-  // The base rules are still the flat layout: without the host marker every
-  // level takes back its accumulated indentation and lands on one column.
+test('both rail layouts share the same bullet column', () => {
   assert.doesNotMatch(wrap, /data-hc-rail-layout/)
-
-  // Branched mode takes back only the margin offset. The 29px Logseq adds for
-  // each child therefore remains visible as one horizontal rail step, while
-  // equal opposite margins leave the content column where Logseq put it.
-  const nested = rule(
-    `${branchedScope} .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap`
-  )
-  assert.equal(value(nested, '--hc-rail-indent'), 'var(--hc-rail-offset) !important')
+  // Layout-specific rules must not override the shared depth compensation.
+  for (const [selector, declarations] of rules) {
+    if (!selector.includes('data-hc-rail-layout')) continue
+    for (const property of ['--hc-rail-indent', 'margin-left', 'margin-right']) {
+      assert.ok(!declarations.includes(`${property}:`), `${selector}: ${property}`)
+    }
+  }
   assert.equal(px(rule('#main-content-container > .cp__sidebar-main-content[data-is-full-width="true"]'), '--hc-rail-offset'), 24)
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?--hc-rail-offset: 48px;/)
 })

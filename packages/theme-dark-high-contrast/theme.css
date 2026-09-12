@@ -1071,21 +1071,6 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   --hc-rail-depth-color: var(--hc-rail-depth-5);
 }
 
-/* Branched layout leaves each nested row at the horizontal position Logseq's
- * own 29px indentation gives it. The control column is still pulled into the
- * page margin and hands that distance back on its right, so only the bullet
- * and its rail move; the content column, ordered-list label and property
- * control keep their flat-layout geometry. This rule follows the per-depth
- * color rules so one layout override covers every rendered depth. Its custom
- * property is important because every extra depth makes the flat selector one
- * class more specific; without it, sufficiently deep blocks would snap back
- * to the flat column. */
-body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
-  #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .block-children .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap {
-  --hc-rail-indent: var(--hc-rail-offset) !important;
-}
-
 /* Branched vertical segments share a 2px width on the original rail axis. */
 body[data-hc-rail-layout="branched"] main:not(.ls-fold-button-on-right)
   #main-content-container .page-blocks-inner .content:not(.doc-mode)

@@ -99,9 +99,8 @@ const RAIL_COLOR_SETTING = 'defaultRailColor'
 const DEFAULT_RAIL_COLOR = '#5B7E96'
 const RAIL_COLOR_PROPERTY = '--hc-rail-default-color'
 
-/* The rail can keep every bullet on its original single column, or let each
- * nesting level keep Logseq's 29px horizontal step so the line can branch
- * through the hierarchy. The stylesheet owns both geometries; the entry only
+/* Both layouts align bullets in one column. Branched connects only consecutive
+ * visible blocks at the same depth. The stylesheet owns the geometry; the entry only
  * reflects the live setting onto the host body, where a settings change can
  * switch layouts without reloading the theme. */
 const RAIL_LAYOUT_SETTING = 'railLayout'
@@ -152,8 +151,8 @@ const settingsSchema = [
     default: DEFAULT_RAIL_LAYOUT,
     title: 'Rail layout',
     description:
-      'Flat keeps every bullet on one vertical rail. Branched moves child bullets right with ' +
-      'their nesting depth and draws vertical rails only between consecutive blocks at the same depth.'
+      'Both layouts align bullets in one column. Flat keeps one continuous rail. ' +
+      'Branched draws vertical rails only between consecutive blocks at the same depth.'
   },
   {
     key: BLOCK_ICONS_SETTING,

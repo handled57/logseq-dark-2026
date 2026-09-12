@@ -11,7 +11,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - VS Code-inspired semantic colors for links, references, properties, tasks, and code.
 - Compact workbench treatment for the header, sidebars, command palette, menus, dialogs, and settings.
 - High-contrast coverage for queries, tables, notifications, PDF controls, graph filters, and whiteboard tools.
-- Every block in the main editor hangs its bullet on a rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at a uniform size. **Flat** keeps one vertical rail; **Branched** keeps bullets at their outline depth and joins consecutive same-depth blocks with vertical rails. The content column keeps its usual nesting in both layouts.
+- Every block in the main editor hangs its bullet on a rail in the margin left of the page, each bullet on the middle of its block's first line and drawn at a uniform size. **Flat** keeps one vertical rail; **Branched** aligns all bullets in one column and joins consecutive same-depth blocks with vertical rails. The content column keeps its usual nesting in both layouts.
 - In **Branched**, every bullet and its connecting rail share the color of their depth. In **Flat**, the line uses the **Rail color** setting; headings and parents have depth-colored bullets and ordinary leaf bullets stay white.
 - Proportional Inter typography for notes; monospace remains limited to code and keyboard labels.
 - Block headings are set 20% below the sizes Logseq gives them, so a heading reads as the head of its outline rather than dominating the notes under it. Every level keeps Logseq's proportions, and page titles are unchanged.
@@ -29,7 +29,7 @@ Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
 
 - **Flat** is the default. It moves every bullet onto the same vertical line,
   preserving the theme's original rail.
-- **Branched** leaves one 29px horizontal step between nesting levels. A 2px
+- **Branched** aligns bullets in the same column as Flat. A 2px
   vertical rail connects only consecutive visible blocks at the same depth.
   Every depth change leaves a gap, with no curves or horizontal connectors.
   The first visible block has a short opening rail above it; the final block
@@ -40,11 +40,11 @@ Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
 |
 *        Block A
 
-   *       Block A.1
-   |
-   *       Block A.2
+*          Block A.1
+|
+*          Block A.2
 
-      *       Block A.2.1
+*             Block A.2.1
 
 *        Block B
 |
@@ -95,9 +95,8 @@ whiteboards and dialogs remain outside the rail.
 
 Every heading, and every block with children, draws its bullet in the color of
 its own depth. Depth 1 is a top-level block. The eight colors repeat below the
-eighth level — depth 9 is amber again. Flat layout caps a block deeper than
-depth 13 at that final rail position; Branched layout continues Logseq's 29px
-step at every rendered depth. Both keep the depth-13 color below that tested
+eighth level — depth 9 is amber again. Both layouts cap a block deeper than
+depth 13 at that final rail position and keep the depth-13 color below that tested
 color range. Branched lines share these colors; Flat uses the configured rail color.
 
 | Depth | Color | Tokens |

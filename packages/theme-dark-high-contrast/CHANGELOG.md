@@ -5,8 +5,8 @@ All notable changes to this project are documented here.
 ## 2.12.0 - 2026-09-11
 
 - Add a **Rail layout** setting. **Flat** remains the default and preserves the
-  single vertical rail. **Branched** keeps each child bullet at its nesting
-  depth and draws 2px vertical rails only between consecutive visible blocks at
+  single vertical rail. **Branched** aligns every bullet in one
+  column and draws 2px vertical rails only between consecutive visible blocks at
   the same depth. Depth changes leave gaps, with no curves or horizontal arms.
   The first block keeps an opening rail above it and the last has no trailing
   rail. Hidden descendants are skipped and ordinary block spacing is retained.

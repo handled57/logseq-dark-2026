@@ -46,9 +46,8 @@ The main-editor bullet rail repositions Logseq's own bullet; it never clones
 one. Flat layout is the default: for each nesting level, the control column
 moves left by that level's `29px` indentation plus `--hc-rail-offset`, then
 returns the same distance as margin so every bullet lands on one column and the
-content hierarchy does not move. Branched layout takes back only
-`--hc-rail-offset`, leaving Logseq's accumulated `29px` indentation visible in
-the bullet positions without moving the content. The rail is scoped to the page
+content hierarchy does not move. Branched layout uses the same depth compensation, aligning all bullets in
+one column without moving the content. The rail is scoped to the page
 tree, stops short of embeds, queries, references, sidebars, dialogs, document
 mode, and right-side fold controls, and uses smaller offsets for narrow and
 full-width layouts. `--hc-rail-bullet-y` aligns a bullet and fold arrow with the
