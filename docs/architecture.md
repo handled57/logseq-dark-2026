@@ -44,7 +44,8 @@ with pinned Logseq 0.10.15 declarations and can also read the installed CSS via
 
 The main-editor bullet rail repositions Logseq's own bullet; it never clones
 one. Flat layout is the default: for each nesting level, the control column
-moves left by that level's `29px` indentation plus `--hc-rail-offset`, then
+moves left by that level's `29px` indentation plus `--hc-rail-offset` (`.8em`
+by default), then
 returns the same distance as margin so every bullet lands on one column and the
 content hierarchy does not move. Connect the dots layout uses the same depth compensation, aligning all bullets in
 one column without moving the content. The rail is scoped to the page

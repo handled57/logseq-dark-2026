@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here.
 
+## 2.13.0 - 2026-09-11
+
+- Use the full available main-content width on desktop viewports.
+- Move the bullet rail nearer the block text with a `.8em` default offset.
+- Stop drawing a border when a block is merely hovered. Selected, highlighted
+  and edited blocks retain their persistent outlines.
+
 ## 2.12.1 - 2026-09-11
 
 - Increase expanded parent rings from 10px to 13px in outer diameter, retaining
