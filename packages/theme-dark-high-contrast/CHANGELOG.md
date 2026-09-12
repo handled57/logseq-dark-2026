@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## 2.12.1 - 2026-09-11
+
+- Increase expanded parent rings from 10px to 13px in outer diameter, retaining
+  their 2px stroke and the existing collapsed-parent styling.
+- Hide Logseq's expand/collapse arrows beside rail bullets; bullets remain the
+  control for folding blocks.
+- End every rail segment at a bullet, removing the Connect the dots opening cap and the
+  Flat tail below the final bullet.
+- Leave empty blocks without a rail segment in both layouts.
+- Rename the **Branched** rail-layout choice to **Connect the dots**, while
+  preserving existing saved selections.
+
 ## 2.12.0 - 2026-09-11
 
 - Show expanded parents as hollow 2px rings with a 10px outer diameter, matching

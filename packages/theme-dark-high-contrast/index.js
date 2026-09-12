@@ -99,16 +99,18 @@ const RAIL_COLOR_SETTING = 'defaultRailColor'
 const DEFAULT_RAIL_COLOR = '#5B7E96'
 const RAIL_COLOR_PROPERTY = '--hc-rail-default-color'
 
-/* Both layouts align bullets in one column. Branched connects only consecutive
+/* Both layouts align bullets in one column. Connect the dots joins only consecutive
  * visible blocks at the same depth. The stylesheet owns the geometry; the entry only
  * reflects the live setting onto the host body, where a settings change can
  * switch layouts without reloading the theme. */
 const RAIL_LAYOUT_SETTING = 'railLayout'
 const DEFAULT_RAIL_LAYOUT = 'Flat'
-const BRANCHED_RAIL_LAYOUT = 'Branched'
+const CONNECT_DOTS_RAIL_LAYOUT = 'Connect the dots'
+const LEGACY_BRANCHED_RAIL_LAYOUT = 'Branched'
 const RAIL_LAYOUT_ATTR = 'data-hc-rail-layout'
 const RAIL_ENTRY_ATTR = 'data-hc-rail-entry'
 const RAIL_EXIT_ATTR = 'data-hc-rail-exit'
+const EMPTY_BLOCK_ATTR = 'data-hc-empty-block'
 
 /* Leading-emoji block icons. A block whose text opens with one emoji has that
  * emoji set in a gutter to the left of the text, the way a passage sets a verse
@@ -137,7 +139,7 @@ const settingsSchema = [
     default: DEFAULT_RAIL_COLOR,
     title: 'Rail color',
     description:
-      'The color of the Flat bullet rail beside a page\'s blocks. Branched rails match their ' +
+      'The color of the Flat bullet rail beside a page\'s blocks. Connect the dots rails match their ' +
       'depth-colored bullets. In Flat, the whole line is drawn in this color, at ' +
       'every nesting level. Defaults to the border color used around the editor, the left menu ' +
       'and the sidebars. Leave empty to keep that border color. The eight colors the bullets ' +
@@ -146,13 +148,13 @@ const settingsSchema = [
   {
     key: RAIL_LAYOUT_SETTING,
     type: 'enum',
-    enumChoices: [DEFAULT_RAIL_LAYOUT, BRANCHED_RAIL_LAYOUT],
+    enumChoices: [DEFAULT_RAIL_LAYOUT, CONNECT_DOTS_RAIL_LAYOUT],
     enumPicker: 'select',
     default: DEFAULT_RAIL_LAYOUT,
     title: 'Rail layout',
     description:
       'Both layouts align bullets in one column. Flat keeps one continuous rail. ' +
-      'Branched draws vertical rails only between consecutive blocks at the same depth.'
+      'Connect the dots draws vertical rails only between consecutive blocks at the same depth.'
   },
   {
     key: BLOCK_ICONS_SETTING,
@@ -313,6 +315,15 @@ function shouldHideBullet(block) {
   if (raw) return specialSource(raw)
   if (typeof wrapper.matches === 'function' && wrapper.matches(SPECIAL_CONTENT_SELECTOR)) return true
   if (wrapper.querySelector(SPECIAL_CONTENT_SELECTOR)) return true
+  return propertyFreeText(wrapper) === ''
+}
+
+function isEmptyBlock(block) {
+  const wrapper = block.querySelector(':scope > .block-main-container > .block-content-wrapper') ||
+    block.querySelector('.block-content-wrapper')
+  if (!wrapper || rawBlockContent(wrapper)) return false
+  if (typeof wrapper.matches === 'function' && wrapper.matches(SPECIAL_CONTENT_SELECTOR)) return false
+  if (wrapper.querySelector(SPECIAL_CONTENT_SELECTOR)) return false
   return propertyFreeText(wrapper) === ''
 }
 
@@ -805,7 +816,8 @@ function applyRailColor() {
 
 function applyRailLayout() {
   const layout = readSetting(RAIL_LAYOUT_SETTING, DEFAULT_RAIL_LAYOUT.toLowerCase())
-  const value = layout === BRANCHED_RAIL_LAYOUT.toLowerCase() ? 'branched' : 'flat'
+  const value = [CONNECT_DOTS_RAIL_LAYOUT, LEGACY_BRANCHED_RAIL_LAYOUT]
+    .map((choice) => choice.toLowerCase()).includes(layout) ? 'branched' : 'flat'
   doc.body.setAttribute(
     RAIL_LAYOUT_ATTR,
     value
@@ -821,9 +833,9 @@ function applyRailPath(layout) {
   for (const block of blocks) {
     block.removeAttribute(RAIL_ENTRY_ATTR)
     block.removeAttribute(RAIL_EXIT_ATTR)
+    if (isEmptyBlock(block)) block.setAttribute(EMPTY_BLOCK_ATTR, '')
+    else block.removeAttribute(EMPTY_BLOCK_ATTR)
   }
-
-  if (layout !== 'branched') return
 
   const paths = new Map()
 
@@ -839,15 +851,25 @@ function applyRailPath(layout) {
     }
 
     if (!paths.has(root)) paths.set(root, [])
-    paths.get(root).push({ block, depth })
+    paths.get(root).push({ block, depth, empty: block.getAttribute(EMPTY_BLOCK_ATTR) !== null })
   }
 
   for (const path of paths.values()) {
-    path.forEach(({ block, depth }, index) => {
-      block.setAttribute(RAIL_ENTRY_ATTR, index === 0 ? 'start' :
-        path[index - 1].depth === depth ? 'connected' : 'none')
-      block.setAttribute(RAIL_EXIT_ATTR,
-        path[index + 1]?.depth === depth ? 'connected' : 'none')
+    path.forEach(({ block, depth, empty }, index) => {
+      const previous = path[index - 1]
+      const next = path[index + 1]
+      if (empty) {
+        block.setAttribute(RAIL_ENTRY_ATTR, 'empty')
+        block.setAttribute(RAIL_EXIT_ATTR, 'empty')
+      } else if (layout === 'branched') {
+        block.setAttribute(RAIL_ENTRY_ATTR, index === 0 ? 'start' :
+          !previous.empty && previous.depth === depth ? 'connected' : 'none')
+        block.setAttribute(RAIL_EXIT_ATTR,
+          next && !next.empty && next.depth === depth ? 'connected' : 'none')
+      } else {
+        if (previous?.empty) block.setAttribute(RAIL_ENTRY_ATTR, 'empty')
+        if (next?.empty) block.setAttribute(RAIL_EXIT_ATTR, 'empty')
+      }
     })
   }
 }
@@ -965,6 +987,7 @@ function teardown() {
   for (const block of doc.querySelectorAll('.ls-block')) {
     block.removeAttribute(RAIL_ENTRY_ATTR)
     block.removeAttribute(RAIL_EXIT_ATTR)
+    block.removeAttribute(EMPTY_BLOCK_ATTR)
   }
 
   collapsedContent.clear()

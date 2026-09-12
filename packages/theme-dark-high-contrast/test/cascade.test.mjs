@@ -543,6 +543,13 @@ test('the rail stands in the margin Logseq leaves left of the page', () => {
   assert.ok(Number.parseInt(narrow[2], 10) < offset, 'a narrow window is given the full rail offset')
 })
 
+test('rail bullets replace the native fold arrows without moving their column', () => {
+  const arrow = rule(`${wrap} > .block-control`)
+  assert.equal(value(arrow, 'visibility'), 'hidden')
+  assert.equal(value(arrow, 'pointer-events'), 'none')
+  assert.match(value(arrow, 'margin-top'), /var\(--hc-rail-bullet-y\)/)
+})
+
 test('the rail takes back exactly the indentation each nesting level applied', () => {
   // Pulled left by everything the level indented plus the margin the rail
   // stands in, and handed back on the other side so the content column does not
@@ -592,7 +599,7 @@ test('both rail layouts share the same bullet column', () => {
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?--hc-rail-offset: 48px;/)
 })
 
-test('branched rails hide both segments at depth changes and retain the opening cap', () => {
+test('branched rails hide both segments at depth changes and add no opening cap', () => {
   const controls = `${branchedScope} .ls-block:not(.block-content-wrapper *)`
   const before = ' > .block-main-container > .block-control-wrap::before'
   const after = ' > .block-main-container > .block-control-wrap::after'
@@ -601,7 +608,7 @@ test('branched rails hide both segments at depth changes and retain the opening 
     controls + '[data-hc-rail-exit="none"]' + after
   )
   assert.equal(value(breaks, 'display'), 'none !important')
-  assert.equal(value(rule(controls + '[data-hc-rail-entry="start"]' + before), 'display'), 'block !important')
+  assert.equal(rules.has(controls + '[data-hc-rail-entry="start"]' + before), false)
   const lines = rule(controls + before + ', ' + controls + after)
   assert.equal(value(lines, 'width'), 'var(--hc-rail-branch-width)')
   assert.equal(value(lines, 'left'), 'calc(30.5px - var(--hc-rail-branch-width) / 2)')
@@ -784,6 +791,12 @@ test('page properties carry no bullet and no rail, and the rail opens under them
   assert.equal(value(rule(railStart), 'display'), 'none')
 })
 
+test('empty blocks carry no rail segment', () => {
+  const emptyEntry = `${scope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="empty"] > .block-main-container > .block-control-wrap::before`
+  const emptyExit = `${scope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="empty"] > .block-main-container > .block-control-wrap::after`
+  assert.equal(value(rule(`${emptyEntry}, ${emptyExit}`), 'display'), 'none !important')
+})
+
 test('every heading level is set to the same fraction of the size Logseq gives it', () => {
   // Logseq's scale reads oversized against this theme's prose, so every level
   // is taken to one fraction of it. Below 1 or the headings grew; the levels
@@ -924,7 +937,7 @@ test('a parent and its first child stand as far apart as two siblings do', () =>
   assert.equal(value(rule('.ls-block'), 'margin-bottom'), 'var(--hc-block-gap)')
 })
 
-test('the rail line runs from the first bullet to the end of the last block', () => {
+test('the rail line runs from the first bullet to the last bullet', () => {
   const line = rule(`${wrap}::before, ${wrap}::after`)
   // The fold arrow, then half a bullet: the center of the bullet Logseq draws.
   assert.equal(px(line, 'left'), rail.arrow + rail.bullet / 2)
@@ -955,16 +968,10 @@ test('the rail line runs from the first bullet to the end of the last block', ()
   // The rail starts at a bullet center: the first rendered block draws nothing
   // above its own bullet.
   assert.match(rule(railStart), /display:\s*none/)
-  // It ends with the last rendered block rather than past it: that block's tail
-  // stops at its own foot instead of overdrawing into the space below.
+  // The final rendered block draws nothing below its own bullet.
   assert.equal(
-    px(
-      rule(
-        `${block}:not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)):not(.ls-block:has(~ .ls-block) *) > .block-main-container > .block-control-wrap::after`
-      ),
-      'bottom'
-    ),
-    0
+    value(rule(`${block}:not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)):not(.ls-block:has(~ .ls-block) *) > .block-main-container > .block-control-wrap::after`), 'display'),
+    'none'
   )
 })
 
@@ -1059,16 +1066,17 @@ test('parent ring interiors mask the rail in both fold states', () => {
   }
 })
 
-test('collapsed parents keep the outer ring and expanded rings match the dot diameter', () => {
+test('collapsed parents keep the outer ring and expanded rings have a 13px outer diameter', () => {
   const closed = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container .bullet`
   assert.equal(value(rule(closed), 'outline'), '2px solid var(--hc-rail-bullet-color)')
   assert.equal(value(rule(closed), 'outline-offset'), '2px')
   const expanded = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed)`
   assert.equal(value(rule(expanded), '--hc-rail-bullet-fill'), 'transparent')
   const inset = rule(`${expanded} .bullet`)
-  assert.equal(value(inset, 'outline-offset'), '-2px')
-  assert.equal(rail.dot + 2 * (2 + px(inset, 'outline-offset')), rail.dot,
-    'expanded ring outer diameter must equal the leaf dot diameter')
+  assert.equal(value(inset, 'outline-width'), '2px')
+  assert.equal(value(inset, 'outline-offset'), '-0.5px')
+  assert.equal(rail.dot + 2 * (px(inset, 'outline-width') + px(inset, 'outline-offset')), 13,
+    'expanded ring outer diameter must be 13px')
   assert.ok(compare(specificity(`${expanded} .bullet`), specificity(closed)) > 0)
   assert.equal(value(rule(`${wrap} .bullet-container .bullet`), 'outline'), 'none')
   for (const competing of [`${wrap} .bullet-container .bullet`, `${wrap} .bullet-container.typed-list .bullet`, `${wrap}:hover .bullet-container .bullet`]) {

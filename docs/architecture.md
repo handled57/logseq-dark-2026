@@ -46,12 +46,14 @@ The main-editor bullet rail repositions Logseq's own bullet; it never clones
 one. Flat layout is the default: for each nesting level, the control column
 moves left by that level's `29px` indentation plus `--hc-rail-offset`, then
 returns the same distance as margin so every bullet lands on one column and the
-content hierarchy does not move. Branched layout uses the same depth compensation, aligning all bullets in
+content hierarchy does not move. Connect the dots layout uses the same depth compensation, aligning all bullets in
 one column without moving the content. The rail is scoped to the page
 tree, stops short of embeds, queries, references, sidebars, dialogs, document
 mode, and right-side fold controls, and uses smaller offsets for narrow and
-full-width layouts. `--hc-rail-bullet-y` aligns a bullet and fold arrow with the
-first rendered line, including headings and boxed block types. Size does not
+full-width layouts. The rail hides and disables the native fold arrow while
+retaining its 22px layout box, because the bullet itself folds the block and
+the reserved box preserves the established column. `--hc-rail-bullet-y` aligns
+the bullet with the first rendered line, including headings and boxed block types. Size does not
 follow that line: every bullet on the rail is one size, a `--hc-rail-bullet-dot`
 of 10px inside Logseq's own 16px `--hc-rail-bullet-size` transparent control, so the bullet
 column reads as a column and a heading is marked by color rather than by bulk.
@@ -60,16 +62,15 @@ Keep arithmetic, selectors, and cascade tests synchronized.
 
 `index.js` reflects the **Rail layout** enum onto `body` as
 `data-hc-rail-layout="flat|branched"` on every paint and removes it on unload.
-The flat geometry is the unqualified stylesheet fallback. Branched rules are
+The flat geometry is the unqualified stylesheet fallback. Connect the dots rules are
 qualified by the body attribute, so changing settings switches the current
 page without reinstalling or reloading the theme. On each paint, the runtime
 groups visible blocks by their content root in DOM reading order, excluding
 front matter, embedded blocks, and descendants with no client rectangles.
-Each row receives `data-hc-rail-entry="start|connected|none"` and
-`data-hc-rail-exit="connected|none"`. Only adjacent visible rows at the same
+Each row receives rail entry and exit markers. Only adjacent visible rows at the same
 depth connect. Both halves at a depth change are hidden, so no rail spans an
-expanded subtree or crosses between nesting columns. The opening row has a
-short rail above its bullet; the last row has no trailing segment.
+expanded subtree or crosses between nesting columns. Every segment begins and
+ends at a bullet, and empty rows interrupt the path.
 
 CSS hides the corresponding control-column pseudo-element for each `none`
 marker. All surviving segments are vertical, 2px wide, and centered on the
@@ -86,7 +87,7 @@ heading to `1rem` at equal specificity, which this stylesheet would otherwise
 win on load order. A heading's rail bullet is placed from the same variable,
 so the type and the bullet that hangs beside it cannot drift apart.
 
-In Branched, every bullet, including leaves, copies its own depth color into
+In Connect the dots, every bullet, including leaves, copies its own depth color into
 `--hc-rail-bullet-color`, and both line pseudo-elements use that same variable.
 Consecutive same-depth endpoints therefore match along the entire connector.
 In Flat, the rail's bullets carry the hierarchy; its line does not. The line's two
@@ -106,7 +107,7 @@ deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
 pins each literal, its position in the cycle, and the 3:1 a non-text interface
 component owes the canvas.
 
-Collapsed parents have a crisp 2px outer ring with a 2px gap. Expanded parents use a hollow 2px ring in the bullet color with a 10px outer diameter matching a leaf dot. An opaque black parent control masks the rail inside the ring and gap; the ring itself is fully opaque. There are no blurred shadows.
+Collapsed parents have a crisp 2px outer ring with a 2px gap. Expanded parents use a hollow 2px ring in the bullet color with a 13px outer diameter. An opaque black parent control masks the rail inside the ring and gap; the ring itself is fully opaque. There are no blurred shadows.
 `--hc-rail-bullet-fill` resolves to `--hc-rail-bullet-color` for leaves and
 collapsed parents. An expanded parent overrides the fill to transparent on its
 bullet container, preserving the ring and ordered-list label.
@@ -124,6 +125,10 @@ so on a graph with an accent set the body re-declares every palette variable and
 a value inherited from `html` never reaches a block. The eight depth colors the
 bullets carry are not the setting's to change.
 
+Every visible rail segment begins and ends at a bullet: the first block paints
+nothing above its bullet, and the final block paints nothing below its bullet.
+An empty block is marked by the runtime and suppresses its own halves plus the
+neighboring halves that would enter it, so it carries no rail segment.
 The rail is the page's own tree and nothing above it. Logseq renders a page's
 properties as its first block, marked `pre-block` in view and while they are
 being typed; that row keeps its place in the column so the content column does

@@ -355,7 +355,7 @@ function railTree() {
   const page = editor.appendChild(node('div', { classes: ['page-blocks-inner'] }))
   const content = page.appendChild(node('div', { classes: ['content'] }))
 
-  function appendBlock(group, { visible = true } = {}) {
+  function appendBlock(group, { visible = true, text = 'Block' } = {}) {
     const block = group.appendChild(node('div', {
       classes: ['ls-block'],
       getClientRects: () => visible ? [{}] : []
@@ -363,7 +363,7 @@ function railTree() {
     const mainContainer = block.appendChild(node('div', { classes: ['block-main-container'] }))
     mainContainer.appendChild(node('div', { classes: ['block-control-wrap'] }))
     const wrapper = mainContainer.appendChild(node('div', { classes: ['block-content-wrapper'] }))
-    wrapper.textContent = 'Block'
+    wrapper.textContent = text
     return block
   }
 
@@ -657,30 +657,34 @@ test('unloading takes the rail color back off the host root', async () => {
   assert.equal(context.hostStyle.properties.has(RAIL_PROPERTY), false)
 })
 
-test('the rail layout setting offers Flat by default and Branched as an alternative', async () => {
+test('the rail layout setting offers Flat by default and Connect the dots as an alternative', async () => {
   const context = await render({}, [])
   const setting = context.logseq.schema.find(({ key }) => key === 'railLayout')
 
   assert.ok(setting, 'the theme offers no rail layout setting')
   assert.equal(setting.type, 'enum')
   assert.equal(setting.enumPicker, 'select')
-  assert.deepEqual([...setting.enumChoices], ['Flat', 'Branched'])
+  assert.deepEqual([...setting.enumChoices], ['Flat', 'Connect the dots'])
   assert.equal(setting.default, 'Flat')
   assert.equal(setting.title, 'Rail layout')
   assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'flat')
 })
 
-test('choosing Branched updates the host layout marker on repaint', async () => {
-  const context = await render({ railLayout: 'Branched' }, [])
+test('choosing Connect the dots updates the host layout marker on repaint', async () => {
+  const context = await render({ railLayout: 'Connect the dots' }, [])
 
   assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'branched')
 
   context.logseq.settings.railLayout = 'Flat'
   context.paint()
   assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'flat')
+
+  context.logseq.settings.railLayout = 'Branched'
+  context.paint()
+  assert.equal(context.parent.document.body.getAttribute('data-hc-rail-layout'), 'branched')
 })
 
-test('Branched connects consecutive same-depth rows and breaks at every depth change', async () => {
+test('Connect the dots joins consecutive same-depth rows and breaks at every depth change', async () => {
   const fixture = railTree()
   const a = fixture.appendBlock(fixture.content)
   const children = fixture.childrenOf(a)
@@ -690,7 +694,7 @@ test('Branched connects consecutive same-depth rows and breaks at every depth ch
   const b = fixture.appendBlock(fixture.content)
   const c = fixture.appendBlock(fixture.content)
   const blocks = [a, a1, a2, a21, b, c]
-  const context = load({ railLayout: 'Branched' }, [], {}, fixture.host)
+  const context = load({ railLayout: 'Connect the dots' }, [], {}, fixture.host)
   await Promise.resolve()
   const entry = () => blocks.map(block => block.getAttribute('data-hc-rail-entry'))
   const exit = () => blocks.map(block => block.getAttribute('data-hc-rail-exit'))
@@ -707,14 +711,14 @@ test('Branched connects consecutive same-depth rows and breaks at every depth ch
   context.paint()
   assert.deepEqual(entry(), Array(6).fill(null))
   assert.deepEqual(exit(), Array(6).fill(null))
-  context.logseq.settings.railLayout = 'Branched'
+  context.logseq.settings.railLayout = 'Connect the dots'
   context.paint()
   for (const handler of context.logseq.unloads) await handler()
   assert.deepEqual(entry(), Array(6).fill(null))
   assert.deepEqual(exit(), Array(6).fill(null))
 })
 
-test('Branched ignores front matter and embedded or hidden blocks in each content root', async () => {
+test('Connect the dots ignores front matter and embedded or hidden blocks in each content root', async () => {
   const fixture = railTree()
   const front = fixture.appendBlock(fixture.content)
   front.classList.add('pre-block')
@@ -724,7 +728,7 @@ test('Branched ignores front matter and embedded or hidden blocks in each conten
   const b = fixture.appendBlock(fixture.content)
   const other = fixture.host.appendChild(node('div', { classes: ['content'] }))
   const lone = fixture.appendBlock(other)
-  load({ railLayout: 'Branched' }, [], {}, fixture.host)
+  load({ railLayout: 'Connect the dots' }, [], {}, fixture.host)
   await Promise.resolve()
   assert.equal(a.getAttribute('data-hc-rail-entry'), 'start')
   assert.equal(a.getAttribute('data-hc-rail-exit'), 'connected')
@@ -736,6 +740,27 @@ test('Branched ignores front matter and embedded or hidden blocks in each conten
     assert.equal(block.getAttribute('data-hc-rail-entry'), null)
     assert.equal(block.getAttribute('data-hc-rail-exit'), null)
   }
+})
+
+test('empty blocks interrupt rail segments in both layouts', async () => {
+  const fixture = railTree()
+  const before = fixture.appendBlock(fixture.content)
+  const empty = fixture.appendBlock(fixture.content, { text: '' })
+  const after = fixture.appendBlock(fixture.content)
+  const context = load({ railLayout: 'Flat' }, [], {}, fixture.host)
+  await Promise.resolve()
+
+  assert.equal(before.getAttribute('data-hc-rail-exit'), 'empty')
+  assert.equal(empty.getAttribute('data-hc-rail-entry'), 'empty')
+  assert.equal(empty.getAttribute('data-hc-rail-exit'), 'empty')
+  assert.equal(after.getAttribute('data-hc-rail-entry'), 'empty')
+
+  context.logseq.settings.railLayout = 'Connect the dots'
+  context.paint()
+  assert.equal(before.getAttribute('data-hc-rail-exit'), 'none')
+  assert.equal(empty.getAttribute('data-hc-rail-entry'), 'empty')
+  assert.equal(empty.getAttribute('data-hc-rail-exit'), 'empty')
+  assert.equal(after.getAttribute('data-hc-rail-entry'), 'none')
 })
 
 test('an unknown rail layout falls back to Flat and unloading removes the marker', async () => {
