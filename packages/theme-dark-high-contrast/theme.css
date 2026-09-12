@@ -58,17 +58,17 @@ html[data-theme][data-color]:root body,
   --hc-rail-indigo: #b180d7;
   --hc-rail-violet: #b66dff;
 
-  /* The bullets' hierarchy colors in ROYGBIV order, one hue per nesting level,
-   * magenta for a top-level block. The eight repeat below the eighth level —
-   * the ninth is magenta again — so no two adjacent levels ever share a hue. */
-  --hc-rail-depth-1: var(--hc-rail-magenta);
-  --hc-rail-depth-2: var(--hc-rail-orange);
-  --hc-rail-depth-3: var(--hc-rail-brown);
-  --hc-rail-depth-4: var(--hc-rail-amber);
-  --hc-rail-depth-5: var(--hc-rail-teal);
-  --hc-rail-depth-6: var(--hc-rail-blue);
-  --hc-rail-depth-7: var(--hc-rail-indigo);
-  --hc-rail-depth-8: var(--hc-rail-violet);
+  /* The bullets' hierarchy colors from brightest to darkest, one hue per level,
+   * amber for a top-level block. The eight repeat below the eighth level —
+   * the ninth is amber again — so no two adjacent levels ever share a hue. */
+  --hc-rail-depth-1: var(--hc-rail-amber);
+  --hc-rail-depth-2: var(--hc-rail-blue);
+  --hc-rail-depth-3: var(--hc-rail-teal);
+  --hc-rail-depth-4: var(--hc-rail-indigo);
+  --hc-rail-depth-5: var(--hc-rail-violet);
+  --hc-rail-depth-6: var(--hc-rail-orange);
+  --hc-rail-depth-7: var(--hc-rail-magenta);
+  --hc-rail-depth-8: var(--hc-rail-brown);
 
   /* The rail line: the color every block paints its stretch of rail with, at
    * every depth. It is the structural border the editor, the left menu and the
@@ -711,7 +711,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 
   --hc-rail-bullet-y: 12px;
   --hc-rail-bullet-size: 16px;
-  --hc-rail-bullet-dot: 9px;
+  --hc-rail-bullet-dot: 10px;
 }
 
 /* A code block or a table is a box of its own, set off from the row by 1rem.
@@ -901,8 +901,8 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
  * empty blocks — are part of the rail, so the suppression rules above are
  * answered here. They still hold everywhere the rail does not reach.
  *
- * A bullet is a solid 9px dot inside Logseq's own 16px control.
- * Expanded, folded and hovered bullets have the same fill and no rings. */
+ * A bullet is a solid 10px dot inside Logseq's own 16px control.
+ * Only collapsed parents add a crisp ring; hover keeps the same size and fill. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container {
   opacity: 1 !important;
@@ -916,6 +916,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   width: var(--hc-rail-bullet-dot);
   height: var(--hc-rail-bullet-dot);
   flex: none;
+  outline: none;
   background-color: var(--hc-rail-bullet-fill);
   box-shadow: none;
 }
@@ -939,7 +940,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap .bullet-container.as-order-list {
   width: var(--hc-rail-bullet-size);
   padding-left: 0;
-  background-color: rgb(255 255 255 / 12%);
+  background-color: transparent;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
@@ -949,6 +950,13 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   border-radius: 9999px;
   background-color: var(--hc-rail-bullet-fill);
   box-shadow: none;
+}
+
+/* Only a collapsed parent gets a sharp ring, with no blur or translucent halo. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container.bullet-closed .bullet {
+  outline: 1px solid var(--hc-rail-bullet-color);
+  outline-offset: 2px;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)

@@ -51,7 +51,7 @@ mode, and right-side fold controls, and uses smaller offsets for narrow and
 full-width layouts. `--hc-rail-bullet-y` aligns a bullet and fold arrow with the
 first rendered line, including headings and boxed block types. Size does not
 follow that line: every bullet on the rail is one size, a `--hc-rail-bullet-dot`
-of 9px inside Logseq's own 16px `--hc-rail-bullet-size` transparent control, so the bullet
+of 10px inside Logseq's own 16px `--hc-rail-bullet-size` transparent control, so the bullet
 column reads as a column and a heading is marked by color rather than by bulk.
 Both sizes are declared on the row alongside `--hc-rail-bullet-y`.
 Keep arithmetic, selectors, and cascade tests synchronized.
@@ -70,9 +70,9 @@ The rail's bullets carry the hierarchy; its line does not. The line's two
 pseudo-elements paint in `--hc-rail-default-color` at every depth, so the whole
 rail is the one color a reader configures. `--hc-rail-depth-color` is declared
 once per nesting level beside that level's `--hc-rail-indent`, cycling the eight
-ROYGBIV tokens `--hc-rail-depth-1`…`--hc-rail-depth-8` so adjacent levels never
+brightness-ordered tokens `--hc-rail-depth-1`…`--hc-rail-depth-8` so adjacent levels never
 share a hue and the cycle starts again below the eighth — depth 9 is depth 1's
-magenta. A row that carries the hierarchy — Logseq's own `haschild="true"`,
+amber. A row that carries the hierarchy — Logseq's own `haschild="true"`,
 which holds while a block is folded, or a first line that renders or is being
 typed as a heading — copies that color into `--hc-rail-bullet-color`; every
 other row keeps a white bullet. That variable is declared on a block's own
@@ -83,7 +83,7 @@ deficiencies rather than to walk the spectrum evenly; `test/theme.test.mjs`
 pins each literal, its position in the cycle, and the 3:1 a non-text interface
 component owes the canvas.
 
-Bullets have no rings or shadows in any state.
+Only collapsed parents have a crisp 1px ring with a 2px gap, in the bullet color. There are no blurred shadows.
 `--hc-rail-bullet-fill` always resolves to `--hc-rail-bullet-color`, including
 expanded parents. These variables live on each block's own control column.
 Rest and hover use the same fill; the hover declaration is important to

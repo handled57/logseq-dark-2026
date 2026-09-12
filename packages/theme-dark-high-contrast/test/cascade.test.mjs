@@ -448,7 +448,7 @@ const declaration = (body, property) => {
 }
 
 /* Read back off the declarations above. */
-const rail = { indent: 29, arrow: 22, bullet: 16, dot: 9, box: 24, gutter: 6, orderList: 22, pagePad: 32 }
+const rail = { indent: 29, arrow: 22, bullet: 16, dot: 10, box: 24, gutter: 6, orderList: 22, pagePad: 32 }
 
 /* Logseq's heading sizes, as multiples of the block's own text size. */
 const headings = { h1: 2, h2: 1.5, h3: 1.2, h4: 1, h5: 0.83, h6: 0.75 }
@@ -580,7 +580,7 @@ test('the rail takes back exactly the indentation each nesting level applied', (
   }
 })
 
-/* The rail's hierarchy colors, in the ROYGBIV order it steps through, and the
+/* The rail's hierarchy colors, in the brightness order it steps through, and the
  * guard the heading rules already qualify themselves by. */
 const spectrum = 8
 const headingGuard = ':not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)'
@@ -697,7 +697,7 @@ test('a heading and a block with children take their depth color; ordinary prose
   )
 })
 
-test('all rail bullets stay solid without rings', () => {
+test('all rail bullets retain their solid fill', () => {
   for (const [selector, body] of rules) {
     if (!selector.startsWith(scope)) continue
     if (/--hc-rail-bullet-fill:/.test(body)) {
@@ -822,7 +822,7 @@ test("a bullet sits on the middle of its block's first line", () => {
 test('every bullet on the rail is drawn at one size', () => {
   // One size for every first line: the bullet column reads as a column, and a
   // heading is marked by the color of its bullet rather than by a bullet larger
-  // than its neighbours'. The dot sits inside Logseq's own 16px halo, and the
+  // than its neighbours'. The dot sits inside Logseq's own 16px control, and the
   // two bands around it are the widths every state is measured out from.
   const defaults = rule(row)
   assert.equal(px(defaults, '--hc-rail-bullet-size'), rail.bullet)
@@ -999,7 +999,14 @@ test('rail controls suppress background halos and hover enlargement', () => {
     specificity('.bullet-link-wrap:hover > .bullet-container:not(.typed-list) .bullet')) > 0)
 })
 
-test('rail bullets have no rings at rest or on hover', () => {
+test('only collapsed parents get a crisp ring, including on hover', () => {
+  const closed = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container.bullet-closed .bullet`
+  assert.equal(value(rule(closed), 'outline'), '1px solid var(--hc-rail-bullet-color)')
+  assert.equal(value(rule(closed), 'outline-offset'), '2px')
+  assert.equal(value(rule(`${wrap} .bullet-container .bullet`), 'outline'), 'none')
+  for (const competing of [`${wrap} .bullet-container .bullet`, `${wrap} .bullet-container.typed-list .bullet`, `${wrap}:hover .bullet-container .bullet`]) {
+    assert.ok(compare(specificity(closed), specificity(competing)) > 0)
+  }
   assert.doesNotMatch(css, /--hc-rail-bullet-(?:gap|ring|edge)/)
   for (const [selector, body] of rules) {
     if (!selector.startsWith(scope)) continue
