@@ -1001,6 +1001,18 @@ test('rail controls suppress background halos and hover enlargement', () => {
     specificity('.bullet-link-wrap:hover > .bullet-container:not(.typed-list) .bullet')) > 0)
 })
 
+test('parent ring interiors mask the rail in both fold states', () => {
+  const parent = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container`
+  assert.equal(value(rule(parent), 'background-color'), 'var(--vscode-hc-black)')
+  assert.equal(value(rule(parent), 'border-radius'), '50%')
+  assert.equal(value(rule(`${parent} .bullet`), 'opacity'), '1')
+  // The 16px opaque disc covers the 14px inner diameter (10px dot + two 2px gaps).
+  assert.ok(rail.bullet >= rail.dot + 2 * 2)
+  for (const competing of [`${wrap} .bullet-container`, `${wrap} .bullet-container.as-order-list`, '.bullet-link-wrap:hover > .bullet-container']) {
+    assert.ok(compare(specificity(parent), specificity(competing)) >= 0)
+  }
+})
+
 test('parents retain a 2px ring and 2px gap in both fold states', () => {
   const closed = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container .bullet`
   assert.equal(value(rule(closed), 'outline'), '2px solid var(--hc-rail-bullet-color)')

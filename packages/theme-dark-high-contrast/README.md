@@ -92,7 +92,8 @@ editor, the left menu and the sidebars are drawn with.
 
 Rail dots are 10px. Parents retain a crisp 2px ring in the dot color with a 2px
 gap. Collapsed parents show the solid dot; expanded parents hide it.
-The surrounding control is transparent, with no glow; hovering keeps the dot the same size.
+An opaque black backing hides the rail inside parent rings, including the gap.
+There is no glow; hovering keeps the dot the same size.
 
 A page's properties are the page's front matter rather than a block of its text,
 so they render with no bullet and no rail segment, and the rail opens at the

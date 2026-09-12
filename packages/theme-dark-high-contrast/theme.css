@@ -952,6 +952,13 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   box-shadow: none;
 }
 
+/* An opaque canvas-colored disc masks the rail through the center and ring gap. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container {
+  background-color: var(--vscode-hc-black);
+  border-radius: 50%;
+}
+
 /* Hide only the fill of an expanded parent's dot, preserving its ring and controls. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed) {
@@ -961,6 +968,7 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
 /* Parents keep a sharp ring in both fold states, without a glow. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container .bullet {
+  opacity: 1;
   outline: 2px solid var(--hc-rail-bullet-color);
   outline-offset: 2px;
 }

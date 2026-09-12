@@ -7,7 +7,7 @@ All notable changes to this project are documented here.
 - Use uniform 10px dots across headings and prose. Preserve first-line alignment.
 - Give parents a 2px ring with a 2px gap in both fold states. Collapsed parents
   show the central dot; expanded parents hide it. Remove container halos and glow,
-  and prevent hover enlargement.
+  and prevent hover enlargement. Mask the rail inside parent rings and their gaps.
 - Order hierarchy colors from brightest to darkest, starting with amber, blue
   and teal at the top levels.
 
