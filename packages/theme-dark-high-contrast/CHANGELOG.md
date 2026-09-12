@@ -10,6 +10,7 @@ All notable changes to this project are documented here.
   control for folding blocks.
 - End every rail segment at a bullet, removing the Branched opening cap and the
   Flat tail below the final bullet.
+- Leave empty blocks without a rail segment in both layouts.
 
 ## 2.12.0 - 2026-09-11
 

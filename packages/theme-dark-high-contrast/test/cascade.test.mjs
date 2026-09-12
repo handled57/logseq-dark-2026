@@ -791,6 +791,12 @@ test('page properties carry no bullet and no rail, and the rail opens under them
   assert.equal(value(rule(railStart), 'display'), 'none')
 })
 
+test('empty blocks carry no rail segment', () => {
+  const emptyEntry = `${scope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="empty"] > .block-main-container > .block-control-wrap::before`
+  const emptyExit = `${scope} .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="empty"] > .block-main-container > .block-control-wrap::after`
+  assert.equal(value(rule(`${emptyEntry}, ${emptyExit}`), 'display'), 'none !important')
+})
+
 test('every heading level is set to the same fraction of the size Logseq gives it', () => {
   // Logseq's scale reads oversized against this theme's prose, so every level
   // is taken to one fraction of it. Below 1 or the headings grew; the levels

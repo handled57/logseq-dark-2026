@@ -32,8 +32,8 @@ Choose **Rail layout** under **Plugins → Dark High Contrast → Settings**:
 - **Branched** aligns bullets in the same column as Flat. A 2px
   vertical rail connects only consecutive visible blocks at the same depth.
   Every depth change leaves a gap, with no curves or horizontal connectors.
-  Every segment begins and ends at a bullet. Collapsed descendants are skipped
-  and block spacing stays unchanged.
+  Every segment begins and ends at a bullet. Empty blocks interrupt the rail;
+  collapsed descendants are skipped and block spacing stays unchanged.
 
 ```markdown
 *        Block A

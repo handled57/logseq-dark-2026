@@ -128,6 +128,8 @@ bullets carry are not the setting's to change.
 
 Every visible rail segment begins and ends at a bullet: the first block paints
 nothing above its bullet, and the final block paints nothing below its bullet.
+An empty block is marked by the runtime and suppresses its own halves plus the
+neighboring halves that would enter it, so it carries no rail segment.
 The rail is the page's own tree and nothing above it. Logseq renders a page's
 properties as its first block, marked `pre-block` in view and while they are
 being typed; that row keeps its place in the column so the content column does

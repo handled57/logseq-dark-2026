@@ -355,7 +355,7 @@ function railTree() {
   const page = editor.appendChild(node('div', { classes: ['page-blocks-inner'] }))
   const content = page.appendChild(node('div', { classes: ['content'] }))
 
-  function appendBlock(group, { visible = true } = {}) {
+  function appendBlock(group, { visible = true, text = 'Block' } = {}) {
     const block = group.appendChild(node('div', {
       classes: ['ls-block'],
       getClientRects: () => visible ? [{}] : []
@@ -363,7 +363,7 @@ function railTree() {
     const mainContainer = block.appendChild(node('div', { classes: ['block-main-container'] }))
     mainContainer.appendChild(node('div', { classes: ['block-control-wrap'] }))
     const wrapper = mainContainer.appendChild(node('div', { classes: ['block-content-wrapper'] }))
-    wrapper.textContent = 'Block'
+    wrapper.textContent = text
     return block
   }
 
@@ -736,6 +736,27 @@ test('Branched ignores front matter and embedded or hidden blocks in each conten
     assert.equal(block.getAttribute('data-hc-rail-entry'), null)
     assert.equal(block.getAttribute('data-hc-rail-exit'), null)
   }
+})
+
+test('empty blocks interrupt rail segments in both layouts', async () => {
+  const fixture = railTree()
+  const before = fixture.appendBlock(fixture.content)
+  const empty = fixture.appendBlock(fixture.content, { text: '' })
+  const after = fixture.appendBlock(fixture.content)
+  const context = load({ railLayout: 'Flat' }, [], {}, fixture.host)
+  await Promise.resolve()
+
+  assert.equal(before.getAttribute('data-hc-rail-exit'), 'empty')
+  assert.equal(empty.getAttribute('data-hc-rail-entry'), 'empty')
+  assert.equal(empty.getAttribute('data-hc-rail-exit'), 'empty')
+  assert.equal(after.getAttribute('data-hc-rail-entry'), 'empty')
+
+  context.logseq.settings.railLayout = 'Branched'
+  context.paint()
+  assert.equal(before.getAttribute('data-hc-rail-exit'), 'none')
+  assert.equal(empty.getAttribute('data-hc-rail-entry'), 'empty')
+  assert.equal(empty.getAttribute('data-hc-rail-exit'), 'empty')
+  assert.equal(after.getAttribute('data-hc-rail-entry'), 'none')
 })
 
 test('an unknown rail layout falls back to Flat and unloading removes the marker', async () => {

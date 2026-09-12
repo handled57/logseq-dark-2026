@@ -109,6 +109,7 @@ const BRANCHED_RAIL_LAYOUT = 'Branched'
 const RAIL_LAYOUT_ATTR = 'data-hc-rail-layout'
 const RAIL_ENTRY_ATTR = 'data-hc-rail-entry'
 const RAIL_EXIT_ATTR = 'data-hc-rail-exit'
+const EMPTY_BLOCK_ATTR = 'data-hc-empty-block'
 
 /* Leading-emoji block icons. A block whose text opens with one emoji has that
  * emoji set in a gutter to the left of the text, the way a passage sets a verse
@@ -313,6 +314,15 @@ function shouldHideBullet(block) {
   if (raw) return specialSource(raw)
   if (typeof wrapper.matches === 'function' && wrapper.matches(SPECIAL_CONTENT_SELECTOR)) return true
   if (wrapper.querySelector(SPECIAL_CONTENT_SELECTOR)) return true
+  return propertyFreeText(wrapper) === ''
+}
+
+function isEmptyBlock(block) {
+  const wrapper = block.querySelector(':scope > .block-main-container > .block-content-wrapper') ||
+    block.querySelector('.block-content-wrapper')
+  if (!wrapper || rawBlockContent(wrapper)) return false
+  if (typeof wrapper.matches === 'function' && wrapper.matches(SPECIAL_CONTENT_SELECTOR)) return false
+  if (wrapper.querySelector(SPECIAL_CONTENT_SELECTOR)) return false
   return propertyFreeText(wrapper) === ''
 }
 
@@ -821,9 +831,9 @@ function applyRailPath(layout) {
   for (const block of blocks) {
     block.removeAttribute(RAIL_ENTRY_ATTR)
     block.removeAttribute(RAIL_EXIT_ATTR)
+    if (isEmptyBlock(block)) block.setAttribute(EMPTY_BLOCK_ATTR, '')
+    else block.removeAttribute(EMPTY_BLOCK_ATTR)
   }
-
-  if (layout !== 'branched') return
 
   const paths = new Map()
 
@@ -839,15 +849,25 @@ function applyRailPath(layout) {
     }
 
     if (!paths.has(root)) paths.set(root, [])
-    paths.get(root).push({ block, depth })
+    paths.get(root).push({ block, depth, empty: block.getAttribute(EMPTY_BLOCK_ATTR) !== null })
   }
 
   for (const path of paths.values()) {
-    path.forEach(({ block, depth }, index) => {
-      block.setAttribute(RAIL_ENTRY_ATTR, index === 0 ? 'start' :
-        path[index - 1].depth === depth ? 'connected' : 'none')
-      block.setAttribute(RAIL_EXIT_ATTR,
-        path[index + 1]?.depth === depth ? 'connected' : 'none')
+    path.forEach(({ block, depth, empty }, index) => {
+      const previous = path[index - 1]
+      const next = path[index + 1]
+      if (empty) {
+        block.setAttribute(RAIL_ENTRY_ATTR, 'empty')
+        block.setAttribute(RAIL_EXIT_ATTR, 'empty')
+      } else if (layout === 'branched') {
+        block.setAttribute(RAIL_ENTRY_ATTR, index === 0 ? 'start' :
+          !previous.empty && previous.depth === depth ? 'connected' : 'none')
+        block.setAttribute(RAIL_EXIT_ATTR,
+          next && !next.empty && next.depth === depth ? 'connected' : 'none')
+      } else {
+        if (previous?.empty) block.setAttribute(RAIL_ENTRY_ATTR, 'empty')
+        if (next?.empty) block.setAttribute(RAIL_EXIT_ATTR, 'empty')
+      }
     })
   }
 }
@@ -965,6 +985,7 @@ function teardown() {
   for (const block of doc.querySelectorAll('.ls-block')) {
     block.removeAttribute(RAIL_ENTRY_ATTR)
     block.removeAttribute(RAIL_EXIT_ATTR)
+    block.removeAttribute(EMPTY_BLOCK_ATTR)
   }
 
   collapsedContent.clear()

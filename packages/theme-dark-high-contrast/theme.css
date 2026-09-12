@@ -907,8 +907,8 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   outline-offset: 0;
 }
 
-/* Bullets the theme hides elsewhere — code, centered text, verse, passages,
- * empty blocks — are part of the rail, so the suppression rules above are
+/* Bullets the theme hides elsewhere — code, centered text, verse and passages
+ * — are part of the rail, so the suppression rules above are
  * answered here. They still hold everywhere the rail does not reach.
  *
  * A bullet is a solid 10px dot inside Logseq's own 16px control.
@@ -1200,6 +1200,17 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   .ls-block:not(.block-content-wrapper *):not(:has(> .block-children-container .ls-block)):not(:has(~ .ls-block)):not(.ls-block:has(~ .ls-block) *)
   > .block-main-container > .block-control-wrap::after {
   display: none;
+}
+
+/* Empty rows interrupt the rail. Their own halves and the neighboring halves
+ * that would enter them are suppressed, leaving no segment attached to them. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-entry="empty"]
+  > .block-main-container > .block-control-wrap::before,
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *)[data-hc-rail-exit="empty"]
+  > .block-main-container > .block-control-wrap::after {
+  display: none !important;
 }
 
 .page-reference,

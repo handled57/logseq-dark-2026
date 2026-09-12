@@ -609,8 +609,8 @@ test('every rendered block in the main editor keeps a bullet on the rail', () =>
     return found[1]
   }
 
-  // The bullets the theme hides elsewhere — code, centered text, verse,
-  // passages, empty blocks — are all part of the rail.
+  // The bullets the theme hides elsewhere — code, centered text, verse and
+  // passages — are all part of the rail.
   assert.match(declarations(`${wrapSelector} .bullet-container`), /opacity:\s*1\s*!important/)
 
   // The control column spans its row so the rail line can run the height of a
