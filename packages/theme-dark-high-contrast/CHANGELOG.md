@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## 2.11.0 - 2026-09-11
+
+- Use uniform 10px dots across headings and prose. Preserve first-line alignment.
+- Give parents a 2px ring with a 2px gap in both fold states. Collapsed parents
+  show the central dot; expanded parents hide it. Remove container halos and glow,
+  and prevent hover enlargement. Mask the rail inside parent rings and their gaps.
+- Order hierarchy colors from brightest to darkest, starting with amber, blue
+  and teal at the top levels.
+
 ## 2.10.0 - 2026-09-10
 
 - Align a page's title with the text of the blocks below it. Logseq leaves the
@@ -196,18 +205,18 @@ All notable changes to this project are documented here.
 
 ## 2.2.0 - 2026-09-07
 
-- Colour the bullet rail by hierarchy. A block that carries the structure of the
+- Color the bullet rail by hierarchy. A block that carries the structure of the
   page — one whose first line is a heading, or one with children of its own —
-  paints its bullet and its own stretch of the rail in the colour of its depth:
+  paints its bullet and its own stretch of the rail in the color of its depth:
   red at the top level, then orange, yellow, green, blue, indigo and violet, the
   seven repeating below the seventh level so no two adjacent levels ever share a
-  hue. A child's segment is always the child's colour rather than its parent's,
-  and a folded parent keeps its colour while its children are out of the
+  hue. A child's segment is always the child's color rather than its parent's,
+  and a folded parent keeps its color while its children are out of the
   document. Ordinary leaf prose keeps the white bullet on the cyan line it
-  already had, and a hovered bullet now lights in whichever of the two colours
+  already had, and a hovered bullet now lights in whichever of the two colors
   its own block paints the rail with.
 
-- Add two colours the VS Code High Contrast palette does not carry, `--hc-red`
+- Add two colors the VS Code High Contrast palette does not carry, `--hc-red`
   and `--hc-indigo`, so the red at the top of the spectrum reads apart from the
   orange a level below it and the indigo stands between the blue and the violet.
   Both clear 6:1 against the black canvas.

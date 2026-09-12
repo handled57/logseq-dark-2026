@@ -439,8 +439,16 @@ test('the block-icon gutter and the indent that hangs out of it are one number',
   assert.ok(Number(declared[1]) > 1 && Number(declared[1]) < 2, 'the icon gutter is not about one emoji wide')
 })
 
+/* A declaration read whole, across the lines a long value is wrapped over,
+ * with the wrapping collapsed to one space. `value` reads a single line. */
+const declaration = (body, property) => {
+  const match = body.replace(/\s*\n\s*/g, ' ').match(new RegExp(`(?:^|;|\\s)${property}:\\s*([^;}]+)`))
+  assert.ok(match, `no "${property}" declaration`)
+  return match[1].trim()
+}
+
 /* Read back off the declarations above. */
-const rail = { indent: 29, arrow: 22, bullet: 16, dot: 6, box: 24, gutter: 6, orderList: 22, pagePad: 32 }
+const rail = { indent: 29, arrow: 22, bullet: 16, dot: 10, box: 24, gutter: 6, orderList: 22, pagePad: 32 }
 
 /* Logseq's heading sizes, as multiples of the block's own text size. */
 const headings = { h1: 2, h2: 1.5, h3: 1.2, h4: 1, h5: 0.83, h6: 0.75 }
@@ -572,7 +580,7 @@ test('the rail takes back exactly the indentation each nesting level applied', (
   }
 })
 
-/* The rail's hierarchy colors, in the ROYGBIV order it steps through, and the
+/* The rail's hierarchy colors, in the brightness order it steps through, and the
  * guard the heading rules already qualify themselves by. */
 const spectrum = 8
 const headingGuard = ':not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)'
@@ -650,7 +658,11 @@ test('a heading and a block with children take their depth color; ordinary prose
   assert.ok(!/--hc-rail-line-color/.test(css), 'the line still has a color of its own to take from a depth')
   const dot = rule(`${wrap} .bullet-container .bullet`)
   assert.equal(value(dot, 'background-color'), 'var(--hc-rail-bullet-fill)')
-  assert.match(dot, /0 0 0 calc\(2px \* var\(--hc-rail-bullet-scale\)\) var\(--hc-rail-bullet-color\)/)
+  assert.equal(
+    value(dot, 'box-shadow'),
+    'none',
+    'a bullet must have no shadow'
+  )
 
   // Every one of those colors is declared on a block's own control column,
   // which no descendant block sits inside: a child's segment takes the child's
@@ -659,7 +671,8 @@ test('a heading and a block with children take their depth color; ordinary prose
     if (!/(?:^|;|\n)\s*--hc-rail-(?:depth-color|bullet-color|bullet-fill):/.test(body)) continue
     for (const part of splitSelectors(selector)) {
       assert.ok(
-        plain(part).endsWith('.block-control-wrap'),
+        plain(part).endsWith('.block-control-wrap') ||
+          plain(part).endsWith('.block-control-wrap .bullet-container'),
         `a hierarchy color is declared where a descendant block inherits it: "${part.slice(0, 60)}…"`
       )
     }
@@ -685,29 +698,20 @@ test('a heading and a block with children take their depth color; ordinary prose
   )
 })
 
-test('a block standing open is a ring; a folded or childless one is filled', () => {
-  // Logseq marks a block that has children with `haschild`, and closes the
-  // bullet of a folded one with `bullet-closed`. A bullet with the first and
-  // without the second is a block whose children are showing, and it gives up
-  // its inside while keeping the two colored rings around it.
-  const open = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap:has(.bullet-container:not(.bullet-closed))`
-  assert.equal(value(rule(open), '--hc-rail-bullet-fill'), 'transparent')
-
-  // Only the fill: the rings the bullet is drawn with are still its own color,
-  // so an open block reads as its depth's hue rather than disappearing.
-  assert.doesNotMatch(rule(open), /--hc-rail-(?:bullet|depth)-color:/)
-
-  // A collapsed block and a leaf are untouched, so the ring is the one state
-  // that is different rather than a new appearance for every bullet.
-  assert.ok(
-    compare(specificity(open), specificity(wrap)) > 0,
-    'the open block does not out-rank the fill it replaces'
-  )
-  assert.deepEqual(
-    [...rules.keys()].filter((selector) => selector.startsWith(scope) && selector.includes('.bullet-closed')),
-    [open],
-    'the rail names a folded bullet somewhere other than the guard that leaves it alone'
-  )
+test('only expanded parents hide their dot fill', () => {
+  for (const [selector, body] of rules) {
+    if (!selector.startsWith(scope)) continue
+    if (/--hc-rail-bullet-fill:/.test(body)) {
+      assert.equal(value(body, '--hc-rail-bullet-fill'),
+        selector.includes('[haschild="true"]') && selector.includes('.bullet-container:not(.bullet-closed)')
+          ? 'transparent' : 'var(--hc-rail-bullet-color)')
+    }
+    if (splitSelectors(selector).some(part => plain(part).endsWith('.bullet')) &&
+        /background-color:/.test(body)) {
+      assert.match(value(body, 'background-color'),
+        /^var\(--hc-rail-bullet-fill\)( !important)?$/)
+    }
+  }
 })
 
 test('page properties carry no bullet and no rail, and the rail opens under them', () => {
@@ -817,58 +821,46 @@ test("a bullet sits on the middle of its block's first line", () => {
   assert.equal(value(rule(`${wrap}::after`), 'top'), 'var(--hc-rail-bullet-y)')
 })
 
-test("a bullet is drawn at the size of its block's first line", () => {
-  // Ordinary prose is the baseline: exactly the bullet Logseq draws, so the
-  // scale is a plain multiple of its 16px halo and its 6px dot, and everything
-  // outside the rail — sidebars, dialogs, document mode — keeps that default.
-  // A custom property substitutes against the element it is declared on, so the
-  // two sizes are declared beside the scale, on the row that carries it: read
-  // from `:root` they would resolve against the root's scale and never follow a
-  // heading's.
+test('every bullet on the rail is drawn at one size', () => {
+  // One size for every first line: the bullet column reads as a column, and a
+  // heading is marked by the color of its bullet rather than by a bullet larger
+  // than its neighbours'. The dot sits inside Logseq's own 16px control, and the
+  // two bands around it are the widths every state is measured out from.
   const defaults = rule(row)
-  assert.equal(Number.parseFloat(value(defaults, '--hc-rail-bullet-scale')), 1)
-  assert.equal(value(defaults, '--hc-rail-bullet-size'), `calc(${rail.bullet}px * var(--hc-rail-bullet-scale))`)
-  assert.equal(value(defaults, '--hc-rail-bullet-dot'), `calc(${rail.dot}px * var(--hc-rail-bullet-scale))`)
+  assert.equal(px(defaults, '--hc-rail-bullet-size'), rail.bullet)
+  assert.equal(px(defaults, '--hc-rail-bullet-dot'), rail.dot)
 
-  // A first line that is X% larger than ordinary text draws a bullet X% larger,
-  // so each heading's scale is the size Logseq gives that level, in the
-  // rendered view and in the editor textarea alike.
+  // Nothing sizes a bullet by the line it hangs beside any more: the heading
+  // rules place their bullets and say nothing about how large they are.
+  assert.ok(!/--hc-rail-bullet-scale/.test(css), 'a bullet is still scaled by its own first line')
   const guard = ':not(:is(.block-ref, .block-embed, .embed-page, .custom-query) *)'
-  for (const [level, size] of Object.entries(headings)) {
+  for (const level of Object.keys(headings)) {
     const body = rule(
       `${row}:has(> .block-content-wrapper ${level}${guard}), ${row}:has(> .editor-wrapper .${level})`
     )
-    assert.equal(
-      value(body, '--hc-rail-bullet-scale'),
-      `calc(${size} * var(--hc-heading-scale))`,
-      `a ${level} bullet is not drawn at the ${size * headingScale}× its own line is set in`
+    assert.doesNotMatch(
+      body,
+      /--hc-rail-bullet-(?:size|dot|gap|ring)/,
+      `a ${level} draws a bullet of a size of its own`
     )
+    assert.match(body, /--hc-rail-bullet-y/, `a ${level} no longer places its bullet on its own first line`)
   }
 
-  // The halo, the dot inside it and the rings around that dot all follow.
+  // The control and the solid dot inside it.
   const halo = rule(`${wrap} .bullet-container`)
   assert.equal(value(halo, 'width'), 'var(--hc-rail-bullet-size)')
   assert.equal(value(halo, 'height'), 'var(--hc-rail-bullet-size)')
   for (const dot of [rule(`${wrap} .bullet-container .bullet`), rule(`${wrap} .bullet-container.typed-list .bullet`)]) {
     assert.equal(value(dot, 'width'), 'var(--hc-rail-bullet-dot)')
     assert.equal(value(dot, 'height'), 'var(--hc-rail-bullet-dot)')
-    assert.match(dot, /box-shadow: 0 0 0 calc\(1px \* var\(--hc-rail-bullet-scale\)\)/)
-    assert.match(dot, /0 0 0 calc\(2px \* var\(--hc-rail-bullet-scale\)\)/)
+    assert.equal(value(dot, 'box-shadow'), 'none')
   }
-  const hovered = `${block}:hover:not(:has(.ls-block:hover))`
-  assert.match(
-    rule(`${hovered} > .block-main-container > .block-control-wrap .bullet-container .bullet`),
-    /0 0 0 calc\(5px \* var\(--hc-rail-bullet-scale\)\)/,
-    'a hovered bullet keeps a ring sized for an ordinary bullet'
-  )
 
-  // A bullet grows around the rail rather than off it: half of whatever it grew
-  // by comes off either side, so its center stays on the line at every size,
-  // and the row's own width is unchanged.
+  // A bullet that never grows is never centered back onto the rail: half of it
+  // places its center on the line, and it takes the whole of Logseq's own box.
   const link = rule(`${wrap} > .bullet-link-wrap`)
-  const centering = `calc((${rail.bullet}px - var(--hc-rail-bullet-size)) / 2)`
-  assert.equal(value(link, 'margin-left'), centering)
-  assert.equal(value(link, 'margin-right'), centering)
+  assert.equal(value(link, 'margin-top'), 'calc(var(--hc-rail-bullet-y) - var(--hc-rail-bullet-size) / 2)')
+  assert.doesNotMatch(link, /margin-(?:left|right)/, 'a bullet is still pulled back around the rail')
 })
 
 test('a parent and its first child stand as far apart as two siblings do', () => {
@@ -992,36 +984,52 @@ test('the rail out-ranks the bullet suppression it answers', () => {
   }
 })
 
-test('hovering a block lights its own bullet and no other', () => {
-  const hovered = `${block}:hover:not(:has(.ls-block:hover)) > .block-main-container > .block-control-wrap`
-  const halo = rule(`${hovered} .bullet-container`)
-  const dot = rule(`${hovered} .bullet-container .bullet`)
+test('rail controls suppress background halos and hover enlargement', () => {
+  const container = `${wrap} .bullet-container`
+  assert.equal(value(rule(container), 'background-color'), 'transparent')
+  for (const competing of [
+    '.bullet-container:not(.typed-list)',
+    '.bullet-container:not(.typed-list).bullet-closed',
+    '.bullet-link-wrap:hover > .bullet-container'
+  ]) {
+    assert.ok(compare(specificity(container), specificity(competing)) > 0,
+      `rail transparency must override ${competing}`)
+  }
+  const hovered = `${wrap}:hover .bullet-container .bullet`
+  assert.equal(value(rule(hovered), 'transform'), 'none')
+  assert.ok(compare(specificity(hovered),
+    specificity('.bullet-link-wrap:hover > .bullet-container:not(.typed-list) .bullet')) > 0)
+})
 
-  // The bullet's own color, at a fraction of full strength: white for ordinary
-  // prose, its own depth's hue for a heading or a parent, so the halo stays
-  // visible against every bullet the rail draws.
-  const glow = /color-mix\(in srgb, var\(--hc-rail-bullet-color\) \d+%, transparent\)/
-  assert.match(halo, new RegExp(`background-color:\\s*${glow.source}`), 'a hovered bullet is not lit in its own color')
-  assert.match(
-    dot,
-    new RegExp(`0 0 0 calc\\(\\d+px \\* var\\(--hc-rail-bullet-scale\\)\\) ${glow.source}`),
-    'a hovered bullet has no ring in its own color'
-  )
+test('parent ring interiors mask the rail in both fold states', () => {
+  const parent = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container`
+  assert.equal(value(rule(parent), 'background-color'), 'var(--vscode-hc-black)')
+  assert.equal(value(rule(parent), 'border-radius'), '50%')
+  assert.equal(value(rule(`${parent} .bullet`), 'opacity'), '1')
+  // The 16px opaque disc covers the 14px inner diameter (10px dot + two 2px gaps).
+  assert.ok(rail.bullet >= rail.dot + 2 * 2)
+  for (const competing of [`${wrap} .bullet-container`, `${wrap} .bullet-container.as-order-list`, '.bullet-link-wrap:hover > .bullet-container']) {
+    assert.ok(compare(specificity(parent), specificity(competing)) >= 0)
+  }
+})
 
-  // The dot keeps the ring the theme draws it with, so hover adds to a bullet
-  // rather than replacing it — and that ring is still the bullet's own color,
-  // not the white every bullet carried before the rail was colored.
-  assert.match(
-    dot,
-    /0 0 0 calc\(1px \* var\(--hc-rail-bullet-scale\)\) var\(--vscode-hc-black\),\s*\n?\s*0 0 0 calc\(2px \* var\(--hc-rail-bullet-scale\)\) var\(--hc-rail-bullet-color\)/
-  )
-
-  // Only the block the pointer is over: an ancestor holding a hovered block
-  // keeps its own bullet plain, the way the block highlight already behaves.
-  assert.ok(
-    compare(specificity(`${hovered} .bullet-container`), specificity(`${wrap} .bullet-container`)) > 0,
-    'the hovered bullet does not out-rank the rail bullet it repaints'
-  )
+test('parents retain a 2px ring and 2px gap in both fold states', () => {
+  const closed = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container .bullet`
+  assert.equal(value(rule(closed), 'outline'), '2px solid var(--hc-rail-bullet-color)')
+  assert.equal(value(rule(closed), 'outline-offset'), '2px')
+  const expanded = `${scope} .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed)`
+  assert.equal(value(rule(expanded), '--hc-rail-bullet-fill'), 'transparent')
+  assert.equal(value(rule(`${wrap} .bullet-container .bullet`), 'outline'), 'none')
+  for (const competing of [`${wrap} .bullet-container .bullet`, `${wrap} .bullet-container.typed-list .bullet`, `${wrap}:hover .bullet-container .bullet`]) {
+    assert.ok(compare(specificity(closed), specificity(competing)) >= 0)
+  }
+  assert.doesNotMatch(css, /--hc-rail-bullet-(?:gap|ring|edge)/)
+  for (const [selector, body] of rules) {
+    if (!selector.startsWith(scope)) continue
+    if (splitSelectors(selector).some(part => plain(part).endsWith('.bullet')) && /box-shadow:/.test(body)) {
+      assert.equal(value(body, 'box-shadow'), 'none')
+    }
+  }
 })
 
 test('the slash-command menu is opaque and paints over the blocks below it', () => {
