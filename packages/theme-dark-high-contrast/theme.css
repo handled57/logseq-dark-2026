@@ -980,11 +980,11 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   outline-offset: 2px;
 }
 
-/* Inset the expanded parent's 3px stroke by 1.5px for a 13px outer diameter. */
+/* Inset the expanded parent's 2px stroke by 0.5px for a 13px outer diameter. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
   .ls-block:not(.block-content-wrapper *)[haschild="true"] > .block-main-container > .block-control-wrap .bullet-container:not(.bullet-closed) .bullet {
-  outline-width: 3px;
-  outline-offset: -1.5px;
+  outline-width: 2px;
+  outline-offset: -0.5px;
 }
 
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)

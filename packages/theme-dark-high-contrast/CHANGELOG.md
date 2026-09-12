@@ -4,8 +4,8 @@ All notable changes to this project are documented here.
 
 ## 2.12.1 - 2026-09-11
 
-- Increase expanded parent rings from 10px to 13px in outer diameter and thicken
-  their stroke to 3px, retaining the existing collapsed-parent styling.
+- Increase expanded parent rings from 10px to 13px in outer diameter, retaining
+  their 2px stroke and the existing collapsed-parent styling.
 
 ## 2.12.0 - 2026-09-11
 
