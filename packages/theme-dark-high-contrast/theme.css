@@ -92,6 +92,19 @@ html[data-theme][data-color]:root body,
   --hc-block-outline-pad: 6px;
   --hc-block-gap: calc(4px + 2 * var(--hc-block-outline-pad));
 
+  /* The column a block's reference count is drawn in, held open on every block
+   * whether or not it carries a count. Logseq lays that count out as a flex
+   * sibling of the block's content, so a referenced block is rendered narrower
+   * than the plain one above it and everything measured off the content column
+   * — a heading's rule, a table, an admonition's box, a wrapped line — stops in
+   * a different place. Flooring that column at one number puts every block back
+   * on the same right edge. The number holds three digits of the count's own
+   * `text-sm` type, the 4px it is padded by on each side, and the 8px `ml-2`
+   * that separates it from the text, so the edge survives every count a block
+   * realistically carries; a count past 999 widens its own block's column
+   * rather than running into the words. */
+  --hc-block-refs-gutter: 2.5rem;
+
   /* Collapsible rich content: the box the control is drawn in, and the height
    * a folded shell keeps — one line, the same 1.75rem an admonition sets its
    * first line in. */
@@ -576,6 +589,20 @@ hr {
  * siblings are. */
 .block-children {
   padding-top: calc(var(--hc-block-gap) + 2px);
+}
+
+/* Logseq hangs a block's reference count in a flex column beside the block's
+ * content, and that column is zero wide until the block is referenced. Holding
+ * it open at `--hc-block-refs-gutter` on every block ends the content column in
+ * the same place whether a count is there or not, so a rule, a box edge or a
+ * line break never steps left and right down the page. The counts are pushed to
+ * the far side of the column as well, which lines them up with one another
+ * instead of leaving each one hard against text of its own length. Sidebars,
+ * dialogs and whiteboards render outside `#main-content-container` and keep
+ * Logseq's own layout, where the room matters more than the alignment. */
+#main-content-container .block-content-wrapper > .flex.flex-row > .flex.flex-row.items-center {
+  justify-content: flex-end;
+  min-width: var(--hc-block-refs-gutter);
 }
 
 .ls-block:focus-visible {

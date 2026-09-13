@@ -88,6 +88,21 @@ heading to `1rem` at equal specificity, which this stylesheet would otherwise
 win on load order. A heading's rail bullet is placed from the same variable,
 so the type and the bullet that hangs beside it cannot drift apart.
 
+Logseq lays a block's reference count out as a flex sibling of the block's
+content: `.block-content-wrapper` opens with a row holding the content box and,
+after it, the box the count is drawn in. That second box is empty until the
+block is referenced, so an unreferenced block's content column is wider than a
+referenced one's, and every edge measured off that column — a heading's rule, a
+table, an admonition's box, the point a line wraps at — lands somewhere else.
+The theme floors the count's box at `--hc-block-refs-gutter` instead, so the
+column is the same width on every block, and pushes the count to the far side
+of it so counts of different lengths line up too. It is a floor rather than a
+width: a count longer than the room widens its own block's column rather than
+running into the words. The rule is scoped to `#main-content-container`, which
+leaves the sidebars, dialogs and whiteboards at Logseq's own layout, and it
+reaches only the count's box, so nothing left of the content — the rail, the
+bullets, the fold controls — moves.
+
 In Connect the dots, every bullet, including leaves, copies its own depth color into
 `--hc-rail-bullet-color`, and both line pseudo-elements use that same variable.
 Consecutive same-depth endpoints therefore match along the entire connector.

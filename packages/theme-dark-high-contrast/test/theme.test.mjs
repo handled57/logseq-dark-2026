@@ -453,6 +453,44 @@ test('block hover leaves the block surface unchanged', () => {
  * box out border-box and sizes it itself, so the room has to be taken outside
  * that box: an outline offset and the spread of the fill's shadow, never
  * padding, which would rewrap the block's text under the pointer. */
+/* A block's right edge must not depend on whether the block happens to be
+ * linked. Logseq gives the reference count a flex column of its own beside the
+ * content and leaves it zero wide on a block nothing points at; the theme holds
+ * that column open on every block instead. */
+test('the reference-count column is reserved on every block in the main editor', () => {
+  const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)]
+    .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
+
+  assert.match(
+    css,
+    /--hc-block-refs-gutter:\s*[\d.]+rem;/,
+    'the reserved column is a variable a graph can retune'
+  )
+
+  const reserved = rules.filter(([, body]) => body.includes('var(--hc-block-refs-gutter)'))
+  assert.equal(reserved.length, 1, 'the reserved column is claimed by more than one rule')
+
+  const [selector, body] = reserved[0]
+  assert.match(body, /min-width:\s*var\(--hc-block-refs-gutter\)/, 'the column is not held open')
+  assert.match(body, /justify-content:\s*flex-end/, 'the counts are not lined up with one another')
+
+  // The count box, and only it: the content box beside it and everything left
+  // of the block keep the room and the layout they had.
+  assert.equal(
+    selector,
+    '#main-content-container .block-content-wrapper > .flex.flex-row > .flex.flex-row.items-center'
+  )
+  assert.doesNotMatch(
+    body,
+    /(?:^|[;\s])width:/,
+    'the column is fixed at a width rather than floored, so a longer count would collide with the text'
+  )
+
+  // Sidebars, dialogs and whiteboards render outside the main editor and are
+  // narrow enough that the room is worth more than the alignment.
+  assert.doesNotMatch(css, /\.cp__right-sidebar[^{}]*--hc-block-refs-gutter/)
+})
+
 test('persistent block outlines stand off the text on a padding of their own', () => {
   const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\n)([^{}]+?)\{([^{}]*)\}/g)]
     .map(([, selector, body]) => [selector.replace(/\s+/g, ' ').trim(), body])
