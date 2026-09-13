@@ -628,7 +628,7 @@ test('every rendered block in the main editor keeps a bullet on the rail', () =>
   // Both layouts read `.block-children` only as the record of depth. Turns are
   // painted on the incoming half of a block's own control column, so no rail
   // rule resizes a child group or could reveal a folded subtree.
-  const painted = /^(?:\.block-children|\.block-main-container|\.block-control-wrap|\.block-control|\.bullet-link-wrap|\.bullet-container|\.bullet|label|\[data-hc-property-toggle\])(?:\.[\w-]+)*(?::(?:hover|focus-visible))?(?::not\(\[[\w-]+\]\))?(?:::(?:before|after))?$/
+  const painted = /^(?:\.block-children|\.block-main-container|\.block-control-wrap|\.block-control|\.bullet-link-wrap|\.bullet-container|\.bullet|label|\[data-hc-property-toggle\])(?:\[[\w-]+\])*(?:\.[\w-]+)*(?::(?:hover|focus-visible))?(?::not\(\[[\w-]+\]\))?(?:::(?:before|after))?$/
   for (const [selector] of railRules) {
     for (const part of selectors(selector)) {
       const target = subject(part)
@@ -728,7 +728,7 @@ test('the passage block reproduces the admonition treatment on its own selectors
   // it is applied to, so the glyph and the line cannot share one element.
   assert.match(
     css,
-    /\.block-body > \.passage::before \{[\s\S]*?width:\s*3rem;[\s\S]*?border-right:\s*4px solid var\(--hc-admonition-accent\)/
+    /\.block-body > \.passage::before \{[\s\S]*?width:\s*calc\(3rem \+ 4px\);[\s\S]*?border-right:\s*4px solid var\(--hc-admonition-accent\)/
   )
   assert.doesNotMatch(css, /\.block-body > \.passage::before \{[^}]*mask/)
 
@@ -989,6 +989,17 @@ test('the property toggle is a stable cyan rail control revealed by hover or foc
   // `:focus-visible`; `index.js` marks it so the ring is skipped for exactly
   // that interaction, and only for as long as the marker survives.
   assert.match(css, /\[data-hc-property-toggle-pointer\]/)
+  // Skipping the ring is not enough on its own: the palette's keyboard-focus
+  // rule paints `outline` with `!important`, which no plain declaration can
+  // answer, so the marked control takes the ring off with `!important` too.
+  assert.match(
+    css,
+    /:focus-visible \{\s*outline:\s*2px solid var\(--vscode-hc-focus\)\s*!important;/
+  )
+  assert.match(
+    css,
+    /\[data-hc-property-toggle\]\[data-hc-property-toggle-pointer\] \{\s*outline:\s*none\s*!important;/
+  )
 })
 
 test('workbench chrome is bordered in the contrast border, not white', () => {

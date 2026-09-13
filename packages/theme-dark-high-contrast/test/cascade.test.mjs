@@ -255,8 +255,19 @@ test('the passage indent reproduces the admonition icon column', () => {
     return value.endsWith('px') ? number / 16 : number
   }
 
+  // `box-sizing` is `border-box` app-wide, so a column that hangs the divider
+  // on its own edge has to carry the divider's width on top of the column's,
+  // or the line is drawn over the last 4px of the column instead of the 4px
+  // after it — 4px left of everything else measured from the same figure.
+  const hung = (declarations, what) => {
+    const match = declarations.match(/width:\s*calc\(([\d.]+)rem \+ (\d+)px\)/)
+    assert.ok(match, `${what} does not carry its divider on top of the column`)
+    return { column: Number.parseFloat(match[1]), divider: Number.parseInt(match[2], 10) / 16 }
+  }
+
   const glyph = rule('.block-body > .passage::after')
-  const column = rem(rule('.block-body > .passage::before'), 'width')
+  const reserved = hung(rule('.block-body > .passage::before'), 'the passage column')
+  const column = reserved.column
   const divider = rem(rule('.block-body > .passage::before'), 'border-right')
   const indent = rem(rule('.block-body > .passage'), 'padding')
 
@@ -267,25 +278,20 @@ test('the passage indent reproduces the admonition icon column', () => {
   assert.equal(column, 3)
   // The divider the theme widens on `.admonition-icon`.
   assert.equal(divider, 0.25)
+  assert.equal(reserved.divider, divider)
   // Everything above, plus the content column's `ml-4`.
   assert.equal(indent, column + divider + 1)
 
-  // A real admonition's column is pinned to that same figure rather than left
-  // to the glyph, which the theme shrinks to 1.5em of the box's 1.125rem text.
-  // Without this the column measured 1.6875rem plus its `pr-4` and the divider
-  // hung 5px left of where the passage — and everything measured from the
-  // passage, the property table included — expects to find it. `box-sizing` is
-  // `border-box` app-wide, so the divider is added to the column, not taken out
-  // of it.
+  // A real admonition's column is pinned to the same two figures rather than
+  // left to the glyph, which the theme shrinks to 1.5em of the box's 1.125rem
+  // text: without this the column measured that glyph plus its `pr-4`, and the
+  // divider followed it away from where the passage draws the same line.
   const iconSelector =
     '.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon'
   const iconStart = css.indexOf(`\n${iconSelector} {`)
   assert.ok(iconStart >= 0, `${iconSelector} is missing`)
   const icon = css.slice(iconStart, css.indexOf('}', iconStart))
-  const pinned = icon.match(/width:\s*calc\(([\d.]+)rem \+ (\d+)px\)/)
-  assert.ok(pinned, 'the admonition icon column is not pinned to a width')
-  assert.equal(Number.parseFloat(pinned[1]), column)
-  assert.equal(Number.parseInt(pinned[2], 10) / 16, divider)
+  assert.deepEqual(hung(icon, 'the admonition column'), reserved)
   // A flex row would otherwise shrink the column below the width set here.
   assert.match(icon, /flex:\s*none/)
 })

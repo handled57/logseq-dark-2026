@@ -904,6 +904,15 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   outline-offset: 0;
 }
 
+/* Excluding the attribute above is not enough on its own: the palette's own
+ * keyboard-focus rule paints `outline` with `!important`, which no plain
+ * declaration can answer however specific its selector. The ring is therefore
+ * taken off the pointer-marked control with `!important` of its own. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle][data-hc-property-toggle-pointer] {
+  outline: none !important;
+}
+
 /* Bullets the theme hides elsewhere — code, centered text, verse and passages
  * — are part of the rail, so the suppression rules above are
  * answered here. They still hold everywhere the rail does not reach.
@@ -2007,14 +2016,20 @@ textarea.block-editor:focus {
  * everything the element paints, borders included: drawing both on one box
  * left the divider masked away. This one carries no mask, so its border-right
  * survives, and it spans the icon and the column's `pr-4` gutter so the line
- * lands where a real `.admonition-icon` border does. */
+ * lands where a real `.admonition-icon` border does.
+ *
+ * `box-sizing` is `border-box` app-wide, so the divider has to be added to the
+ * 3rem column rather than left to be taken out of it. Without that the line was
+ * drawn over the last 4px of the column instead of the 4px after it, which put
+ * it 4px left of everything measured from the same figure — the content indent
+ * below, the property table, and the divider drawn down past that table. */
 .block-body > .passage::before {
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 3rem;
+  width: calc(3rem + 4px);
   border-right: 4px solid var(--hc-admonition-accent);
 }
 
