@@ -9,6 +9,10 @@ All notable changes to this project are documented here.
   bracket the icon opens rather than a separate element sitting underneath.
 - Stop the property-visibility toggle from keeping a focus ring after a mouse
   click. The ring still marks keyboard focus.
+- Pin a named admonition's icon column to the 3rem the rest of the theme is
+  measured from. Shrinking the icon to suit the box's text had pulled the
+  column, and the divider hung on it, 5px left of where a passage draws the
+  same line and where the property table below it starts.
 
 ## 2.13.1 - 2026-09-12
 

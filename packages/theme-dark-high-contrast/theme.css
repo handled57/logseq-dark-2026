@@ -1941,7 +1941,20 @@ textarea.block-editor:focus {
   font-size: var(--hc-admonition-font-size);
 }
 
+/* The icon column is pinned rather than left to the glyph.
+ *
+ * Logseq sizes the icon `h-8 w-8`, so the column measured 2rem plus its 1rem
+ * `pr-4` and the divider hung at 3rem. The rule below shrinks the glyph to
+ * 1.5em of the box's 1.125rem text, and with nothing else setting the column
+ * the divider followed it 5px left — leaving a real admonition's divider out of
+ * line with the 3rem a passage reserves, and with everything else measured from
+ * that figure, the property table and the divider drawn past it included.
+ * Restating the historical column keeps the glyph free to change size without
+ * moving the line it sits beside. `box-sizing` is `border-box` app-wide, so the
+ * divider is added to the 3rem rather than taken out of it. */
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon {
+  flex: none !important;
+  width: calc(3rem + 4px) !important;
   justify-content: flex-start !important;
   color: var(--hc-admonition-accent) !important;
   border-right: 4px solid var(--hc-admonition-accent) !important;
