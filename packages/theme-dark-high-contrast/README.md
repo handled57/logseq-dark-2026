@@ -306,7 +306,7 @@ When a block carries more than one configured key, the first key in the settings
 
 ### Where a visible table renders
 
-A property table the configuration does not hide renders *below* the block's admonition or passage, set off from it by a small gap, with its left border lined up with the box's own text. Logseq renders the table ahead of the block body, which leaves it above the box its properties describe and reading as though it belonged to whatever came before. This is a change to the render only: the properties stay first in the block's source, and clicking into the block still shows them written where Logseq writes them.
+A property table the configuration does not hide renders *below* the block's admonition or passage, set off from it by a small gap, with its left border lined up with the box's own text. Logseq renders the table ahead of the block body, which leaves it above the box its properties describe and reading as though it belonged to whatever came before. This is a change to the render only: the properties stay first in the block's source, and clicking into the block still shows them written where Logseq writes them. The box's own accent-colored divider continues through the gap and down the full height of the table, so the table reads as still inside the bracket the icon opens.
 
 It covers the six named admonitions — `tip`, `note`, `important`, `caution`, `warning` and `pinned` — and the theme's own passage block. A table that a rule hides, and every ordinary block's table, is left exactly where it is.
 

@@ -92,6 +92,12 @@ const pairings = [
     upstream: '.block-properties',
     theme:
       '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties'
+  },
+  {
+    surface: 'the divider bar drawn past a property table',
+    upstream: '.block-properties',
+    theme:
+      '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden]))::after'
   }
 ]
 
@@ -249,8 +255,19 @@ test('the passage indent reproduces the admonition icon column', () => {
     return value.endsWith('px') ? number / 16 : number
   }
 
+  // `box-sizing` is `border-box` app-wide, so a column that hangs the divider
+  // on its own edge has to carry the divider's width on top of the column's,
+  // or the line is drawn over the last 4px of the column instead of the 4px
+  // after it — 4px left of everything else measured from the same figure.
+  const hung = (declarations, what) => {
+    const match = declarations.match(/width:\s*calc\(([\d.]+)rem \+ (\d+)px\)/)
+    assert.ok(match, `${what} does not carry its divider on top of the column`)
+    return { column: Number.parseFloat(match[1]), divider: Number.parseInt(match[2], 10) / 16 }
+  }
+
   const glyph = rule('.block-body > .passage::after')
-  const column = rem(rule('.block-body > .passage::before'), 'width')
+  const reserved = hung(rule('.block-body > .passage::before'), 'the passage column')
+  const column = reserved.column
   const divider = rem(rule('.block-body > .passage::before'), 'border-right')
   const indent = rem(rule('.block-body > .passage'), 'padding')
 
@@ -261,8 +278,22 @@ test('the passage indent reproduces the admonition icon column', () => {
   assert.equal(column, 3)
   // The divider the theme widens on `.admonition-icon`.
   assert.equal(divider, 0.25)
+  assert.equal(reserved.divider, divider)
   // Everything above, plus the content column's `ml-4`.
   assert.equal(indent, column + divider + 1)
+
+  // A real admonition's column is pinned to the same two figures rather than
+  // left to the glyph, which the theme shrinks to 1.5em of the box's 1.125rem
+  // text: without this the column measured that glyph plus its `pr-4`, and the
+  // divider followed it away from where the passage draws the same line.
+  const iconSelector =
+    '.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon'
+  const iconStart = css.indexOf(`\n${iconSelector} {`)
+  assert.ok(iconStart >= 0, `${iconSelector} is missing`)
+  const icon = css.slice(iconStart, css.indexOf('}', iconStart))
+  assert.deepEqual(hung(icon, 'the admonition column'), reserved)
+  // A flex row would otherwise shrink the column below the width set here.
+  assert.match(icon, /flex:\s*none/)
 })
 
 test('the moved property table lines up with the box text and takes the box tail', () => {
@@ -306,6 +337,65 @@ test('the moved property table lines up with the box text and takes the box tail
   assert.ok(spacingMetrics[0].includes('margin:2rem 0'), 'the pinned box tail is no longer 2rem')
   assert.match(table, /margin-bottom:\s*2rem;/)
   assert.match(css, /> \.block-body > :is\([^{]*\.passage\) \{\s*\n\s*margin-bottom:\s*0;/)
+})
+
+test('the divider through the property table lines up with the box\'s own divider', () => {
+  const declarations = (selector) => {
+    const start = css.indexOf(`\n${selector} {`)
+    assert.ok(start >= 0, `${selector} is missing`)
+    return css.slice(start, css.indexOf('}', start))
+  }
+
+  const scope =
+    '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden]))'
+  const bar = declarations(`${scope}::after`)
+
+  // `.block-content` is the anchor, and the one the table's own offset is
+  // already measured from, so both are arithmetic in the same space.
+  assert.match(declarations(scope), /position:\s*relative;/)
+
+  // The bar stands at the box's own divider: the box's 1px transparent edge,
+  // then the icon column's 2rem icon and 1rem `pr-4`. Read back against the
+  // table's offset, that is the 4px divider plus the content's `ml-4` — the
+  // 1.25rem between the divider and the text it sets off.
+  const column = bar.match(/left:\s*calc\(([\d.]+)rem \+ (\d+)px\)/)
+  assert.ok(column, 'the bar carries no offset to the box divider')
+  const table = declarations(`${scope} > .block-properties`).match(/margin-left:\s*calc\(([\d.]+)rem \+ (\d+)px\)/)
+  assert.equal(Number.parseInt(column[2], 10), Number.parseInt(table[2], 10), 'the bar and the table read a different box edge')
+  assert.equal(
+    Number.parseFloat(table[1]) - Number.parseFloat(column[1]),
+    0.25 + 1,
+    'the bar does not stand one divider and one `ml-4` left of the table'
+  )
+  assert.match(bar, /width:\s*4px;/)
+  assert.match(bar, /background-color:\s*var\(--hc-admonition-accent\);/)
+
+  // The flex column carries a 2rem tail at each end — the box's own top margin
+  // and the tail the table took off the box. Cancelling both lands the bar on
+  // the box's top edge and the table's bottom edge.
+  const tail = Number.parseFloat(spacingMetrics[0].match(/margin:([\d.]+)rem 0/)[1])
+  assert.match(bar, new RegExp(`top:\\s*${tail}rem;`))
+  assert.match(bar, new RegExp(`bottom:\\s*${tail}rem;`))
+  assert.match(declarations(`${scope} > .block-properties`), new RegExp(`margin-bottom:\\s*${tail}rem;`))
+
+  // Every accent the box itself carries is redeclared on the shared
+  // `.block-content` ancestor so the sibling table can read it too.
+  for (const [kind, accent] of [
+    ['.admonitionblock.tip', 'var(--vscode-hc-focus)'],
+    ['.admonitionblock.note', '#ebbc00'],
+    ['.admonitionblock.important', '#eb9091'],
+    ['.admonitionblock:is(.caution, .warning)', '#fa934e'],
+    ['.admonitionblock.pinned', 'currentColor'],
+    ['.passage', 'var(--vscode-hc-cyan)']
+  ]) {
+    const selector = `.block-content:has(> .block-body > ${kind}):has(> .block-properties:not([data-hc-hidden]))`
+    const rule = declarations(selector)
+    assert.match(
+      rule,
+      new RegExp(`--hc-admonition-accent:\\s*${accent.replace(/[().*+?^$|[\]\\]/g, '\\$&')};`),
+      `${kind}: --hc-admonition-accent is not redeclared as ${accent}`
+    )
+  }
 })
 
 /* Both layouts hang every block's bullet on one vertical line. Every other distance the

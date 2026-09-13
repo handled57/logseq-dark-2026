@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here.
 
+## 2.14.0 - 2026-09-12
+
+- Extend an admonition or passage's accent-colored icon divider down through
+  its own visible property table, so the table reads as still inside the
+  bracket the icon opens rather than a separate element sitting underneath.
+- Stop the property-visibility toggle from keeping a focus ring after a mouse
+  click. The ring still marks keyboard focus.
+- Hang an admonition or passage's divider on the 3rem icon column instead of
+  over its last 4px, and pin a named admonition's column to that same figure
+  rather than letting it follow the icon's size. The line now stands where the
+  box's own text indent, its property table and the divider drawn past that
+  table are all measured from.
+
 ## 2.13.1 - 2026-09-12
 
 - Fix the property-visibility toggle's dot turning white on hover. It answers

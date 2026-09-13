@@ -628,7 +628,7 @@ test('every rendered block in the main editor keeps a bullet on the rail', () =>
   // Both layouts read `.block-children` only as the record of depth. Turns are
   // painted on the incoming half of a block's own control column, so no rail
   // rule resizes a child group or could reveal a folded subtree.
-  const painted = /^(?:\.block-children|\.block-main-container|\.block-control-wrap|\.block-control|\.bullet-link-wrap|\.bullet-container|\.bullet|label|\[data-hc-property-toggle\])(?:\.[\w-]+)*(?::(?:hover|focus-visible))?(?:::(?:before|after))?$/
+  const painted = /^(?:\.block-children|\.block-main-container|\.block-control-wrap|\.block-control|\.bullet-link-wrap|\.bullet-container|\.bullet|label|\[data-hc-property-toggle\])(?:\[[\w-]+\])*(?:\.[\w-]+)*(?::(?:hover|focus-visible))?(?::not\(\[[\w-]+\]\))?(?:::(?:before|after))?$/
   for (const [selector] of railRules) {
     for (const part of selectors(selector)) {
       const target = subject(part)
@@ -728,7 +728,7 @@ test('the passage block reproduces the admonition treatment on its own selectors
   // it is applied to, so the glyph and the line cannot share one element.
   assert.match(
     css,
-    /\.block-body > \.passage::before \{[\s\S]*?width:\s*3rem;[\s\S]*?border-right:\s*4px solid var\(--hc-admonition-accent\)/
+    /\.block-body > \.passage::before \{[\s\S]*?width:\s*calc\(3rem \+ 4px\);[\s\S]*?border-right:\s*4px solid var\(--hc-admonition-accent\)/
   )
   assert.doesNotMatch(css, /\.block-body > \.passage::before \{[^}]*mask/)
 
@@ -855,7 +855,7 @@ test('a visible property table renders below the admonition or passage it names'
 
   assert.match(
     css,
-    new RegExp(`${escapeRegExp(scope)} \\{\\s*\\n\\s*display:\\s*flex;\\s*\\n\\s*flex-direction:\\s*column;`),
+    new RegExp(`${escapeRegExp(scope)} \\{\\s*\\n\\s*position:\\s*relative;\\s*\\n\\s*display:\\s*flex;\\s*\\n\\s*flex-direction:\\s*column;`),
     'the reordering column is missing or is not scoped to a visible table on a rendered box'
   )
 
@@ -978,12 +978,28 @@ test('the property toggle is a stable cyan rail control revealed by hover or foc
   assert.match(css, /\[data-hc-property-toggle\]::before \{[\s\S]*?width:\s*8px;[\s\S]*?height:\s*8px;[\s\S]*?border-radius:\s*50%;[\s\S]*?background:\s*currentColor;[\s\S]*?opacity:\s*0;/)
   assert.match(css, /\.ls-block:not\(\.block-content-wrapper \*\):hover:not\(:has\(\.ls-block:hover\)\)[\s\S]*?\[data-hc-property-toggle\]::before,[\s\S]*?\[data-hc-property-toggle\]:focus-visible::before \{\s*opacity:\s*1;/)
   assert.match(css, /\.ls-block:not\(\.block-content-wrapper \*\):hover:not\(:has\(\.ls-block:hover\)\)[\s\S]*?\[data-hc-property-toggle\]:hover::before \{[\s\S]*?box-shadow:/)
-  assert.match(css, /\[data-hc-property-toggle\]:focus-visible \{[\s\S]*?outline:\s*2px solid var\(--vscode-hc-focus\);/)
+  assert.match(css, /\[data-hc-property-toggle\]:focus-visible:not\(\[data-hc-property-toggle-pointer\]\) \{[\s\S]*?outline:\s*2px solid var\(--vscode-hc-focus\);/)
   assert.match(css, /forced-colors:\s*active\)\s*\{[\s\S]*?\[data-hc-property-toggle\] \{[\s\S]*?color:\s*ButtonText;/)
   assert.doesNotMatch(css, /\[data-hc-property-toggle[^\]]*\][^{]*\{[^}]*(?:transition|animation):/)
   // Upstream's generic `button:hover` repaints button text white with
   // `!important`; the toggle answers it so hovering never bleaches its dot.
   assert.match(css, /\[data-hc-property-toggle\]:hover \{\s*color:\s*var\(--vscode-hc-cyan\)\s*!important;/)
+  // A mouse click leaves the control focused for accessibility, but that
+  // focus is script-driven and would otherwise still satisfy
+  // `:focus-visible`; `index.js` marks it so the ring is skipped for exactly
+  // that interaction, and only for as long as the marker survives.
+  assert.match(css, /\[data-hc-property-toggle-pointer\]/)
+  // Skipping the ring is not enough on its own: the palette's keyboard-focus
+  // rule paints `outline` with `!important`, which no plain declaration can
+  // answer, so the marked control takes the ring off with `!important` too.
+  assert.match(
+    css,
+    /:focus-visible \{\s*outline:\s*2px solid var\(--vscode-hc-focus\)\s*!important;/
+  )
+  assert.match(
+    css,
+    /\[data-hc-property-toggle\]\[data-hc-property-toggle-pointer\] \{\s*outline:\s*none\s*!important;/
+  )
 })
 
 test('workbench chrome is bordered in the contrast border, not white', () => {

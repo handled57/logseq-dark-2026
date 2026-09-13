@@ -893,10 +893,24 @@ main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .c
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-hc-cyan) 35%, transparent);
 }
 
+/* `index.js` marks the control with `data-hc-property-toggle-pointer` while a
+ * mouse click holds its focus, since that focus is script-driven and would
+ * otherwise still satisfy `:focus-visible`. Excluding the attribute here
+ * leaves the ring for keyboard activation and later native Tab-focus, and
+ * removes it only for the pointer interaction that just happened. */
 main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
-  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]:focus-visible {
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle]:focus-visible:not([data-hc-property-toggle-pointer]) {
   outline: 2px solid var(--vscode-hc-focus);
   outline-offset: 0;
+}
+
+/* Excluding the attribute above is not enough on its own: the palette's own
+ * keyboard-focus rule paints `outline` with `!important`, which no plain
+ * declaration can answer however specific its selector. The ring is therefore
+ * taken off the pointer-marked control with `!important` of its own. */
+main:not(.ls-fold-button-on-right) #main-content-container .page-blocks-inner .content:not(.doc-mode)
+  .ls-block:not(.block-content-wrapper *) > .block-main-container > .block-control-wrap > [data-hc-property-toggle][data-hc-property-toggle-pointer] {
+  outline: none !important;
 }
 
 /* Bullets the theme hides elsewhere — code, centered text, verse and passages
@@ -1936,7 +1950,20 @@ textarea.block-editor:focus {
   font-size: var(--hc-admonition-font-size);
 }
 
+/* The icon column is pinned rather than left to the glyph.
+ *
+ * Logseq sizes the icon `h-8 w-8`, so the column measured 2rem plus its 1rem
+ * `pr-4` and the divider hung at 3rem. The rule below shrinks the glyph to
+ * 1.5em of the box's 1.125rem text, and with nothing else setting the column
+ * the divider followed it 5px left — leaving a real admonition's divider out of
+ * line with the 3rem a passage reserves, and with everything else measured from
+ * that figure, the property table and the divider drawn past it included.
+ * Restating the historical column keeps the glyph free to change size without
+ * moving the line it sits beside. `box-sizing` is `border-box` app-wide, so the
+ * divider is added to the 3rem rather than taken out of it. */
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon {
+  flex: none !important;
+  width: calc(3rem + 4px) !important;
   justify-content: flex-start !important;
   color: var(--hc-admonition-accent) !important;
   border-right: 4px solid var(--hc-admonition-accent) !important;
@@ -1989,14 +2016,20 @@ textarea.block-editor:focus {
  * everything the element paints, borders included: drawing both on one box
  * left the divider masked away. This one carries no mask, so its border-right
  * survives, and it spans the icon and the column's `pr-4` gutter so the line
- * lands where a real `.admonition-icon` border does. */
+ * lands where a real `.admonition-icon` border does.
+ *
+ * `box-sizing` is `border-box` app-wide, so the divider has to be added to the
+ * 3rem column rather than left to be taken out of it. Without that the line was
+ * drawn over the last 4px of the column instead of the 4px after it, which put
+ * it 4px left of everything measured from the same figure — the content indent
+ * below, the property table, and the divider drawn down past that table. */
 .block-body > .passage::before {
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 3rem;
+  width: calc(3rem + 4px);
   border-right: 4px solid var(--hc-admonition-accent);
 }
 
@@ -2109,6 +2142,7 @@ textarea.block-editor:focus {
  * left where it is: an ordinary block, and a styled block rendering bare, keep
  * the flow layout they already have. */
 .block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) {
+  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -2137,6 +2171,72 @@ textarea.block-editor:focus {
  * table. */
 .block-content:has(> .block-properties:not([data-hc-hidden])) > .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage) {
   margin-bottom: 0;
+}
+
+/* The divider continues down through the table describing the box.
+ *
+ * `--hc-admonition-accent` is declared on the box itself (`.admonitionblock`
+ * or `.passage`), a descendant of `.block-body`. `.block-properties` is
+ * `.block-body`'s sibling, not its descendant, so the variable never reaches
+ * it through inheritance; it is redeclared here on their shared
+ * `.block-content` ancestor, scoped to the same box-kind and
+ * visible-property-table condition as the repositioning rules above. */
+.block-content:has(> .block-body > .admonitionblock.tip):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: var(--vscode-hc-focus);
+}
+
+.block-content:has(> .block-body > .admonitionblock.note):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: #ebbc00;
+}
+
+.block-content:has(> .block-body > .admonitionblock.important):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: #eb9091;
+}
+
+.block-content:has(> .block-body > .admonitionblock:is(.caution, .warning)):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: #fa934e;
+}
+
+.block-content:has(> .block-body > .admonitionblock.pinned):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: currentColor;
+}
+
+.block-content:has(> .block-body > .passage):has(> .block-properties:not([data-hc-hidden])) {
+  --hc-admonition-accent: var(--vscode-hc-cyan);
+}
+
+/* The line is drawn once, against `.block-content` itself, rather than
+ * dovetailed onto the end of the box's own divider. It simply lies over that
+ * divider for the height the two share — same color, same offset — and carries
+ * on past it to the foot of the table, so there is no seam between two bars to
+ * misalign.
+ *
+ * `.block-content` is the anchor because it is the origin the table's own
+ * `margin-left` above is already measured from, and that offset renders
+ * correctly, which is what makes the same arithmetic trustworthy here.
+ * Measuring from the table instead meant relying on `.block-properties` taking
+ * `position: relative`, and where that did not hold the bar resolved against
+ * another ancestor and missed the column entirely.
+ *
+ * `left` repeats the box's own geometry from that shared origin: the 1px
+ * transparent edge the box carries, then the icon column's 2rem icon and 1rem
+ * `pr-4`, which is exactly where the box hangs its own 4px divider — 1.25rem
+ * left of the table's edge, the divider and the content's `ml-4` that separate
+ * the two.
+ *
+ * Vertically the flex column wraps the box, the gap and the table, plus a 2rem
+ * tail at each end: the box's own top margin, and the tail the table took off
+ * the box below. Cancelling both lands the bar on the box's top edge and the
+ * table's bottom edge. */
+.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden]))::after {
+  content: "";
+  position: absolute;
+  top: 2rem;
+  bottom: 2rem;
+  left: calc(3rem + 1px);
+  width: 4px;
+  background-color: var(--hc-admonition-accent);
+  pointer-events: none;
 }
 
 /* Leading emoji as a block icon --------------------------------------------
