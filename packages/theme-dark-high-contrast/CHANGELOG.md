@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## 2.16.0 - 2026-09-12
+
+- End every block on the same right edge, whether or not it is referenced.
+  Logseq draws a block's reference count in a column beside the block's
+  content and leaves that column zero wide on a block nothing points at, so a
+  linked block was laid out 24 to 40 pixels narrower than the plain block above
+  it and the heading rule, a table, a box edge and the point a line of prose
+  wrapped at all stopped somewhere different down the page. The column is now
+  held open on every block at `--hc-block-refs-gutter`, `2.5rem` by default,
+  with the counts pushed to the far side of it so they line up with one another
+  as well. A count too long for the room widens its own block's column rather
+  than running into the words. Sidebars, dialogs and whiteboards keep Logseq's
+  layout, and nothing left of the content column moves.
+
 ## 2.15.0 - 2026-09-12
 
 - Rule every heading level off with a thin white underline. Logseq underlines

@@ -962,6 +962,69 @@ test('every heading level is ruled off in white, in view and while typed', () =>
   assert.doesNotMatch(body, /font-size|font-weight|margin-top/, 'the heading line also retunes the heading')
 })
 
+/* Logseq lays a block's reference count out as a flex sibling of the block's
+ * content rather than over it: `.block-content-wrapper` is a column whose first
+ * row holds the content box and, after it, the box the count is drawn in. That
+ * second box is empty until the block is referenced, so the content column is
+ * rendered wider on an unreferenced block than on the one above it. These are
+ * the declarations that decide how much wider. */
+const refsMetrics = [
+  '.flex-row{flex-direction:row}',
+  '.items-center{align-items:center}',
+  '.ml-2{margin-left:.5rem}',
+  '.text-sm{font-size:.875rem;line-height:1.25rem}',
+  '.open-block-ref-link{background-color:var(--ls-page-properties-background-color);' +
+    'border-radius:2px;padding:1px 4px}'
+]
+
+test('every block reserves the same reference-count column', () => {
+  const selector =
+    '#main-content-container .block-content-wrapper > .flex.flex-row > .flex.flex-row.items-center'
+  const body = rule(selector)
+
+  // The column is held open whether or not a count is in it, which is what
+  // ends every block's content on one edge.
+  assert.equal(value(body, 'min-width'), 'var(--hc-block-refs-gutter)')
+
+  // The count is pushed to the far side of the column, so counts of different
+  // lengths line up with each other rather than each sitting hard against text
+  // of its own length.
+  assert.equal(value(body, 'justify-content'), 'flex-end')
+
+  // Two declarations and nothing else: the column is widened, not re-laid.
+  // Logseq's own `flex flex-row items-center` still decides how it stacks.
+  assert.equal(body.split(';').filter((part) => part.trim()).length, 2, 'the gutter rule does more than reserve room')
+
+  // The room is one named variable a graph can retune from `custom.css`.
+  const declared = css.match(/--hc-block-refs-gutter:\s*([\d.]+)rem;/)
+  assert.ok(declared, 'the reference-count gutter is not declared in rem')
+
+  // It has to hold the widest count a block realistically carries, or the edge
+  // it exists to hold moves again on that block. Three digits of the count's
+  // own `text-sm` type — a digit is about half its size in a proportional
+  // face — the 4px it is padded by on each side, and the 8px `ml-2` that
+  // separates it from the text.
+  const fontSize = Number(refsMetrics[3].match(/font-size:([\d.]+)rem/)[1])
+  const padding = Number(refsMetrics[4].match(/padding:1px (\d+)px/)[1])
+  const gap = Number(refsMetrics[2].match(/margin-left:([\d.]+)rem/)[1])
+  const widest = 3 * fontSize / 2 + (2 * padding) / 16 + gap
+  assert.ok(
+    Number(declared[1]) >= widest,
+    `the gutter reserves ${declared[1]}rem, less than the ${widest}rem a three-digit count asks for`
+  )
+
+  // Sidebars, dialogs and whiteboards render outside `#main-content-container`
+  // and keep Logseq's own layout, where the room matters more than the edge.
+  assert.ok(selector.startsWith('#main-content-container '), 'the gutter reaches outside the main editor')
+
+  // The count box is Logseq's own, and nothing upstream sizes it, so the theme
+  // needs no more specificity than naming it takes.
+  assert.ok(
+    !refsMetrics.some((declaration) => declaration.includes('.block-content-wrapper')),
+    'upstream now sizes the row the count is drawn in'
+  )
+})
+
 test("a bullet sits on the middle of its block's first line", () => {
   // Half of the 24px line an ordinary block renders, which is what Logseq's own
   // 24px control box was centering the bullet by.
@@ -1373,7 +1436,7 @@ test(
     }
     for (const declaration of [
       ...admonitionMetrics, ...spacingMetrics, ...nestingMetrics, ...railMetrics, ...headingMetrics, ...titleMetrics,
-      ...popupMetrics, ...iconMetrics, ...tableMetrics
+      ...popupMetrics, ...iconMetrics, ...tableMetrics, ...refsMetrics
     ]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }
