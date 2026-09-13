@@ -910,6 +910,59 @@ test('every heading level is set to the same fraction of the size Logseq gives i
   assert.doesNotMatch(css, /\.page-title[^{}]*\{[^{}]*font-size/)
 })
 
+/* The underline Logseq draws under a heading, which the theme replaces: an
+ * `h1` and an `h2` only, in a token this theme paints a shade off its own page
+ * black. The token carries backgrounds elsewhere, so the line is redrawn on
+ * the heading rather than recolored through it. */
+const headingMetrics = [
+  '.editor-inner .uniline-block:is(.h1,.h2),.ls-block :is(h1,h2){border-bottom:1px solid var(--ls-quaternary-background-color);margin:.125em 0;padding-bottom:.125em}'
+]
+
+test('every heading level is ruled off in the structural border, in view and while typed', () => {
+  const selector =
+    '.editor-inner .uniline-block:is(.h1, .h2, .h3, .h4, .h5, .h6):not(.block-ref *), .ls-block :is(h1, h2, h3, h4, h5, h6):not(.block-ref *)'
+  const body = rule(selector)
+
+  // One thin line, in the theme's structural border — the color the editor
+  // frame, the sidebars and the rail are drawn with.
+  assert.equal(value(body, 'border-bottom'), '1px solid var(--vscode-hc-border)')
+
+  // Logseq's own pair of selectors, and every level in both: the rendered
+  // heading and the editor textarea, which carries the level as a class, so
+  // the line holds while a heading is typed rather than arriving on blur.
+  const [editor, rendered] = splitSelectors(selector)
+  for (const level of Object.keys(headings)) {
+    assert.match(editor, new RegExp(`\\.${level}\\b`), `a ${level} carries no line while it is being typed`)
+    assert.match(rendered, new RegExp(`\\b${level}\\b`), `a rendered ${level} carries no line`)
+  }
+
+  // The line is the heading's own box, and a heading is a block box filling
+  // the block's content column: it opens where the heading's text opens and
+  // runs to the end of that column. Nothing here narrows or re-lays it.
+  assert.doesNotMatch(body, /(?:^|[;\s])(?:width|max-width|display|float)\s*:/, 'the heading line re-lays the heading')
+
+  // Upstream rules off an h1 and an h2 in that near-invisible token, in the
+  // selectors pinned above; the theme has to out-rank both to redraw the line,
+  // and does so on its block-reference guard alone.
+  for (const [part, upstream] of [
+    [editor, '.editor-inner .uniline-block:is(.h1,.h2)'],
+    [rendered, '.ls-block :is(h1,h2)']
+  ]) {
+    assert.ok(headingMetrics[0].includes(upstream), `"${upstream}" is not the pinned upstream selector`)
+    assert.ok(compare(specificity(part), specificity(upstream)) > 0, `the heading line does not out-rank "${upstream}"`)
+
+    // A heading quoted inside a block reference is normalized and left unruled
+    // upstream, in a rule of its own this stylesheet loads after. Both
+    // selectors step around it rather than out-ranking it, as the sizes do.
+    assert.ok(part.includes(':not(.block-ref *)'), `a heading quoted in a block reference is ruled off by "${part}"`)
+  }
+
+  // Sizes, weight and the margin the rail measures a heading's bullet from are
+  // not this rule's to set: the line is added to the heading, not a retuning
+  // of it.
+  assert.doesNotMatch(body, /font-size|font-weight|margin-top/, 'the heading line also retunes the heading')
+})
+
 test("a bullet sits on the middle of its block's first line", () => {
   // Half of the 24px line an ordinary block renders, which is what Logseq's own
   // 24px control box was centering the bullet by.
@@ -1320,8 +1373,8 @@ test(
       )
     }
     for (const declaration of [
-      ...admonitionMetrics, ...spacingMetrics, ...nestingMetrics, ...railMetrics, ...titleMetrics, ...popupMetrics, ...iconMetrics,
-      ...tableMetrics
+      ...admonitionMetrics, ...spacingMetrics, ...nestingMetrics, ...railMetrics, ...headingMetrics, ...titleMetrics,
+      ...popupMetrics, ...iconMetrics, ...tableMetrics
     ]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }

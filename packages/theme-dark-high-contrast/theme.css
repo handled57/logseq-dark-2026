@@ -456,6 +456,31 @@ h6,
   font-size: calc(0.75em * var(--hc-heading-scale));
 }
 
+/* Every heading is ruled off from the notes under it. Logseq underlines an
+ * `h1` and an `h2` only, in `--ls-quaternary-background-color` — a shade off
+ * this theme's own black, so the line upstream draws cannot be seen. The rule
+ * is taken to every level instead and drawn in the border the editor frame,
+ * the sidebars and the rail are drawn with, so a heading at any depth reads as
+ * opening a section rather than resting on its size alone, which at this
+ * theme's scale separates the lower levels from their prose by very little.
+ *
+ * The line is the heading's own box, and a heading fills the block's content
+ * column: it starts where the heading's text starts and runs to the end of
+ * that column. The selectors are Logseq's own pair — the rendered heading and
+ * the editor textarea, which carries the level as a class — so the rule holds
+ * while the heading is typed in. Both step around a heading quoted inside a
+ * block reference, which upstream leaves unruled in a rule of the same
+ * specificity that this stylesheet would otherwise win on load order.
+ *
+ * The room above and below the line is upstream's own, in the heading's `em`,
+ * so it follows the type rather than holding one level's spacing. */
+.editor-inner .uniline-block:is(.h1, .h2, .h3, .h4, .h5, .h6):not(.block-ref *),
+.ls-block :is(h1, h2, h3, h4, h5, h6):not(.block-ref *) {
+  border-bottom: 1px solid var(--vscode-hc-border);
+  padding-bottom: 0.125em;
+  margin-bottom: 0.125em;
+}
+
 hr {
   border-color: var(--vscode-hc-border);
 }
