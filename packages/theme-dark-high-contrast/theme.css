@@ -377,10 +377,17 @@ body {
  * on every accent, and both halves of the pair are declared so the text can
  * never keep a colour from one rule over a background from another. */
 ::selection,
-html[data-color] ::selection,
+html[data-color] ::selection {
+  color: var(--ls-selection-text-color, #ffffff);
+  background-color: var(--ls-selection-background-color, #264f78);
+}
+
+/* Firefox's prefixed twin is unknown to Chromium, and one unknown selector
+ * invalidates the whole list it sits in — so it gets a rule of its own rather
+ * than taking the rule above down with it in the app Logseq actually ships. */
 html[data-color] ::-moz-selection {
-  color: var(--ls-selection-text-color);
-  background: var(--ls-selection-background-color);
+  color: var(--ls-selection-text-color, #ffffff);
+  background-color: var(--ls-selection-background-color, #264f78);
 }
 
 /* Keyboard focus mirrors VS Code's active contrast border. */
@@ -2718,10 +2725,15 @@ html[data-theme][data-color] .cp__themes-installed .it:hover {
 .cm-s-lsradix.cm-s-dark div.CodeMirror-selected,
 .cm-s-lsradix.cm-s-light div.CodeMirror-selected,
 .cm-s-lsradix.cm-s-dark .CodeMirror-line::selection,
+.cm-s-lsradix.cm-s-dark.CodeMirror ::selection {
+  background-color: #264f78 !important;
+}
+
+/* Split off for the same reason as the selection pair above: mixed in, the
+ * prefixed selectors took the whole rule down in Chromium. */
 .cm-s-lsradix.cm-s-dark .CodeMirror-line::-moz-selection,
-.cm-s-lsradix.cm-s-dark.CodeMirror ::selection,
 .cm-s-lsradix.cm-s-dark.CodeMirror ::-moz-selection {
-  background: #264f78 !important;
+  background-color: #264f78 !important;
 }
 
 .cm-s-lsradix .CodeMirror-cursor {

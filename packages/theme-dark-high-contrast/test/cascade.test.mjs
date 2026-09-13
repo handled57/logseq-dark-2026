@@ -1430,14 +1430,33 @@ test("the page title's text starts in the column the blocks' text stands in", ()
   assert.equal(declarations.length, 1, 'the title rule carries more than the indent')
 })
 
+test('no vendor-prefixed selector shares a list with a standard one', () => {
+  // Chromium drops an entire selector list when one selector in it is unknown,
+  // so a `::-moz-selection` mixed into a list takes the whole rule down in the
+  // app Logseq actually ships. Prefixed selectors get rules of their own.
+  for (const selector of rules.keys()) {
+    const parts = splitSelectors(selector)
+    if (parts.length < 2) continue
+    const prefixed = parts.filter((part) => /::?-(moz|ms)-/.test(part))
+    assert.ok(
+      prefixed.length === 0 || prefixed.length === parts.length,
+      `"${selector}" mixes prefixed and standard selectors, so Chromium drops all of it`
+    )
+  }
+})
+
 test('the selection rule declares both halves of the pair', () => {
   // A rule that sets only one half lets the other survive from a losing rule,
   // which is how selected text ended up black on the browser's own highlight.
-  const selection = rule(
-    '::selection, html[data-color] ::selection, html[data-color] ::-moz-selection'
-  )
-  assert.match(selection, /color:\s*var\(--ls-selection-text-color\)/)
-  assert.match(selection, /background:\s*var\(--ls-selection-background-color\)/)
+  // Both halves carry a literal fallback: if either token failed to resolve the
+  // declaration would be invalid at computed-value time and compute to `unset`,
+  // which for a selection background is transparent — an invisible selection
+  // rather than a readable one.
+  for (const selector of ['::selection, html[data-color] ::selection', 'html[data-color] ::-moz-selection']) {
+    const selection = rule(selector)
+    assert.match(selection, /color:\s*var\(--ls-selection-text-color,\s*#ffffff\)/)
+    assert.match(selection, /background-color:\s*var\(--ls-selection-background-color,\s*#264f78\)/)
+  }
 
   // Both tokens resolve to the readable pair, not to the inverted one.
   assert.match(css, /--ls-selection-background-color:\s*var\(--vscode-hc-selection\)/)

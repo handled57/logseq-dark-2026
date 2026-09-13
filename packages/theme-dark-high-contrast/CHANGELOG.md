@@ -15,6 +15,14 @@ All notable changes to this project are documented here.
   text on `#264f78`, VS Code's own Dark High Contrast selection blue, which is
   already the blue behind a selection in code. Windows forced-colors users keep
   the platform's `Highlight`/`HighlightText`.
+- Stop Chromium throwing away two selection rules whole. Firefox's prefixed
+  `::-moz-selection` is unknown to the engine Logseq actually runs on, and one
+  unknown selector invalidates the entire list it sits in — so the prefixed
+  twins were silently taking the rules they shared a list with down with them,
+  including the one that painted selected code. Each prefixed selector now has
+  a rule of its own. Both halves of the selection pair also carry a literal
+  fallback, so a token that failed to resolve can no longer leave the selection
+  background transparent and the selection invisible.
 
 ## 2.16.0 - 2026-09-12
 
