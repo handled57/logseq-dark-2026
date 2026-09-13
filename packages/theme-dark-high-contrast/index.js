@@ -51,6 +51,7 @@ const ICON_ATTR = 'data-hc-block-icon'
 const OPEN_MENU_ATTR = 'data-hc-open-block'
 const PROPERTY_TOGGLE_ATTR = 'data-hc-property-toggle'
 const PROPERTY_TOGGLE_UUID_ATTR = 'data-hc-property-toggle-uuid'
+const PROPERTY_TOGGLE_POINTER_ATTR = 'data-hc-property-toggle-pointer'
 const BULLET_SELECTOR = '.bullet-link-wrap, .bullet-container'
 /* Whiteboard bullets carry gestures of their own — a portal shape, a shape
  * link — so they are left to Logseq. */
@@ -383,6 +384,9 @@ function ensurePropertyToggle(host, uuid) {
   if (!existing) {
     control.setAttribute('type', 'button')
     control.setAttribute(PROPERTY_TOGGLE_ATTR, '')
+    // Cleared on blur so a later native Tab-focus is never mistaken for the
+    // mouse activation that set it — see `togglePropertyVisibility`.
+    control.addEventListener('blur', () => control.removeAttribute(PROPERTY_TOGGLE_POINTER_ATTR))
     host.appendChild(control)
   }
 
@@ -426,7 +430,18 @@ function propertyToggleControl(event) {
   return event.target?.closest?.(`[${PROPERTY_TOGGLE_ATTR}]`) ?? null
 }
 
-function togglePropertyVisibility(control) {
+/* `mousedown` on the control is caught and prevented below so the click
+ * cannot also start Logseq's own block interactions, which stops the browser
+ * from ever focusing the button by its ordinary mousedown default. The
+ * `.focus()` here is therefore a script-driven focus indistinguishable, to a
+ * browser's own `:focus-visible` heuristics, from a keyboard activation — so a
+ * mouse click would otherwise leave the same focus ring keyboard use earns.
+ * `pointerActivated` marks that this focus followed a pointer click, and
+ * `theme.css` answers it by suppressing the ring for exactly this attribute,
+ * only for as long as focus remains: the `blur` listener in
+ * `ensurePropertyToggle` clears it, so a later native Tab back onto the same
+ * control still shows the ring. */
+function togglePropertyVisibility(control, { pointerActivated = false } = {}) {
   const uuid = control.getAttribute(PROPERTY_TOGGLE_UUID_ATTR) ?? ''
   const block = control.closest?.('.ls-block')
   const table = block?.querySelector?.('.block-properties')
@@ -435,6 +450,8 @@ function togglePropertyVisibility(control) {
   const visible = table.getAttribute(HIDDEN_ATTR) !== null
   propertyVisibility.set(uuid, visible)
   applyPropertyVisibility(table, control, visible)
+  if (pointerActivated) control.setAttribute(PROPERTY_TOGGLE_POINTER_ATTR, '')
+  else control.removeAttribute(PROPERTY_TOGGLE_POINTER_ATTR)
   control.focus?.()
 }
 
@@ -444,7 +461,7 @@ function toggleProperties(event) {
 
   event.preventDefault()
   event.stopPropagation()
-  if (event.type === 'click') togglePropertyVisibility(control)
+  if (event.type === 'click') togglePropertyVisibility(control, { pointerActivated: true })
 }
 
 function togglePropertiesOnKey(event) {

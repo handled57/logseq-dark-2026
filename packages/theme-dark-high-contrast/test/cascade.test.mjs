@@ -94,10 +94,10 @@ const pairings = [
       '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties'
   },
   {
-    surface: 'the divider bar drawn against a property table',
+    surface: 'the divider bar drawn past a property table',
     upstream: '.block-properties',
     theme:
-      '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties::before'
+      '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden]))::after'
   }
 ]
 
@@ -322,24 +322,36 @@ test('the divider through the property table lines up with the box\'s own divide
   }
 
   const scope =
-    '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden])) > .block-properties'
-  const bar = declarations(`${scope}::before`)
+    '.block-content:has(> .block-body > :is(.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning), .passage)):has(> .block-properties:not([data-hc-hidden]))'
+  const bar = declarations(`${scope}::after`)
 
-  // The bar sits at the same x-position as the box's own 4px divider: 1rem
-  // `pr-4` plus the 2rem icon, offset back from the table's own left edge by
-  // its `margin-left: calc(4.25rem + 1px)`.
-  assert.match(bar, /left:\s*calc\(-1\.25rem - 1px\);/)
+  // `.block-content` is the anchor, and the one the table's own offset is
+  // already measured from, so both are arithmetic in the same space.
+  assert.match(declarations(scope), /position:\s*relative;/)
+
+  // The bar stands at the box's own divider: the box's 1px transparent edge,
+  // then the icon column's 2rem icon and 1rem `pr-4`. Read back against the
+  // table's offset, that is the 4px divider plus the content's `ml-4` — the
+  // 1.25rem between the divider and the text it sets off.
+  const column = bar.match(/left:\s*calc\(([\d.]+)rem \+ (\d+)px\)/)
+  assert.ok(column, 'the bar carries no offset to the box divider')
+  const table = declarations(`${scope} > .block-properties`).match(/margin-left:\s*calc\(([\d.]+)rem \+ (\d+)px\)/)
+  assert.equal(Number.parseInt(column[2], 10), Number.parseInt(table[2], 10), 'the bar and the table read a different box edge')
+  assert.equal(
+    Number.parseFloat(table[1]) - Number.parseFloat(column[1]),
+    0.25 + 1,
+    'the bar does not stand one divider and one `ml-4` left of the table'
+  )
   assert.match(bar, /width:\s*4px;/)
-
-  // The top cancels the table's own `margin-top: 0.75rem` and 1px border, so
-  // the bar starts exactly where the box's divider stops; the bottom reaches
-  // 1px past the table's own border to its full visible height.
-  assert.match(bar, /top:\s*calc\(-0\.75rem - 1px\);/)
-  assert.match(bar, /bottom:\s*-1px;/)
   assert.match(bar, /background-color:\s*var\(--hc-admonition-accent\);/)
 
-  // The table becomes the positioning context the bar is measured against.
-  assert.match(declarations(scope), /position:\s*relative;/)
+  // The flex column carries a 2rem tail at each end — the box's own top margin
+  // and the tail the table took off the box. Cancelling both lands the bar on
+  // the box's top edge and the table's bottom edge.
+  const tail = Number.parseFloat(spacingMetrics[0].match(/margin:([\d.]+)rem 0/)[1])
+  assert.match(bar, new RegExp(`top:\\s*${tail}rem;`))
+  assert.match(bar, new RegExp(`bottom:\\s*${tail}rem;`))
+  assert.match(declarations(`${scope} > .block-properties`), new RegExp(`margin-bottom:\\s*${tail}rem;`))
 
   // Every accent the box itself carries is redeclared on the shared
   // `.block-content` ancestor so the sibling table can read it too.

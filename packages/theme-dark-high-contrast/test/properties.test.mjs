@@ -399,6 +399,12 @@ test('property buttons toggle either initial state and keep accessibility in syn
   assert.equal(hiddenControl.getAttribute('aria-expanded'), 'true')
   assert.equal(hiddenControl.getAttribute('title'), 'Hide block properties')
   assert.equal(hiddenControl.focused, true)
+  // The click leaves the control focused for accessibility, but that focus is
+  // script-driven; the pointer marker tells theme.css to skip the ring a
+  // browser's own :focus-visible heuristic would otherwise still draw.
+  assert.equal(hiddenControl.attributes.has('data-hc-property-toggle-pointer'), true)
+  hiddenControl.dispatch('blur')
+  assert.equal(hiddenControl.attributes.has('data-hc-property-toggle-pointer'), false)
 
   const visibleFixture = propertyRailBlock('65f00000-0000-0000-0000-000000000041', { status: 'open' })
   const visibleContext = load({ hiddenProperties: 'type: passage' }, [
@@ -415,6 +421,8 @@ test('property buttons toggle either initial state and keep accessibility in syn
   })
   assert.equal(visibleFixture.table.attributes.has('data-hc-hidden'), true)
   assert.equal(visibleControl.getAttribute('aria-expanded'), 'false')
+  // Keyboard activation keeps the normal focus ring: no pointer marker.
+  assert.equal(visibleControl.attributes.has('data-hc-property-toggle-pointer'), false)
 })
 
 test('a property override survives repaint and settings changes for its UUID', async () => {

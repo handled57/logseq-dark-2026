@@ -7,6 +7,8 @@ All notable changes to this project are documented here.
 - Extend an admonition or passage's accent-colored icon divider down through
   its own visible property table, so the table reads as still inside the
   bracket the icon opens rather than a separate element sitting underneath.
+- Stop the property-visibility toggle from keeping a focus ring after a mouse
+  click. The ring still marks keyboard focus.
 
 ## 2.13.1 - 2026-09-12
 
