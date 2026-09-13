@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here.
 
+## 2.16.2 - 2026-09-13
+
+- Style the PDF annotation context menu. The earlier PDF fix covered the
+  toolbar and the outline panel's Contents/Figures tabs, but left the popup a
+  text or area highlight opens (`.extensions__pdf-hls-ctx-menu`, with its
+  Copy/Link actions and color dots) in Logseq's own light colors, along with
+  the outline's Highlights tab list. Both now use the theme palette.
+
 ## 2.16.1 - 2026-09-13
 
 - Make selected text readable again. Logseq declares its own

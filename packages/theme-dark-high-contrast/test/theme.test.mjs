@@ -372,6 +372,8 @@ test('workbench selectors and accessibility fallbacks are present', () => {
     /\.settings-modal/,
     /\.ui__notifications \.notification-area/,
     /\.extensions__pdf-toolbar/,
+    /\.extensions__pdf-hls-ctx-menu/,
+    /\.extensions__pdf-highlights-list-item/,
     /\.whiteboard-page-title/,
     /:focus-visible/,
     /forced-colors:\s*active/,

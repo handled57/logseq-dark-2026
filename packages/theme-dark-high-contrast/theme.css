@@ -2614,6 +2614,45 @@ kbd {
   outline-offset: -2px;
 }
 
+/* PDF annotation context menu: the popup a text or area highlight opens with
+ * Copy/Link/color actions. Distinct from the outline (Contents/Figures) panel
+ * above. */
+.extensions__pdf-hls-ctx-menu {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+  border-color: var(--vscode-hc-border) !important;
+  box-shadow: none !important;
+}
+
+.extensions__pdf-hls-ctx-menu::after {
+  border-color: var(--vscode-hc-border);
+}
+
+.extensions__pdf-hls-ctx-menu > li.item:hover {
+  color: var(--vscode-hc-bright-blue) !important;
+  background-color: var(--vscode-hc-panel) !important;
+}
+
+/* PDF highlights list: the sidebar tab listing existing highlights, alongside
+ * Contents and Figures. */
+.extensions__pdf-highlights-list-item > h6,
+.extensions__pdf-highlights-list-item > p {
+  color: var(--vscode-hc-white) !important;
+}
+
+.extensions__pdf-highlights-list-item > p:hover {
+  color: var(--vscode-hc-bright-blue) !important;
+}
+
+.extensions__pdf-highlights-list-item.active {
+  background-color: var(--vscode-hc-panel) !important;
+}
+
+.extensions__pdf-highlights-list-item.active > h6,
+.extensions__pdf-highlights-list-item.active > p {
+  color: var(--vscode-hc-white) !important;
+}
+
 .whiteboard-page-title:focus-within {
   border-color: var(--vscode-hc-focus) !important;
   box-shadow: 0 0 0 1px var(--vscode-hc-focus) !important;
