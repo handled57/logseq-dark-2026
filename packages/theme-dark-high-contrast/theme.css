@@ -26,6 +26,7 @@ html[data-theme][data-color]:root body,
   --vscode-hc-blue: #569cd6;
   --vscode-hc-bright-blue: #1aebff;
   --vscode-hc-link: #3794ff;
+  --vscode-hc-selection: #264f78;
   --vscode-hc-green: #7ca668;
   --vscode-hc-string: #ce9178;
   --vscode-hc-purple: #c586c0;
@@ -174,8 +175,8 @@ html[data-theme][data-color]:root body,
   --ls-block-bullet-active-color: var(--vscode-hc-focus);
   --ls-block-left-color: var(--vscode-hc-border);
   --ls-block-highlight-color: #1f1f1f;
-  --ls-selection-background-color: var(--vscode-hc-white);
-  --ls-selection-text-color: var(--vscode-hc-black);
+  --ls-selection-background-color: var(--vscode-hc-selection);
+  --ls-selection-text-color: var(--vscode-hc-white);
   --ls-page-checkbox-color: var(--vscode-hc-black);
   --ls-page-checkbox-border-color: var(--vscode-hc-border);
   --ls-page-blockquote-color: var(--vscode-hc-white);
@@ -368,9 +369,18 @@ body {
   accent-color: var(--vscode-hc-white);
 }
 
-::selection {
-  color: var(--vscode-hc-black);
-  background: var(--vscode-hc-white);
+/* Logseq declares `html[data-color=none] ::selection` (0,1,1), which beats a
+ * bare `::selection` (0,0,1) — and on the `none` accent its own
+ * `hsl(var(--primary)/.2)` is invalid at computed-value time because
+ * `--primary` is never declared there, so the browser's default highlight
+ * paints through. Matching that selector's shape puts the theme back in front
+ * on every accent, and both halves of the pair are declared so the text can
+ * never keep a colour from one rule over a background from another. */
+::selection,
+html[data-color] ::selection,
+html[data-color] ::-moz-selection {
+  color: var(--ls-selection-text-color);
+  background: var(--ls-selection-background-color);
 }
 
 /* Keyboard focus mirrors VS Code's active contrast border. */

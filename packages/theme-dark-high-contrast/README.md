@@ -71,12 +71,13 @@ whiteboards and dialogs remain outside the rail.
 | Color | Tokens | Used for |
 | --- | --- | --- |
 | `#000000` | `--vscode-hc-black` | Primary canvas; editor, menus, dialogs, controls, code, whiteboards, and selected surfaces. |
-| `#ffffff` | `--vscode-hc-white` | Primary text and icons, strong borders, bullets, scrollbars, and inverted selection backgrounds. |
+| `#ffffff` | `--vscode-hc-white` | Primary text and icons, strong borders, bullets, scrollbars, and selected text. |
 | `#f38518` | `--vscode-hc-focus`, `--vscode-hc-orange` | Keyboard focus, active bullets, editor focus, and primary interaction emphasis. |
 | `#5b7e96` | `--vscode-hc-border` | Structural borders, guides, dividers, inactive controls, and the gray/accent ramps. |
 | `#569cd6` | `--vscode-hc-blue` | Tags and syntax keywords. |
 | `#1aebff` | `--vscode-hc-bright-blue` | Hovered links and tags and the brightest accent-scale text. |
 | `#3794ff` | `--vscode-hc-link` | Links, whiteboard blue strokes, and quick-link hover states. |
+| `#264f78` | `--vscode-hc-selection` | The background behind selected text, everywhere text can be selected. |
 | `#7ca668` | `--vscode-hc-green` | Comments and idle file-sync status. |
 | `#ce9178` | `--vscode-hc-string` | Inline code and string syntax. |
 | `#c586c0` | `--vscode-hc-purple` | Purple whiteboard strokes and syntax accents. |
@@ -172,7 +173,7 @@ first content block below them.
 | `#ebbc00` | `.admonitionblock.note` → `--hc-admonition-accent` | Note icon and four-pixel divider. |
 | `#eb9091` | `.admonitionblock.important` → `--hc-admonition-accent` | Important icon and four-pixel divider. |
 | `#fa934e` | `.admonitionblock.caution`, `.admonitionblock.warning` → `--hc-admonition-accent` | Caution/warning icons and four-pixel dividers. |
-| `#264f78` | `.cm-s-lsradix … .CodeMirror-selected` and selection pseudo-elements | Selected text in Logseq's CodeMirror editor. |
+| `#264f78` | `.cm-s-lsradix … .CodeMirror-selected` and selection pseudo-elements | Selected text in Logseq's CodeMirror editor, on the same blue as `--vscode-hc-selection`. |
 
 ### HSL control tokens
 
@@ -437,7 +438,7 @@ LOGSEQ_CSS=/path/to/Logseq/resources/app/css/style.css npm test
 
 ## Accessibility
 
-The test suite checks the principal text/background combinations against WCAG contrast thresholds, and every bullet-rail hierarchy color for contrast against the black canvas and for separation from the colors of the levels beside it. The stylesheet also includes visible `:focus-visible` treatment, inverted selection, reduced-motion handling, and a forced-colors fallback.
+The test suite checks the principal text/background combinations against WCAG contrast thresholds, and every bullet-rail hierarchy color for contrast against the black canvas and for separation from the colors of the levels beside it. The stylesheet also includes visible `:focus-visible` treatment, white-on-blue selection, reduced-motion handling, and a forced-colors fallback.
 
 ## Attribution
 

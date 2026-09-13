@@ -1094,7 +1094,7 @@ test('principal foreground/background pairs meet WCAG thresholds', () => {
     ['secondary text', '#d7d7d7', '#000000', 7],
     ['disabled text', '#a0a0a0', '#000000', 4.5],
     ['link text', '#3794ff', '#000000', 4.5],
-    ['selection text', '#000000', '#ffffff', 7],
+    ['selection text', '#ffffff', '#264f78', 7],
     ['string token', '#ce9178', '#000000', 4.5],
     ['comment token', '#7ca668', '#000000', 4.5],
     ['verse number', '#9cdcfe', '#000000', 7],

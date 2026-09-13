@@ -78,6 +78,16 @@ const pairings = [
     tie: true
   },
   {
+    // Upstream's own declaration is `hsl(var(--primary)/.2)`, which is invalid
+    // on the `none` accent because `--primary` is never declared there — the
+    // browser's default highlight paints through unless the theme matches this
+    // selector's shape and wins on load order.
+    surface: 'selected text',
+    upstream: 'html[data-color=none] ::selection',
+    theme: 'html[data-color] ::selection',
+    tie: true
+  },
+  {
     surface: 'rendered admonition icon dividers',
     upstream: '.admonition-icon',
     theme: '.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) .admonition-icon'
@@ -1418,6 +1428,24 @@ test("the page title's text starts in the column the blocks' text stands in", ()
   // Nothing else moves: the indent is one declaration on one box.
   const declarations = rule(selector).split(';').filter((part) => part.trim())
   assert.equal(declarations.length, 1, 'the title rule carries more than the indent')
+})
+
+test('the selection rule declares both halves of the pair', () => {
+  // A rule that sets only one half lets the other survive from a losing rule,
+  // which is how selected text ended up black on the browser's own highlight.
+  const selection = rule(
+    '::selection, html[data-color] ::selection, html[data-color] ::-moz-selection'
+  )
+  assert.match(selection, /color:\s*var\(--ls-selection-text-color\)/)
+  assert.match(selection, /background:\s*var\(--ls-selection-background-color\)/)
+
+  // Both tokens resolve to the readable pair, not to the inverted one.
+  assert.match(css, /--ls-selection-background-color:\s*var\(--vscode-hc-selection\)/)
+  assert.match(css, /--ls-selection-text-color:\s*var\(--vscode-hc-white\)/)
+  assert.match(css, /--vscode-hc-selection:\s*#264f78/)
+
+  // Firefox needs the vendor-prefixed twin in the same list.
+  assert.ok(css.includes('html[data-color] ::-moz-selection'), 'the -moz- twin is missing')
 })
 
 /* Optional: confirm the pinned literals still describe the installed app. */
