@@ -1004,11 +1004,14 @@ test('the property toggle is a stable cyan rail control revealed by hover or foc
 
 test('workbench chrome is bordered in the contrast border, not white', () => {
   // Panes, panels, sidebars and controls all draw their edges with
-  // --vscode-hc-border. Two declarations use a border property to paint
-  // something that is not chrome, and stay white on purpose.
+  // --vscode-hc-border. Three declarations use a border property to paint
+  // something that is not chrome, and stay white on purpose: a bullet's ring,
+  // the code editor's caret, and the line a heading is ruled off with, which
+  // belongs to the heading's own type rather than to the workbench.
   const allowed = new Set([
     '--ls-block-bullet-border-color: var(--vscode-hc-white)',
-    'border-left-color: var(--vscode-hc-white) !important'
+    'border-left-color: var(--vscode-hc-white) !important',
+    'border-bottom: 1px solid var(--vscode-hc-white)'
   ])
 
   const offenders = (css.match(/[\w-]*border[\w-]*\s*:\s*[^;{}]*--vscode-hc-white[^;{}]*/g) ?? [])

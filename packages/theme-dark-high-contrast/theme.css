@@ -459,10 +459,10 @@ h6,
 /* Every heading is ruled off from the notes under it. Logseq underlines an
  * `h1` and an `h2` only, in `--ls-quaternary-background-color` — a shade off
  * this theme's own black, so the line upstream draws cannot be seen. The rule
- * is taken to every level instead and drawn in the border the editor frame,
- * the sidebars and the rail are drawn with, so a heading at any depth reads as
- * opening a section rather than resting on its size alone, which at this
- * theme's scale separates the lower levels from their prose by very little.
+ * is taken to every level instead and drawn in the white the heading's own
+ * text is set in, so a heading at any depth reads as opening a section rather
+ * than resting on its size alone, which at this theme's scale separates the
+ * lower levels from their prose by very little.
  *
  * The line is the heading's own box, and a heading fills the block's content
  * column: it starts where the heading's text starts and runs to the end of
@@ -476,7 +476,7 @@ h6,
  * so it follows the type rather than holding one level's spacing. */
 .editor-inner .uniline-block:is(.h1, .h2, .h3, .h4, .h5, .h6):not(.block-ref *),
 .ls-block :is(h1, h2, h3, h4, h5, h6):not(.block-ref *) {
-  border-bottom: 1px solid var(--vscode-hc-border);
+  border-bottom: 1px solid var(--vscode-hc-white);
   padding-bottom: 0.125em;
   margin-bottom: 0.125em;
 }

@@ -918,14 +918,13 @@ const headingMetrics = [
   '.editor-inner .uniline-block:is(.h1,.h2),.ls-block :is(h1,h2){border-bottom:1px solid var(--ls-quaternary-background-color);margin:.125em 0;padding-bottom:.125em}'
 ]
 
-test('every heading level is ruled off in the structural border, in view and while typed', () => {
+test('every heading level is ruled off in white, in view and while typed', () => {
   const selector =
     '.editor-inner .uniline-block:is(.h1, .h2, .h3, .h4, .h5, .h6):not(.block-ref *), .ls-block :is(h1, h2, h3, h4, h5, h6):not(.block-ref *)'
   const body = rule(selector)
 
-  // One thin line, in the theme's structural border — the color the editor
-  // frame, the sidebars and the rail are drawn with.
-  assert.equal(value(body, 'border-bottom'), '1px solid var(--vscode-hc-border)')
+  // One thin line, in the white the heading's own text is set in.
+  assert.equal(value(body, 'border-bottom'), '1px solid var(--vscode-hc-white)')
 
   // Logseq's own pair of selectors, and every level in both: the rendered
   // heading and the editor textarea, which carries the level as a class, so
