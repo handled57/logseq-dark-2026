@@ -2558,10 +2558,42 @@ kbd {
   box-shadow: none !important;
 }
 
+.extensions__pdf-toolbar > .inner > .r a.button,
 .extensions__pdf-toolbar > .inner > .r a.button.is-active {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-toolbar > .inner > .r a.button.is-active {
   border-bottom-color: var(--vscode-hc-focus);
+}
+
+.extensions__pdf-toolbar > .inner > .r a.button:hover {
+  color: var(--vscode-hc-bright-blue) !important;
+}
+
+/* PDF outline container and all its text content */
+.extensions__pdf-outline,
+.extensions__pdf-outline > * {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+}
+
+/* PDF outline tabs and buttons */
+.extensions__pdf-outline [role="tablist"],
+.extensions__pdf-outline [role="tab"],
+.extensions__pdf-outline button {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-outline [role="tab"][aria-selected="true"],
+.extensions__pdf-outline button:hover,
+.extensions__pdf-outline button.active {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-panel) !important;
 }
 
 .extensions__pdf-outline-item > .inner > a,
