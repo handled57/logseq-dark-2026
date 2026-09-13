@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## 2.15.0 - 2026-09-12
+
+- Rule every heading level off with a thin white underline. Logseq underlines
+  only an `h1` and an `h2`, in a token this theme
+  paints a shade off its own page black, so the line could not be seen and the
+  smaller levels carried none at all. The rule starts where the heading's text
+  starts, runs to the end of the block's content column, and holds while the
+  heading is being typed. A heading quoted inside a block reference stays
+  unruled.
+
 ## 2.14.0 - 2026-09-12
 
 - Extend an admonition or passage's accent-colored icon divider down through
