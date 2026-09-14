@@ -4,11 +4,19 @@ All notable changes to this project are documented here.
 
 ## 2.16.2 - 2026-09-13
 
-- Style the PDF annotation context menu. The earlier PDF fix covered the
-  toolbar and the outline panel's Contents/Figures tabs, but left the popup a
-  text or area highlight opens (`.extensions__pdf-hls-ctx-menu`, with its
-  Copy/Link actions and color dots) in Logseq's own light colors, along with
-  the outline's Highlights tab list. Both now use the theme palette.
+- Darken every PDF popup, not just the outline. The previous fix styled the
+  toolbar and the outline panel, which left the viewer's settings popup and
+  its find-in-document bar sitting on a pale gray card: all of them paint from
+  one shared `.hls-popup-box` base that hard-codes that fill and draws its
+  border as a scaled `::after` in a mid gray, so styling the outline alone
+  reached none of its siblings. The theme now takes the shared base, so the
+  settings rows, the theme swatches' rims, the finder's input, buttons and
+  results, and the Copy/Link context menu a highlight opens all follow the
+  palette. `test/cascade.test.mjs` pins the shared base against the installed
+  Logseq stylesheet.
+- Finish the outline panel's chrome: the Contents/Figures/Highlights tab bar
+  kept upstream's light dividers and gray active fill, and the Highlights tab
+  listed its entries in gray on black.
 
 ## 2.16.1 - 2026-09-13
 

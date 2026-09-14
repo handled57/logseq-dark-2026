@@ -2596,6 +2596,22 @@ kbd {
   background-color: var(--vscode-hc-panel) !important;
 }
 
+/* The Contents/Figures/Highlights tab bar draws its own light rules. */
+.extensions__pdf-outline-tabs {
+  border-bottom-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-outline-tabs > .inner {
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-outline-tabs button:active,
+.extensions__pdf-outline-tabs button.active {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-panel) !important;
+  opacity: 1;
+}
+
 .extensions__pdf-outline-item > .inner > a,
 .extensions__pdf-outline-item > .inner > a > i svg {
   color: var(--vscode-hc-white);
@@ -2614,23 +2630,81 @@ kbd {
   outline-offset: -2px;
 }
 
-/* PDF annotation context menu: the popup a text or area highlight opens with
- * Copy/Link/color actions. Distinct from the outline (Contents/Figures) panel
- * above. */
+/* Every PDF popup — settings, finder, and the context menu a highlight opens —
+ * paints itself from one hard-coded light base: `.hls-popup-box` fills with a
+ * pale gray and draws its border as a scaled `::after` in a mid gray, and the
+ * context menu repeats both literals on its own selector. Styling the shared
+ * base is what turns the whole family dark; the outline panel above rides on
+ * the same overlay but paints its own `> section`. */
+.hls-popup-box,
 .extensions__pdf-hls-ctx-menu {
   color: var(--vscode-hc-white) !important;
   background-color: var(--vscode-hc-black) !important;
-  border-color: var(--vscode-hc-border) !important;
   box-shadow: none !important;
 }
 
+.hls-popup-box::after,
 .extensions__pdf-hls-ctx-menu::after {
-  border-color: var(--vscode-hc-border);
+  border-color: var(--vscode-hc-border) !important;
 }
 
 .extensions__pdf-hls-ctx-menu > li.item:hover {
   color: var(--vscode-hc-bright-blue) !important;
   background-color: var(--vscode-hc-panel) !important;
+}
+
+/* Settings popup: the rows are muted gray on the light base upstream, and the
+ * divider above the toggles is `#ccc`. The three theme swatches keep their
+ * literal paper colors — they are previews of the page tint, not chrome. */
+.extensions__pdf-settings-item {
+  color: var(--vscode-hc-white) !important;
+}
+
+.extensions__pdf-settings-item.toggle-input {
+  border-top-color: var(--vscode-hc-border) !important;
+  opacity: 1;
+}
+
+.extensions__pdf-settings-item.theme-picker > button {
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-settings-item.theme-picker > button:hover {
+  border-color: var(--vscode-hc-focus) !important;
+  opacity: 1;
+}
+
+/* Finder popup: upstream sets black input text on a gray-200 fill and renders
+ * its results in gray-800, both unreadable on the dark base. */
+.extensions__pdf-finder.hls-popup-box > .input-inner .input-wrap {
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .input-inner .input-wrap:active,
+.extensions__pdf-finder.hls-popup-box > .input-inner .input-wrap:focus-within {
+  border-color: var(--vscode-hc-focus) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .input-inner input {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-panel) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .input-inner input:focus {
+  border-color: var(--vscode-hc-focus) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .input-inner .ui__button .ti {
+  color: var(--vscode-hc-white) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .input-inner .ui__button.active .ti,
+.extensions__pdf-finder.hls-popup-box > .input-inner .ui__button:hover .ti {
+  color: var(--vscode-hc-bright-blue) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .result-inner {
+  color: var(--vscode-hc-white) !important;
 }
 
 /* PDF highlights list: the sidebar tab listing existing highlights, alongside
