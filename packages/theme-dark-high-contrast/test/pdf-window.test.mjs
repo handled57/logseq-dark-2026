@@ -2,11 +2,13 @@
  *
  * Logseq's "open in a system window" PDF viewer is a `window.open` child of
  * the host document, and Logseq copies exactly one stylesheet into it — its
- * own `./css/style.css`. The custom theme the host wears is left behind, which
+ * own `./css/style.css`. Everything else the host wears is left behind, which
  * is why the viewer and every popup it opens came up in Logseq's default
- * palette. The entry wraps the host's `open` to hand the child the same
- * stylesheet, so what is driven here is that wrapper: which windows it dresses,
- * what it leaves alone, and that unloading puts the host's `open` back.
+ * palette. The selected theme is one of those, and Logseq hangs it on a
+ * `<link>` with nothing to find it by, so the entry copies whichever of the
+ * host's stylesheets the child has not got. What is driven here is that
+ * wrapper: which windows it dresses, what it copies, what it leaves alone, and
+ * that unloading puts the host's `open` back.
  */
 
 import assert from 'node:assert/strict'
@@ -20,16 +22,27 @@ import { descendants, matchesSelector, node } from '../../../test/support/host-d
 const root = dirname(fileURLToPath(import.meta.url))
 const source = await classicScript(resolve(root, '..', 'index.js'))
 
+/* Logseq's own stylesheet resolves to the same URL in both documents: the
+ * child's `<base>` is the host's location. */
+const LOGSEQ_CSS = 'file:///app/css/style.css'
+const ICONS_CSS = 'file:///app/css/tabler-icons.min.css'
 const THEME_HREF = 'file:///plugins/theme-dark-high-contrast/theme.css'
+const MARK = 'data-hc-pdf-window'
 
 function query(target, selector) {
   return descendants(target).find((child) => matchesSelector(child, selector)) ?? null
 }
 
-/* The child Logseq builds: a document with a head, and a root element that
- * carries `is-system-window` once Logseq has set it up. */
-function pdfWindow({ system = true } = {}) {
+function stylesheet(href, options = {}) {
+  return Object.assign(node('link', { attributes: { rel: 'stylesheet' }, ...options }), { href })
+}
+
+/* The child Logseq builds: a head holding the one stylesheet Logseq copies,
+ * and a root element that carries `is-system-window` once it is set up. */
+function pdfWindow({ system = true, sheets = [LOGSEQ_CSS] } = {}) {
   const head = node('head')
+  for (const href of sheets) head.appendChild(stylesheet(href))
+
   const documentElement = node('html', { classes: system ? ['is-system-window'] : [] })
   const win = {
     closed: false,
@@ -37,20 +50,28 @@ function pdfWindow({ system = true } = {}) {
       head,
       documentElement,
       createElement: (tag) => node(tag),
-      querySelector: (selector) => query(head, selector)
+      querySelector: (selector) => query(head, selector),
+      querySelectorAll: (selector) => head.querySelectorAll(selector)
     }
   }
 
   return { win, head, documentElement }
 }
 
-function load({ theme = THEME_HREF, accent = '' } = {}) {
+function copied(head) {
+  return head.querySelectorAll(`[${MARK}]`)
+}
+
+function load({ sheets = [ICONS_CSS, LOGSEQ_CSS, THEME_HREF], accent = '' } = {}) {
   const body = node('body')
   const head = node('head')
-  if (theme) head.appendChild(Object.assign(node('link', { id: 'logseq-custom-theme-id' }), { href: theme }))
+  for (const href of sheets) head.appendChild(stylesheet(href))
 
   const documentElement = node('html', { attributes: accent ? { 'data-color': accent } : {} })
-  const frames = []
+  documentElement.appendChild(head)
+  documentElement.appendChild(body)
+
+  const timers = []
   const unloads = []
   const opened = []
   let hostOpen = null
@@ -62,8 +83,9 @@ function load({ theme = THEME_HREF, accent = '' } = {}) {
       disconnect() {}
     },
     parent: {
-      requestAnimationFrame(callback) {
-        frames.push(callback)
+      requestAnimationFrame() {},
+      setTimeout(callback) {
+        timers.push(callback)
       },
       open(...args) {
         opened.push(args)
@@ -75,8 +97,8 @@ function load({ theme = THEME_HREF, accent = '' } = {}) {
         createElement: (tag) => node(tag),
         addEventListener() {},
         removeEventListener() {},
-        querySelector: (selector) => query(head, selector) ?? body.querySelector(selector),
-        querySelectorAll: (selector) => body.querySelectorAll(selector)
+        querySelector: (selector) => documentElement.querySelector(selector),
+        querySelectorAll: (selector) => documentElement.querySelectorAll(selector)
       }
     },
     logseq: {
@@ -107,15 +129,16 @@ function load({ theme = THEME_HREF, accent = '' } = {}) {
   context.body = body
   context.opened = opened
   context.unloads = unloads
+  context.timers = timers
   /* Logseq builds the child after `open` returns, so the entry looks again on
-   * later frames; the test drives those by hand. */
-  context.settle = (times = 3) => {
+   * the microtask that follows and then on a timer; the test drives both. */
+  context.settle = async (times = 3) => {
     for (let turn = 0; turn < times; turn += 1) {
-      const pending = frames.splice(0, frames.length)
-      for (const frame of pending) frame()
+      await Promise.resolve()
+      const pending = timers.splice(0, timers.length)
+      for (const timer of pending) timer()
     }
   }
-  context.frames = frames
   context.openWindow = (win) => {
     hostOpen = win
     return context.parent.open('about:blank', '_blank', 'width=700,height=800')
@@ -130,22 +153,43 @@ async function started(options) {
   return context
 }
 
-function injected(head) {
-  return query(head, '#hc-pdf-window-theme')
-}
-
-test('hands the pop-out PDF window the theme the host is wearing', async () => {
+test('hands the pop-out PDF window every stylesheet the host has and it lacks', async () => {
   const context = await started()
   const { win, head } = pdfWindow()
 
   context.openWindow(win)
-  context.settle()
+  await context.settle()
 
-  const link = injected(head)
-  assert.ok(link, 'the child window should carry the theme stylesheet')
-  assert.equal(link.tagName, 'LINK')
-  assert.equal(link.rel, 'stylesheet')
-  assert.equal(link.href, THEME_HREF)
+  const links = copied(head)
+  assert.deepEqual(links.map((link) => link.href), [ICONS_CSS, THEME_HREF])
+  for (const link of links) {
+    assert.equal(link.tagName, 'LINK')
+    assert.equal(link.rel, 'stylesheet')
+  }
+})
+
+test('copies the theme in after the stylesheet Logseq gave the child', async () => {
+  const context = await started()
+  const { win, head } = pdfWindow()
+
+  context.openWindow(win)
+  await context.settle()
+
+  assert.deepEqual(
+    head.children.map((link) => link.href),
+    [LOGSEQ_CSS, ICONS_CSS, THEME_HREF],
+    'the theme must come last, or Logseq’s own palette outranks it'
+  )
+})
+
+test('does not copy a stylesheet the child already has', async () => {
+  const context = await started()
+  const { win, head } = pdfWindow()
+
+  context.openWindow(win)
+  await context.settle()
+
+  assert.equal(head.querySelectorAll('link').filter((link) => link.href === LOGSEQ_CSS).length, 1)
 })
 
 test('forwards the open call and returns the host window untouched', async () => {
@@ -161,7 +205,7 @@ test('leaves the host accent behind, so nothing accent-scoped outranks the palet
   const { win, documentElement } = pdfWindow()
 
   context.openWindow(win)
-  context.settle()
+  await context.settle()
 
   assert.equal(documentElement.getAttribute('data-color'), null)
 })
@@ -171,9 +215,9 @@ test('leaves an ordinary popup alone', async () => {
   const { win, head } = pdfWindow({ system: false })
 
   context.openWindow(win)
-  context.settle(5)
+  await context.settle(5)
 
-  assert.equal(injected(head), null)
+  assert.equal(copied(head).length, 0)
 })
 
 test('stops looking at a window that never becomes a PDF viewer', async () => {
@@ -181,42 +225,42 @@ test('stops looking at a window that never becomes a PDF viewer', async () => {
   const { win } = pdfWindow({ system: false })
 
   context.openWindow(win)
-  context.settle(200)
+  await context.settle(200)
 
-  assert.equal(context.frames.length, 0, 'the entry should give up rather than watch forever')
+  assert.equal(context.timers.length, 0, 'the entry should give up rather than watch forever')
 })
 
-test('dresses a window that only becomes the viewer on a later frame', async () => {
+test('dresses a window that only becomes the viewer on a later try', async () => {
   const context = await started()
   const { win, head, documentElement } = pdfWindow({ system: false })
 
   context.openWindow(win)
-  context.settle(1)
-  assert.equal(injected(head), null)
+  await context.settle(1)
+  assert.equal(copied(head).length, 0)
 
   documentElement.classList.add('is-system-window')
-  context.settle(1)
-  assert.ok(injected(head))
+  await context.settle(1)
+  assert.equal(copied(head).length, 2)
 })
 
-test('adds the stylesheet once, however many frames run', async () => {
+test('copies once, however many tries run', async () => {
   const context = await started()
   const { win, head } = pdfWindow()
 
   context.openWindow(win)
-  context.settle(5)
+  await context.settle(5)
 
-  assert.equal(descendants(head).filter((child) => child.id === 'hc-pdf-window-theme').length, 1)
+  assert.equal(copied(head).length, 2)
 })
 
-test('does nothing when no custom theme link is on the host', async () => {
-  const context = await started({ theme: '' })
+test('does nothing when the child already wears everything the host does', async () => {
+  const context = await started({ sheets: [LOGSEQ_CSS] })
   const { win, head } = pdfWindow()
 
   context.openWindow(win)
-  context.settle(5)
+  await context.settle(5)
 
-  assert.equal(injected(head), null)
+  assert.equal(copied(head).length, 0)
 })
 
 test('skips a window that closed before it was dressed', async () => {
@@ -225,27 +269,28 @@ test('skips a window that closed before it was dressed', async () => {
   win.closed = true
 
   context.openWindow(win)
-  context.settle(5)
+  await context.settle(5)
 
-  assert.equal(injected(head), null)
+  assert.equal(copied(head).length, 0)
 })
 
-test('unloading restores the host open and strips the stylesheet it added', async () => {
+test('unloading restores the host open and strips the stylesheets it added', async () => {
   const context = await started()
   const { win, head } = pdfWindow()
   const wrapped = context.parent.open
 
   context.openWindow(win)
-  context.settle()
-  assert.ok(injected(head))
+  await context.settle()
+  assert.equal(copied(head).length, 2)
 
   for (const unload of context.unloads) await unload()
 
   assert.notEqual(context.parent.open, wrapped)
-  assert.equal(injected(head), null)
+  assert.equal(copied(head).length, 0)
+  assert.deepEqual(head.children.map((link) => link.href), [LOGSEQ_CSS])
 
   const next = pdfWindow()
   context.openWindow(next.win)
-  context.settle()
-  assert.equal(injected(next.head), null, 'the unloaded theme should dress no further windows')
+  await context.settle()
+  assert.equal(copied(next.head).length, 0, 'the unloaded theme should dress no further windows')
 })

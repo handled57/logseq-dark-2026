@@ -6,13 +6,18 @@ All notable changes to this project are documented here.
 
 - Theme the PDF viewer after it is popped out into its own window. Logseq
   opens that window with `window.open` and copies exactly one stylesheet into
-  it — its own `./css/style.css` — so the custom theme was left behind and the
-  viewer, its toolbar, its outline panel and every popup it opens came up in
-  Logseq's default palette, however dark the main window was. The theme now
-  hands the child window the same stylesheet the host is wearing, and paints
-  the window's own ground, so a popped-out PDF reads the same as an embedded
-  one. A window that was already popped out when the theme loaded is out of
-  reach and keeps Logseq's palette until it is reopened.
+  it — its own `./css/style.css` — so the theme was left behind and the viewer,
+  its toolbar, its outline panel and every popup it opens came up on Logseq's
+  default green ground, however dark the main window was. The theme now hands
+  the child window whichever of the host's stylesheets it is missing, which is
+  the theme itself and Logseq's own icon font, and paints the window's ground,
+  so a popped-out PDF reads the same as an embedded one. Logseq hangs a
+  selected theme on a `<link>` with no id, class or attribute to find it by, so
+  the theme cannot ask for itself by name and instead compares the two
+  documents' stylesheet lists; `#logseq-custom-theme-id`, which does have a
+  name, is the graph's `logseq/custom.css` and not the theme. A window that was
+  already popped out when the theme loaded is out of reach and keeps Logseq's
+  palette until it is reopened.
 
 ## 2.16.2 - 2026-09-13
 

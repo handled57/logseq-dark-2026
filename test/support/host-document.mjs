@@ -4,7 +4,14 @@ export function matchesSelector(target, selector) {
     return tokens.length > 0 && tokens.every((token) => {
       if (token.startsWith('.')) return target.classList.has(token.slice(1))
       if (token.startsWith('#')) return target.id === token.slice(1)
-      if (token.startsWith('[')) return target.attributes.has(token.slice(1, -1))
+      if (token.startsWith('[')) {
+        const [, name, value] = token.slice(1, -1).match(/^([\w-]+)(?:=["']?(.*?)["']?)?$/) ?? []
+        if (!name) return false
+        if (value === undefined) return target.attributes.has(name)
+        /* An IDL attribute a script set as a property reads back the same way
+         * a parsed one does, so the stub looks in both places. */
+        return (target.attributes.has(name) ? target.attributes.get(name) : target[name]) === value
+      }
       return target.tagName === token.toUpperCase()
     })
   })
