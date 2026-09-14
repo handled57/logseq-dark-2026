@@ -2,6 +2,39 @@
 
 All notable changes to this project are documented here.
 
+## 2.17.0 - 2026-09-13
+
+- Theme the PDF viewer after it is popped out into its own window. Logseq
+  opens that window with `window.open` and copies exactly one stylesheet into
+  it — its own `./css/style.css` — so the theme was left behind and the viewer,
+  its toolbar, its outline panel and every popup it opens came up on Logseq's
+  default green ground, however dark the main window was. The theme now hands
+  the child window whichever of the host's stylesheets it is missing, which is
+  the theme itself and Logseq's own icon font, and paints the window's ground,
+  so a popped-out PDF reads the same as an embedded one. Logseq hangs a
+  selected theme on a `<link>` with no id, class or attribute to find it by, so
+  the theme cannot ask for itself by name and instead compares the two
+  documents' stylesheet lists; `#logseq-custom-theme-id`, which does have a
+  name, is the graph's `logseq/custom.css` and not the theme. A window that was
+  already popped out when the theme loaded is out of reach and keeps Logseq's
+  palette until it is reopened.
+
+## 2.16.2 - 2026-09-13
+
+- Darken every PDF popup, not just the outline. The previous fix styled the
+  toolbar and the outline panel, which left the viewer's settings popup and
+  its find-in-document bar sitting on a pale gray card: all of them paint from
+  one shared `.hls-popup-box` base that hard-codes that fill and draws its
+  border as a scaled `::after` in a mid gray, so styling the outline alone
+  reached none of its siblings. The theme now takes the shared base, so the
+  settings rows, the theme swatches' rims, the finder's input, buttons and
+  results, and the Copy/Link context menu a highlight opens all follow the
+  palette. `test/cascade.test.mjs` pins the shared base against the installed
+  Logseq stylesheet.
+- Finish the outline panel's chrome: the Contents/Figures/Highlights tab bar
+  kept upstream's light dividers and gray active fill, and the Highlights tab
+  listed its entries in gray on black.
+
 ## 2.16.1 - 2026-09-13
 
 - Make selected text readable again. Logseq declares its own

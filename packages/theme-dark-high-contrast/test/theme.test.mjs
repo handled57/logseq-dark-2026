@@ -193,6 +193,9 @@ test('the property script reads the host document and hides only its own table',
   assert.match(script, /\{ childList: true, subtree: true \}/)
   assert.doesNotMatch(script, /attributes:\s*true/)
   assert.doesNotMatch(script, /(?<!parent\.)requestAnimationFrame/)
+  /* Same reason, and the same realm: a timer the sandbox owns dies with the
+   * sandbox, and the host's is the clock the host's documents run on. */
+  assert.doesNotMatch(script, /(?<!parent\.)setTimeout/)
 })
 
 test('official High Contrast palette values remain exact', () => {
@@ -372,6 +375,11 @@ test('workbench selectors and accessibility fallbacks are present', () => {
     /\.settings-modal/,
     /\.ui__notifications \.notification-area/,
     /\.extensions__pdf-toolbar/,
+    /\.hls-popup-box/,
+    /\.extensions__pdf-hls-ctx-menu/,
+    /\.extensions__pdf-settings-item/,
+    /\.extensions__pdf-highlights-list-item/,
+    /html\.is-system-window/,
     /\.whiteboard-page-title/,
     /:focus-visible/,
     /forced-colors:\s*active/,

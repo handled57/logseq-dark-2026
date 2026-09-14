@@ -2558,10 +2558,58 @@ kbd {
   box-shadow: none !important;
 }
 
+.extensions__pdf-toolbar > .inner > .r a.button,
 .extensions__pdf-toolbar > .inner > .r a.button.is-active {
   color: var(--vscode-hc-white) !important;
   background: var(--vscode-hc-black) !important;
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-toolbar > .inner > .r a.button.is-active {
   border-bottom-color: var(--vscode-hc-focus);
+}
+
+.extensions__pdf-toolbar > .inner > .r a.button:hover {
+  color: var(--vscode-hc-bright-blue) !important;
+}
+
+/* PDF outline container and all its text content */
+.extensions__pdf-outline,
+.extensions__pdf-outline > * {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+}
+
+/* PDF outline tabs and buttons */
+.extensions__pdf-outline [role="tablist"],
+.extensions__pdf-outline [role="tab"],
+.extensions__pdf-outline button {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-outline [role="tab"][aria-selected="true"],
+.extensions__pdf-outline button:hover,
+.extensions__pdf-outline button.active {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-panel) !important;
+}
+
+/* The Contents/Figures/Highlights tab bar draws its own light rules. */
+.extensions__pdf-outline-tabs {
+  border-bottom-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-outline-tabs > .inner {
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-outline-tabs button:active,
+.extensions__pdf-outline-tabs button.active {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-panel) !important;
+  opacity: 1;
 }
 
 .extensions__pdf-outline-item > .inner > a,
@@ -2580,6 +2628,103 @@ kbd {
   background: var(--vscode-hc-black);
   outline: 2px solid var(--vscode-hc-focus);
   outline-offset: -2px;
+}
+
+/* Every PDF popup — settings, finder, and the context menu a highlight opens —
+ * paints itself from one hard-coded light base: `.hls-popup-box` fills with a
+ * pale gray and draws its border as a scaled `::after` in a mid gray, and the
+ * context menu repeats both literals on its own selector. Styling the shared
+ * base is what turns the whole family dark; the outline panel above rides on
+ * the same overlay but paints its own `> section`. */
+.hls-popup-box,
+.extensions__pdf-hls-ctx-menu {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-black) !important;
+  box-shadow: none !important;
+}
+
+.hls-popup-box::after,
+.extensions__pdf-hls-ctx-menu::after {
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-hls-ctx-menu > li.item:hover {
+  color: var(--vscode-hc-bright-blue) !important;
+  background-color: var(--vscode-hc-panel) !important;
+}
+
+/* Settings popup: the rows are muted gray on the light base upstream, and the
+ * divider above the toggles is `#ccc`. The three theme swatches keep their
+ * literal paper colors — they are previews of the page tint, not chrome. */
+.extensions__pdf-settings-item {
+  color: var(--vscode-hc-white) !important;
+}
+
+.extensions__pdf-settings-item.toggle-input {
+  border-top-color: var(--vscode-hc-border) !important;
+  opacity: 1;
+}
+
+.extensions__pdf-settings-item.theme-picker > button {
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-settings-item.theme-picker > button:hover {
+  border-color: var(--vscode-hc-focus) !important;
+  opacity: 1;
+}
+
+/* Finder popup: upstream sets black input text on a gray-200 fill and renders
+ * its results in gray-800, both unreadable on the dark base. */
+.extensions__pdf-finder.hls-popup-box > .input-inner .input-wrap {
+  border-color: var(--vscode-hc-border) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .input-inner .input-wrap:active,
+.extensions__pdf-finder.hls-popup-box > .input-inner .input-wrap:focus-within {
+  border-color: var(--vscode-hc-focus) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .input-inner input {
+  color: var(--vscode-hc-white) !important;
+  background-color: var(--vscode-hc-panel) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .input-inner input:focus {
+  border-color: var(--vscode-hc-focus) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .input-inner .ui__button .ti {
+  color: var(--vscode-hc-white) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .input-inner .ui__button.active .ti,
+.extensions__pdf-finder.hls-popup-box > .input-inner .ui__button:hover .ti {
+  color: var(--vscode-hc-bright-blue) !important;
+}
+
+.extensions__pdf-finder.hls-popup-box > .result-inner {
+  color: var(--vscode-hc-white) !important;
+}
+
+/* PDF highlights list: the sidebar tab listing existing highlights, alongside
+ * Contents and Figures. */
+.extensions__pdf-highlights-list-item > h6,
+.extensions__pdf-highlights-list-item > p {
+  color: var(--vscode-hc-white) !important;
+}
+
+.extensions__pdf-highlights-list-item > p:hover {
+  color: var(--vscode-hc-bright-blue) !important;
+}
+
+.extensions__pdf-highlights-list-item.active {
+  background-color: var(--vscode-hc-panel) !important;
+}
+
+.extensions__pdf-highlights-list-item.active > h6,
+.extensions__pdf-highlights-list-item.active > p {
+  color: var(--vscode-hc-white) !important;
 }
 
 .whiteboard-page-title:focus-within {
@@ -2672,6 +2817,16 @@ html[data-theme][data-color] .cp__themes-installed .it:hover {
   background-color: var(--vscode-hc-black) !important;
   outline: 2px solid var(--vscode-hc-focus);
   outline-offset: -2px;
+}
+
+/* The pop-out PDF window is a bare `window.open` child: no app container, no
+ * `#main-content-container`, nothing but `html.is-system-window` over the
+ * viewer. Nothing paints the page ground for it, so the window paints its own.
+ * The class never appears in the main window. */
+html.is-system-window,
+html.is-system-window body {
+  color: var(--vscode-hc-white);
+  background-color: var(--vscode-hc-black);
 }
 
 /* The PDF viewer redefines its own background token on the container element,

@@ -54,6 +54,12 @@ const pairings = [
     theme: '.extensions__pdf-container[data-theme]'
   },
   {
+    surface: 'the shared PDF popup base behind the settings, finder and outline menus',
+    upstream: '.hls-popup-box',
+    theme: '.hls-popup-box',
+    tie: true
+  },
+  {
     surface: 'even table rows',
     upstream: '.block-content tr:nth-child(2n)',
     theme: '.block-content tr:nth-child(even)',

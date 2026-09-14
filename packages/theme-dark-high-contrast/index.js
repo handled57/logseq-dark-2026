@@ -113,6 +113,22 @@ const RAIL_ENTRY_ATTR = 'data-hc-rail-entry'
 const RAIL_EXIT_ATTR = 'data-hc-rail-exit'
 const EMPTY_BLOCK_ATTR = 'data-hc-empty-block'
 
+/* Logseq's pop-out PDF window is a plain `window.open` child of the host, not
+ * a second app window: it carries `html.is-system-window`, the host's theme
+ * mode, and a head into which Logseq copies exactly one stylesheet, its own
+ * `./css/style.css`. Every other stylesheet the host wears is left behind, so
+ * the viewer, its toolbar and every popup it opens come up in Logseq's default
+ * palette with its icon font missing. A selected theme is one of those: Logseq
+ * hangs it on an anonymous `<link>` with no id and no attribute to find it by,
+ * so the theme cannot ask for itself by name. It asks the other way round —
+ * which of the host's stylesheets the child has not got — and copies those.
+ * The child is same-origin, so they are readable and appendable. */
+const PDF_WINDOW_CLASS = 'is-system-window'
+const STYLESHEET_LINK = 'link[rel="stylesheet"]'
+const PDF_WINDOW_LINK_ATTR = 'data-hc-pdf-window'
+const PDF_WINDOW_TRIES = 40
+const PDF_WINDOW_DELAY = 50
+
 /* Leading-emoji block icons. A block whose text opens with one emoji has that
  * emoji set in a gutter to the left of the text, the way a passage sets a verse
  * number, so it reads as the block's icon. Nothing is rewritten: the emoji is
@@ -975,6 +991,116 @@ function foldOnBulletClick(event) {
  * window's does. Coalescing per frame keeps a burst of edit-mode mutations
  * down to one pass. */
 let queued = false
+/* The pop-out PDF window, dressed in the host's own stylesheets.
+ *
+ * There is no handle to the child window other than the one `window.open`
+ * returns to Logseq, so the entry wraps the host's `open` and keeps the value
+ * on its way past. Nothing about the call is changed: the wrapper forwards its
+ * arguments and returns what the host returned, and unloading puts the
+ * original function back.
+ *
+ * Logseq builds the child document synchronously but only after `open` has
+ * returned, so the theme cannot read `is-system-window` from inside the
+ * wrapper. It looks again on the microtask that follows — by which time that
+ * whole build has run — and then on a short timer, giving up after
+ * `PDF_WINDOW_TRIES` rather than watching an ordinary popup forever. A timer
+ * rather than a frame is deliberate: the child takes the focus as it opens,
+ * and a backgrounded host throttles or stops animation frames outright while
+ * its timers keep firing.
+ *
+ * A window opened before the theme loaded is out of reach and stays in
+ * Logseq's palette until it is reopened.
+ */
+const pdfWindows = new Set()
+let hostOpen = null
+
+/* Which of the host's stylesheets the child is missing. Comparing resolved
+ * `href`s is what makes this safe to run against a document Logseq has already
+ * dressed: the child's base is the host's own location, so its copy of
+ * `./css/style.css` resolves to the same URL as the host's and is not copied
+ * twice. What is left is the selected theme and anything else hung on the host
+ * after boot, in the host's own order, appended after what Logseq gave the
+ * child so the theme still has the last word.
+ *
+ * Logseq writes the theme mode onto the child itself; the accent stays behind
+ * with the host, and is better left there. Without it none of Logseq's
+ * accent-scoped `--ls-*` blocks apply in the child, so the palette's own
+ * `:root` declarations are unopposed. */
+function missingStyleSheets(target) {
+  const own = new Set()
+  for (const link of target.querySelectorAll(STYLESHEET_LINK)) own.add(link.href)
+  return Array.from(doc.querySelectorAll(STYLESHEET_LINK)).filter(
+    (link) => link.href && !own.has(link.href)
+  )
+}
+
+function dressPdfWindow(win) {
+  const target = win?.document
+  const root = target?.documentElement
+  if (!root?.matches?.(`.${PDF_WINDOW_CLASS}`) || !target.head) return false
+  if (target.querySelector?.(`[${PDF_WINDOW_LINK_ATTR}]`)) return true
+
+  const missing = missingStyleSheets(target)
+  if (!missing.length) return false
+
+  for (const source of missing) {
+    const link = target.createElement('link')
+    link.setAttribute(PDF_WINDOW_LINK_ATTR, '')
+    link.rel = 'stylesheet'
+    link.href = source.href
+    target.head.appendChild(link)
+  }
+  pdfWindows.add(win)
+  return true
+}
+
+function watchPdfWindow(win) {
+  if (!win) return
+
+  let tries = 0
+  const look = () => {
+    if (win.closed) return
+    try {
+      if (dressPdfWindow(win)) return
+    } catch (error) {
+      console.warn('Dark High Contrast could not theme the PDF window', error)
+      return
+    }
+    tries += 1
+    if (tries < PDF_WINDOW_TRIES) parent.setTimeout(look, PDF_WINDOW_DELAY)
+  }
+
+  Promise.resolve().then(look)
+}
+
+function interceptPdfWindows() {
+  if (hostOpen || typeof parent.open !== 'function') return
+
+  const original = parent.open
+  parent.open = function open(...args) {
+    const win = original.apply(parent, args)
+    watchPdfWindow(win)
+    return win
+  }
+  /* A host that refuses the assignment leaves `open` as it found it; there is
+   * nothing to restore, so nothing is remembered either. */
+  if (parent.open === original) return
+  hostOpen = original
+}
+
+function releasePdfWindows() {
+  if (hostOpen) parent.open = hostOpen
+  hostOpen = null
+
+  for (const win of pdfWindows) {
+    if (win.closed) continue
+    for (const link of win.document?.querySelectorAll?.(`[${PDF_WINDOW_LINK_ATTR}]`) || []) {
+      link.remove?.()
+    }
+  }
+  pdfWindows.clear()
+}
+
 function repaint() {
   if (queued) return
   queued = true
@@ -988,6 +1114,7 @@ function repaint() {
  * plugin, so unloading has to leave none of it behind. */
 let observer = null
 function teardown() {
+  releasePdfWindows()
   observer?.disconnect()
   observer = null
   doc.removeEventListener('click', foldOnBulletClick, true)
@@ -1033,6 +1160,7 @@ function main() {
   })
   logseq.beforeunload?.(async () => teardown())
   logseq.Editor.registerBlockContextMenuItem('Open', openBlock)
+  interceptPdfWindows()
   doc.addEventListener('click', foldOnBulletClick, true)
   doc.addEventListener('mousedown', toggleCollapse, true)
   doc.addEventListener('click', toggleCollapse, true)

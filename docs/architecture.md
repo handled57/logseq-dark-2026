@@ -264,6 +264,42 @@ click on a control are taken in the capture phase, so neither Logseq's
 edit-on-click nor the bullet fold above ever sees them, and `beforeunload`
 removes every control along with the attributes.
 
+The theme also reaches one document it does not own. Logseq's pop-out PDF
+viewer is a `window.open` child of the host, not a second app window: Logseq
+gives it `html.is-system-window`, the host's theme mode, and exactly one
+stylesheet, its own `./css/style.css`. Every other stylesheet the host wears is
+left behind, so the viewer, its toolbar and every popup it opens render in
+Logseq's default palette with the icon font missing.
+
+A selected theme is one of those left-behind stylesheets, and it cannot be
+asked for by name. `#logseq-custom-theme-id` is *not* it: that id belongs to the
+graph's own `logseq/custom.css`. Logseq applies a theme through
+`LSPluginCore.selectTheme`, which appends a bare
+`<link rel="stylesheet" href="…">` to the host head carrying no id, class or
+attribute of its own. So the theme identifies the missing sheets the other way
+round — it compares the host's `link[rel="stylesheet"]` hrefs against the
+child's and copies whichever the child has not got, in the host's order, after
+what Logseq gave it. Comparing resolved hrefs is what makes that safe to repeat:
+the child's `<base>` is the host's location, so its copy of `./css/style.css`
+resolves to the same URL as the host's and is never copied twice. Each copy is
+marked `data-hc-pdf-window`, which is also the idempotence check.
+
+The child is same-origin, so the theme wraps the host's `open` to get a handle
+on it; the wrapper forwards its arguments and returns the host's value
+unchanged, and it gives up silently if the host refuses the assignment. Logseq
+builds the child synchronously but only after `open` has returned, so the theme
+looks on the following microtask — by which time that whole build has run — and
+then on a 50ms timer, giving up after 40 tries rather than watching an ordinary
+popup forever. Timers rather than animation frames: the child takes the focus as
+it opens, and a backgrounded host throttles or stops `parent.requestAnimationFrame`
+outright while its timers keep firing.
+
+The host accent is deliberately left behind, which keeps Logseq's accent-scoped
+`--ls-*` blocks out of the child entirely. `beforeunload` puts the host's `open`
+back and strips every copied link from any window still open. A window popped
+out before the theme loaded is unreachable and keeps Logseq's palette until it
+is reopened.
+
 ## Passage parser and local text
 
 `packages/plugin-passage/bible.js` is a classic browser script loaded before
