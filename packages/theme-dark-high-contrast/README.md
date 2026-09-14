@@ -20,6 +20,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Every block in the main editor ends on the same right edge whether or not it is referenced, so a heading's rule, a table, a box edge and the point a line wraps at no longer step left and right down the page.
 - Optionally hides the property table on blocks matching any number of property pairs (see below).
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../plugin-passage) plugin's job, and the theme does not require it.
+- Sets a named admonition and a passage in the same size as the block around them, rather than the larger type Logseq gives an admonition, so the page reads at one size and the box, its divider and its icon are what mark the block out.
 - Sizes named-admonition and passage icons at 1.5 times the first line's font and aligns them with that line while their semantic divider continues through the full block height.
 - Folds a long rendered box — an admonition, a passage, a table, a quote, a code block, a math block, a piece of media, a block or page embed — on a control of its own, without folding the block that holds it or touching a line of its source.
 - Sets the emoji a block opens with in a gutter of its own, left of the block's text, so it reads as that block's icon and the lines under it stay in one column. The emoji is left exactly where it is written.
@@ -327,7 +328,7 @@ For God so loved the world…
 #+END_PASSAGE
 ```
 
-It renders bulletless, on the black admonition surface, with a cyan open-book icon and the same 4px accent divider the named admonitions carry. The icon is a 1.5em square, scaling from the first line's font size and vertically centered with that line, while the text keeps the same indent, so a passage and an admonition line up beside each other.
+It renders bulletless, on the black admonition surface, with a cyan open-book icon and the same 4px accent divider the named admonitions carry. The icon is a 1.5em square, scaling from the first line's font size and vertically centered with that line, while the text keeps the same indent, so a passage and an admonition line up beside each other. Both are set in the size of the block they sit in: Logseq hands a named admonition's text to a class Tailwind sets a size larger, and the theme takes it back so a passage, an admonition and the prose around them read at one size.
 
 `PASSAGE` is not one of the admonition names compiled into Logseq's parser, and that list cannot be extended by a theme, a setting or a plugin. Logseq renders the block as a plain `div.passage` with no icon and no container styling, so the theme reproduces the admonition treatment on its own selectors and supplies the icon itself, inlined as an SVG mask so its color stays a palette token. The block is styled to *match* the admonitions; it is not parsed as one.
 

@@ -1983,9 +1983,22 @@ textarea.block-editor:focus {
  * Logseq's icon column carries `justify-center`, which centers the icon over
  * the full height of a long admonition. Keep the column (and therefore its
  * divider) stretched to the full height, but pin its contents to the top. The
- * icon is 1.5 times the `text-lg` content's 1.125rem font size while its first
- * line box is 1.75rem, so half their difference centers the icon on that first
- * rendered line. The fixed column geometry remains independent of the glyph. */
+ * icon is 1.5 times the content's font size while its first line box is
+ * 1.75rem, so half their difference centers the icon on that first rendered
+ * line. The fixed column geometry remains independent of the glyph.
+ *
+ * That content is `div.ml-4.text-lg`, which Tailwind sets a size larger than
+ * the prose around it at 1.125rem. The box, its divider and its icon already
+ * mark an admonition out, so the type is taken back to the size of the block
+ * the box sits in: `1em` of that block rather than a figure of its own, so a
+ * graph that retunes `--ls-page-text-size` moves an admonition with everything
+ * else. A CSS-wide keyword is no use here — `--hc-admonition-font-size:
+ * inherit` would make the custom property itself inherit rather than the font
+ * size that reads it.
+ *
+ * Tailwind's 1.75rem line box is left alone, so the first line of an
+ * admonition holds the height — and therefore the icon and the rail bullet
+ * beside it hold the position — that they had at the larger size. */
 .admonitionblock.tip {
   --hc-admonition-accent: var(--vscode-hc-focus);
 }
@@ -2008,7 +2021,7 @@ textarea.block-editor:focus {
 }
 
 .admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning) {
-  --hc-admonition-font-size: 1.125rem;
+  --hc-admonition-font-size: 1em;
   --hc-admonition-first-line-height: 1.75rem;
   --hc-admonition-icon-size: 1.5em;
 
@@ -2023,7 +2036,7 @@ textarea.block-editor:focus {
  *
  * Logseq sizes the icon `h-8 w-8`, so the column measured 2rem plus its 1rem
  * `pr-4` and the divider hung at 3rem. The rule below shrinks the glyph to
- * 1.5em of the box's 1.125rem text, and with nothing else setting the column
+ * 1.5em of the box's own text, and with nothing else setting the column
  * the divider followed it 5px left — leaving a real admonition's divider out of
  * line with the 3rem a passage reserves, and with everything else measured from
  * that figure, the property table and the divider drawn past it included.
@@ -2063,7 +2076,10 @@ textarea.block-editor:focus {
  * is. The indent reproduces the admonition's own metrics exactly: a 2rem icon,
  * the icon column's 1rem `pr-4`, the 4px divider, and the content's 1rem
  * `ml-4`. `min-height` matches the row height a 2rem icon forces on a real
- * admonition whose content is shorter than its icon. */
+ * admonition whose content is shorter than its icon.
+ *
+ * A passage is not a `.text-lg` box, so it takes the same `1em` of the block
+ * around it in its own right, and the two kinds of box read at one size. */
 .block-body > .passage {
   --hc-admonition-accent: var(--vscode-hc-cyan);
   --hc-admonition-first-line-height: 1.75rem;
@@ -2074,7 +2090,7 @@ textarea.block-editor:focus {
   margin: 2rem 0;
   padding: 0 0 0 4.25rem;
   min-height: 2rem;
-  font-size: 1.125rem;
+  font-size: 1em;
   background: var(--vscode-hc-black) !important;
   border: 1px solid transparent !important;
   border-radius: 2px !important;
