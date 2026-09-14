@@ -2819,6 +2819,16 @@ html[data-theme][data-color] .cp__themes-installed .it:hover {
   outline-offset: -2px;
 }
 
+/* The pop-out PDF window is a bare `window.open` child: no app container, no
+ * `#main-content-container`, nothing but `html.is-system-window` over the
+ * viewer. Nothing paints the page ground for it, so the window paints its own.
+ * The class never appears in the main window. */
+html.is-system-window,
+html.is-system-window body {
+  color: var(--vscode-hc-white);
+  background-color: var(--vscode-hc-black);
+}
+
 /* The PDF viewer redefines its own background token on the container element,
  * so a root-level value alone would not reach it. */
 .extensions__pdf-container[data-theme],

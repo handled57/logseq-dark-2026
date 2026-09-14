@@ -113,6 +113,18 @@ const RAIL_ENTRY_ATTR = 'data-hc-rail-entry'
 const RAIL_EXIT_ATTR = 'data-hc-rail-exit'
 const EMPTY_BLOCK_ATTR = 'data-hc-empty-block'
 
+/* Logseq's pop-out PDF window is a plain `window.open` child of the host, not
+ * a second app window: it carries `html.is-system-window`, the host's theme
+ * mode, and a head into which Logseq copies exactly one stylesheet, its own
+ * `./css/style.css`. The custom-theme link the host wears is left behind, so
+ * the viewer, its toolbar and every popup it opens come up in Logseq's default
+ * palette. The child is same-origin, so the theme hands it the same stylesheet
+ * the host is wearing and the accent attribute its selectors key on. */
+const PDF_WINDOW_CLASS = 'is-system-window'
+const HOST_THEME_LINK = '#logseq-custom-theme-id'
+const PDF_WINDOW_LINK_ID = 'hc-pdf-window-theme'
+const PDF_WINDOW_FRAMES = 120
+
 /* Leading-emoji block icons. A block whose text opens with one emoji has that
  * emoji set in a gutter to the left of the text, the way a passage sets a verse
  * number, so it reads as the block's icon. Nothing is rewritten: the emoji is
@@ -975,6 +987,91 @@ function foldOnBulletClick(event) {
  * window's does. Coalescing per frame keeps a burst of edit-mode mutations
  * down to one pass. */
 let queued = false
+/* The pop-out PDF window, dressed in the host's own theme.
+ *
+ * There is no handle to the child window other than the one `window.open`
+ * returns to Logseq, so the entry wraps the host's `open` and keeps the value
+ * on its way past. Nothing about the call is changed: the wrapper forwards its
+ * arguments and returns what the host returned, and unloading puts the
+ * original function back.
+ *
+ * Logseq builds the child document after `open` returns, so the theme cannot
+ * read `is-system-window` on the first tick; it looks again each frame until
+ * the class is there and gives up after `PDF_WINDOW_FRAMES` rather than
+ * watching an ordinary popup forever. A window opened before the theme loaded
+ * is out of reach and stays in Logseq's palette until it is reopened.
+ */
+const pdfWindows = new Set()
+let hostOpen = null
+
+function hostThemeHref() {
+  const link = doc.querySelector(HOST_THEME_LINK)
+  return link?.href || ''
+}
+
+/* Logseq writes the theme mode onto the child itself; the accent stays behind
+ * with the host, and is better left there. Without it none of Logseq's
+ * accent-scoped `--ls-*` blocks apply in the child, so the palette's own
+ * `:root` declarations are unopposed. */
+function dressPdfWindow(win) {
+  const target = win?.document
+  const root = target?.documentElement
+  if (!root?.matches?.(`.${PDF_WINDOW_CLASS}`) || !target.head) return false
+  if (target.querySelector?.(`#${PDF_WINDOW_LINK_ID}`)) return true
+
+  const href = hostThemeHref()
+  if (!href) return false
+
+  const link = target.createElement('link')
+  link.id = PDF_WINDOW_LINK_ID
+  link.rel = 'stylesheet'
+  link.href = href
+  target.head.appendChild(link)
+  pdfWindows.add(win)
+  return true
+}
+
+function watchPdfWindow(win) {
+  if (!win) return
+
+  let frames = 0
+  const look = () => {
+    if (win.closed) return
+    try {
+      if (dressPdfWindow(win)) return
+    } catch (error) {
+      console.warn('Dark High Contrast could not theme the PDF window', error)
+      return
+    }
+    frames += 1
+    if (frames < PDF_WINDOW_FRAMES) parent.requestAnimationFrame(look)
+  }
+
+  look()
+}
+
+function interceptPdfWindows() {
+  if (hostOpen || typeof parent.open !== 'function') return
+
+  hostOpen = parent.open
+  parent.open = function open(...args) {
+    const win = hostOpen.apply(parent, args)
+    watchPdfWindow(win)
+    return win
+  }
+}
+
+function releasePdfWindows() {
+  if (hostOpen) parent.open = hostOpen
+  hostOpen = null
+
+  for (const win of pdfWindows) {
+    if (win.closed) continue
+    win.document?.querySelector?.(`#${PDF_WINDOW_LINK_ID}`)?.remove?.()
+  }
+  pdfWindows.clear()
+}
+
 function repaint() {
   if (queued) return
   queued = true
@@ -988,6 +1085,7 @@ function repaint() {
  * plugin, so unloading has to leave none of it behind. */
 let observer = null
 function teardown() {
+  releasePdfWindows()
   observer?.disconnect()
   observer = null
   doc.removeEventListener('click', foldOnBulletClick, true)
@@ -1033,6 +1131,7 @@ function main() {
   })
   logseq.beforeunload?.(async () => teardown())
   logseq.Editor.registerBlockContextMenuItem('Open', openBlock)
+  interceptPdfWindows()
   doc.addEventListener('click', foldOnBulletClick, true)
   doc.addEventListener('mousedown', toggleCollapse, true)
   doc.addEventListener('click', toggleCollapse, true)

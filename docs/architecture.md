@@ -264,6 +264,23 @@ click on a control are taken in the capture phase, so neither Logseq's
 edit-on-click nor the bullet fold above ever sees them, and `beforeunload`
 removes every control along with the attributes.
 
+The theme also reaches one document it does not own. Logseq's pop-out PDF
+viewer is a `window.open` child of the host, not a second app window: Logseq
+gives it `html.is-system-window`, the host's theme mode, and exactly one
+stylesheet, its own `./css/style.css`. Nothing carries the custom theme across,
+so the viewer, its toolbar and every popup it opens render in Logseq's default
+palette. The child is same-origin, so the theme wraps the host's `open`, reads
+the `href` off the host's own `#logseq-custom-theme-id` link, and appends it to
+the child's head under the id `hc-pdf-window-theme`. The wrapper forwards its
+arguments and returns the host's value unchanged. Logseq builds the child after
+`open` returns, so the theme looks again each frame until `is-system-window` is
+there and gives up after 120 frames rather than watching an ordinary popup
+forever; the host accent is deliberately left behind, which keeps Logseq's
+accent-scoped `--ls-*` blocks out of the child entirely. `beforeunload` puts the
+host's `open` back and strips the link from any window still open. A window
+popped out before the theme loaded is unreachable and keeps Logseq's palette
+until it is reopened.
+
 ## Passage parser and local text
 
 `packages/plugin-passage/bible.js` is a classic browser script loaded before

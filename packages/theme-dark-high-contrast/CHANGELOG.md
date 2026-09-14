@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## 2.17.0 - 2026-09-13
+
+- Theme the PDF viewer after it is popped out into its own window. Logseq
+  opens that window with `window.open` and copies exactly one stylesheet into
+  it — its own `./css/style.css` — so the custom theme was left behind and the
+  viewer, its toolbar, its outline panel and every popup it opens came up in
+  Logseq's default palette, however dark the main window was. The theme now
+  hands the child window the same stylesheet the host is wearing, and paints
+  the window's own ground, so a popped-out PDF reads the same as an embedded
+  one. A window that was already popped out when the theme loaded is out of
+  reach and keeps Logseq's palette until it is reopened.
+
 ## 2.16.2 - 2026-09-13
 
 - Darken every PDF popup, not just the outline. The previous fix styled the
