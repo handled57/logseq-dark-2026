@@ -728,7 +728,7 @@ test('named admonitions align their semantic icons with the first line', () => {
 
   assert.match(
     css,
-    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?--hc-admonition-font-size:\\s*1\\.125rem;[\\s\\S]*?--hc-admonition-first-line-height:\\s*1\\.75rem;[\\s\\S]*?--hc-admonition-icon-size:\\s*1\\.5em;[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[\\s\\S]*?--hc-admonition-font-size:\\s*1em;[\\s\\S]*?--hc-admonition-first-line-height:\\s*1\\.75rem;[\\s\\S]*?--hc-admonition-icon-size:\\s*1\\.5em;[\\s\\S]*?border-color:\\s*transparent\\s*!important`)
   )
   assert.match(
     css,
@@ -749,6 +749,41 @@ test('named admonitions align their semantic icons with the first line', () => {
   assert.match(css, /\.notification-content\.warning,\s*\.warning\s*\{[\s\S]*?border-color:\s*var\(--vscode-hc-yellow\)\s*!important/)
 })
 
+test('an admonition and a passage set their text at the size of the block around them', () => {
+  const types = ['tip', 'note', 'important', 'caution', 'pinned', 'warning']
+  const scopedTypes = types.map((type) => `.${type}`).join(', ')
+
+  // Logseq hands a named admonition's content to `div.ml-4.text-lg`, which
+  // Tailwind sizes at 1.125rem. Both kinds of box take `1em` of the block they
+  // sit in instead, so a reader moving from prose into one sees one type size,
+  // and a graph that retunes `--ls-page-text-size` moves them with it.
+  assert.match(
+    css,
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[^}]*?--hc-admonition-font-size:\\s*1em;`)
+  )
+  assert.match(css, /\.block-body > \.passage \{[^}]*?font-size:\s*1em;/)
+
+  // A CSS-wide keyword would apply to the custom property itself rather than
+  // to the font size reading it, which leaves `font-size` invalid at
+  // computed-value time.
+  assert.doesNotMatch(css, /--hc-admonition-font-size:\s*(?:inherit|initial|unset|revert)/)
+
+  // Nothing sets either box back to a type size of its own.
+  assert.doesNotMatch(
+    css,
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)[^{]*\\{[^}]*?font-size:\\s*1\\.125rem`)
+  )
+  assert.doesNotMatch(css, /\.block-body > \.passage[^{]*\{[^}]*?font-size:\s*1\.125rem/)
+
+  // The line box the glyph and the rail bullet are measured against is
+  // Tailwind's and is left at 1.75rem, so neither moves with the type.
+  assert.match(
+    css,
+    new RegExp(`\\.admonitionblock:is\\(${escapeRegExp(scopedTypes)}\\)\\s*\\{[^}]*?--hc-admonition-first-line-height:\\s*1\\.75rem;`)
+  )
+  assert.match(css, /\.block-body > \.passage \{[^}]*?--hc-admonition-first-line-height:\s*1\.75rem;/)
+})
+
 test('the passage block reproduces the admonition treatment on its own selectors', () => {
   // Logseq emits no `.admonitionblock` for `#+BEGIN_PASSAGE`, so `.passage`
   // must not join the admonition type list; it carries the shared accent
@@ -767,7 +802,7 @@ test('the passage block reproduces the admonition treatment on its own selectors
   // `ml-4`, restated as padding, and the row height its `h-8` icon forces.
   assert.match(
     css,
-    /\.block-body > \.passage \{[\s\S]*?padding:\s*0 0 0 4\.25rem[\s\S]*?min-height:\s*2rem[\s\S]*?font-size:\s*1\.125rem/
+    /\.block-body > \.passage \{[\s\S]*?padding:\s*0 0 0 4\.25rem[\s\S]*?min-height:\s*2rem[\s\S]*?font-size:\s*1em/
   )
 
   // The divider is its own pseudo-element: a mask clips the border off the box

@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## 2.18.0 - 2026-09-13
+
+- Set a named admonition and a passage in the size of the block around them.
+  Logseq hands an admonition's content to `div.ml-4.text-lg`, which Tailwind
+  sizes at 1.125rem, and the theme restated that figure for the passage so the
+  two matched each other; both therefore read a size larger than the prose
+  above and below them. The box, its accent divider and its icon already mark
+  the block out, so the type is now `1em` of the block the box sits in, which
+  also follows a graph that retunes `--ls-page-text-size`. Tailwind's 1.75rem
+  line box is left alone, so the icon centred on the first line and the rail
+  bullet measured beside it hold their positions; the icon, a square of 1.5em,
+  follows the text down from 27px to 24px, and the 3rem icon column, its 4px
+  divider, the content indent and the property table below the box do not
+  move.
+
 ## 2.17.0 - 2026-09-13
 
 - Theme the PDF viewer after it is popped out into its own window. Logseq
