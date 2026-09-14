@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented here.
 
+## 2.18.0 - 2026-09-13
+
+- Lay a markdown list written inside a block on a gutter of its own. Logseq
+  already parses a line opening with `* ` as a bulleted item and one opening
+  with `1. ` as a numbered one, and renders both into the block's body, but its
+  stylesheet lays out only the numbered half: it gives an ordered list the
+  block's own text column and leaves an unordered one on the stock `1.2em`
+  indent and a hollow `circle` marker. So the two kinds stood in different
+  columns, neither lined up with ordinary prose, and a bulleted item was drawn
+  at almost exactly the size and shape the rail gives an expanded parent's
+  bullet — a list item inside a block read as a block of its own. Both kinds
+  now open their marker in the column the block's text begins in, with the
+  item's text one gutter right of it and every line after the first returning
+  to that column, so a long item wraps under its own text rather than under its
+  marker. Bulleted items are drawn as a filled disc, which is nothing the rail
+  draws. Numbered items keep the numbers their text asks for, including a list
+  that does not open at 1, because Logseq writes each item's own source number
+  to the item and the theme reads it back rather than counting. Nested lists
+  step in by one gutter per level, checkbox items keep their box, and nothing
+  reaches the rail, the block's bullet or the block's source — the `*` is still
+  the first character of the line, and clicking into the block shows it. The
+  gutter is `--hc-list-gutter`, `1.5em` by default and retunable from
+  `custom.css`.
+
 ## 2.17.0 - 2026-09-13
 
 - Theme the PDF viewer after it is popped out into its own window. Logseq

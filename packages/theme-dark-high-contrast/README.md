@@ -22,6 +22,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../plugin-passage) plugin's job, and the theme does not require it.
 - Sizes named-admonition and passage icons at 1.5 times the first line's font and aligns them with that line while their semantic divider continues through the full block height.
 - Folds a long rendered box — an admonition, a passage, a table, a quote, a code block, a math block, a piece of media, a block or page embed — on a control of its own, without folding the block that holds it or touching a line of its source.
+- Lays out a markdown list written inside a block — `* ` for bullets, `1. ` for numbers — on one gutter, so both kinds open in the column the block's own text begins in and a wrapped item comes back to its text rather than under its marker. Bullets are drawn as a filled disc, which is nothing the rail draws.
 - Sets the emoji a block opens with in a gutter of its own, left of the block's text, so it reads as that block's icon and the lines under it stay in one column. The emoji is left exactly where it is written.
 - Left-clicking a block bullet expands or collapses that block rather than opening it. Shift-click still opens the block in the sidebar, and right-clicking offers **Open**, immediately above **Open in sidebar**, to open the block in the main editor.
 - No build runtime, tracking, remote imports, or network access.
@@ -273,6 +274,32 @@ The emoji is not moved, copied or replaced. It is still the first character of t
 - The bullet on the rail is Logseq's own and is left alone. Folding, hovering, clicking, dragging and the bullets' hierarchy colors all behave as they did.
 
 Turn it off in **Plugins → Dark High Contrast → Settings** under **Leading emoji as a block icon**, and every emoji goes back into its line. The gutter is `--hc-block-icon-gutter`, `1.5em` by default, so a graph that sets its notes in a face with a wider or narrower emoji can retune it from `custom.css`.
+
+## Lists inside a block
+
+A block's own text can hold a markdown list. Opening a line with `* ` makes a bulleted item and opening one with `1. ` makes a numbered one:
+
+```text
+* milk
+* eggs
+* a longer item that runs past the width of the block
+```
+
+Both kinds are laid out on one gutter. The marker opens in the column the block's text would ordinarily have begun in, and the item's text stands one gutter right of it — which is where every line of that item after the first comes back to, so a long item wraps under its own text rather than under its marker.
+
+Logseq itself parses and renders both lists; what the theme changes is where they sit. Logseq lays out only the numbered half, leaving a bulleted list indented in a column of its own and drawn in a hollow ring at almost exactly the size and shape the rail gives an expanded parent's bullet — so a list item inside a block read as a block of its own. The theme draws bullets as a filled disc instead, in the block's text rather than in the margin.
+
+- Nothing is written to the graph and no character is moved. The `*` is still the first character of the block's source; clicking into the block shows the line exactly as it was typed.
+- `+ ` opens a bulleted item as well, because Logseq's parser accepts it. A leading `-` does not: Logseq reads it as the block's own marker, not as a list.
+- A numbered list renders the numbers its text asks for, so one written `3.`, `4.`, `5.` starts at three. Logseq writes each item's own source number, which is also why `1.`, `1.`, `1.` renders as three ones.
+- Nested items step in by one gutter per level and keep the same treatment. Checkbox items — `* [ ] task` — keep their box, after the marker.
+- A list that follows an intro line in the same block is laid out the same way, under that line.
+- Lists render this way wherever a block does: the main editor, the right sidebar, block references and embeds. Logseq's own menus, settings and shortcut lists are untouched.
+- Nothing here reaches the rail. The block's own bullet, its fold arrow and its neighbours stand where they did.
+
+The gutter is `--hc-list-gutter`, `1.5em` by default, so a graph that wants a tighter or wider marker column can retune it from `custom.css`.
+
+Typing `1. ` into an otherwise empty block is a separate Logseq feature: it converts the block itself into a numbered list item, recorded as a `logseq.order-list-type` property and drawn in the bullet column. That is unchanged, and the theme keeps its number beside the block's content while the bullet rides the rail.
 
 ## Hiding properties by property value
 

@@ -1499,6 +1499,101 @@ button:disabled,
   border-color: var(--vscode-hc-error) !important;
 }
 
+/* Lists inside a block -----------------------------------------------------
+ *
+ * A block's own text can hold a markdown list: mldoc parses a line opening
+ * with `* ` as an unordered list item and a line opening with `1. ` as an
+ * ordered one, and Logseq renders both into `.block-body` as
+ * `<ul>`/`<ol>` of `<li><p>…</p></li>`. Nothing here invents that list, marks a
+ * block or rewrites a character of it — the `*` is still the first character of
+ * the block's source, and clicking into the block shows the line as written.
+ *
+ * Logseq styles only half of that pair. It gives an ordered list
+ * `list-style-position: inside` and `margin-left: 0`, which puts the number in
+ * the column the block's text begins in, and leaves an unordered one on the
+ * stock `ul { list-style: circle }` and `ol, ul { margin-left: 1.2em }`. So a
+ * bulleted list stood in a column of its own, a further 1.2em right of the
+ * numbered list above it, and drew its items in a hollow ring the size and
+ * shape the rail draws an expanded parent's bullet in — a list item inside a
+ * block read as a block of its own.
+ *
+ * Both kinds are laid out here the same way, on one gutter: the marker opens at
+ * the block's own text column, and the item's text stands in a column one
+ * gutter right of it, which every line of that item after the first returns to.
+ * That is the hanging indent `--hc-block-icon-gutter` draws for a leading
+ * emoji, built the same way — padding on the item carries its text column, and
+ * a negative `text-indent` of the same size pulls the first line, the marker
+ * with it, back out to the left of it.
+ *
+ * The gutter is carved out of the block's own text column rather than the
+ * margin left of it, so nothing here reaches the rail: the block's bullet, its
+ * fold arrow and its neighbours stand where they did. `.block-body` is the box
+ * Logseq renders every block's body into, so this reaches a list wherever a
+ * block is rendered — the main editor, the sidebar, a block reference, an
+ * embed — and nothing outside a block, which is what keeps it off Logseq's own
+ * menus and settings lists. */
+:root {
+  --hc-list-gutter: 1.5em;
+}
+
+/* The list itself stands in the block's text column, with no indentation of its
+ * own: what indents an item is the gutter its own marker stands in, below. */
+.block-body :is(ul, ol) {
+  margin-left: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+/* The item's text column, and the first line pulled back out of it. */
+.block-body :is(ul, ol) > li {
+  padding-left: var(--hc-list-gutter);
+  text-indent: calc(-1 * var(--hc-list-gutter));
+}
+
+/* The marker, laid in a box exactly the gutter wide so that the text opening
+ * every item begins where the lines wrapping under it do. `min-width` rather
+ * than `width`, so a marker too wide for the gutter — a list numbered past
+ * two digits — pushes its own line right instead of running into its text. */
+.block-body :is(ul, ol) > li::before {
+  display: inline-block;
+  min-width: var(--hc-list-gutter);
+  text-indent: 0;
+}
+
+/* A filled disc, which the rail draws nothing in: its bullets are a 10px dot
+ * and a ring of the same size standing in the margin, and this is a glyph of
+ * the block's own text, in the text column. */
+.block-body ul > li::before {
+  content: "\2022";
+}
+
+/* Logseq writes each ordered item's own source number to `<li value>`, so the
+ * numbering a list renders with is the one its text asks for, including a list
+ * that does not open at 1. The counter is the fallback for an item rendered
+ * without one, and never renumbers a list that has them. */
+.block-body ol > li::before {
+  content: counter(list-item) ".";
+}
+
+.block-body ol > li[value]::before {
+  content: attr(value) ".";
+}
+
+/* Logseq renders an item's text in a `<p>`, which would otherwise open a line
+ * below the marker. It already flattens one inside an ordered list; an
+ * unordered list needs the same. */
+.block-body :is(ul, ol) > li > p {
+  display: initial;
+}
+
+/* `text-indent` inherits, so anything the item holds in a block of its own — a
+ * nested list, a quote, a code block — would hang a line back out of the
+ * gutter as well. A nested list still steps in by one gutter, because it is
+ * laid out inside its item's text column. */
+.block-body :is(ul, ol) > li > * {
+  text-indent: 0;
+}
+
 /* Quotes, code, tables, and queries */
 blockquote {
   color: var(--vscode-hc-white);

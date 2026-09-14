@@ -60,6 +60,18 @@ const pairings = [
     tie: true
   },
   {
+    surface: 'a list inside a block, which Logseq lays out for ordered lists only',
+    upstream: '.block-body ol',
+    theme: '.block-body :is(ul, ol)',
+    tie: true
+  },
+  {
+    surface: "the paragraph Logseq wraps a list item's text in",
+    upstream: '.block-body ol>li>p',
+    theme: '.block-body :is(ul, ol) > li > p',
+    tie: true
+  },
+  {
     surface: 'even table rows',
     upstream: '.block-content tr:nth-child(2n)',
     theme: '.block-content tr:nth-child(even)',
@@ -492,6 +504,24 @@ const iconMetrics = [
  * `overflow-wrap: anywhere`, which counts toward intrinsic sizing and takes a
  * column's floor down to a single character. These are the declarations the
  * cell rule answers. */
+/* A markdown list inside a block is Logseq's own render: mldoc parses a line
+ * opening with `* ` or `1. ` as a list item and the block component builds
+ * `<ul>`/`<ol>` of `<li><p>…</p></li>` into `.block-body`. These are the
+ * declarations the theme's own layout answers — the stock list indentation and
+ * marker every list starts from, and the treatment Logseq gives an ordered list
+ * and no other, which is what left the two kinds standing in different columns.
+ * The theme replaces all of it with one gutter, so an upstream change to any of
+ * these is a change to what it is replacing. */
+const listMetrics = [
+  'menu,ol,ul{list-style:none;margin:0;padding:0}',
+  'ul{list-style:circle}',
+  'ol,ul{margin-left:1.2em}',
+  'ol{list-style:decimal}',
+  '.block-body dl>li,.block-body ol>li,.block-body ul>li{margin:0}',
+  '.block-body ol{list-style-position:inside;margin-left:0}',
+  '.block-body ol>li::marker,.block-body ol>li>p{display:initial}'
+]
+
 const tableMetrics = [
   '.block-content div.table-wrapper,.cp__all_pages-content div.table-wrapper,' +
     '.cp__shortcut-page div.table-wrapper{overflow:auto}',
@@ -1209,6 +1239,91 @@ test('an ordered list keeps its number beside the content and a bullet on the ra
   assert.match(rule(`${wrap} > .bullet-link-wrap`), /position:\s*static/)
 })
 
+/* A markdown list written inside a block's own text, which is a different thing
+ * from the ordered-list block type above: that one is a property Logseq sets on
+ * the block and draws in the bullet column, this one is `<ul>`/`<ol>` rendered
+ * into the block's body from the text the reader typed. */
+const listGutter = 'var(--hc-list-gutter)'
+const list = '.block-body :is(ul, ol)'
+
+test("a list item's marker opens in the column the block's text begins in", () => {
+  // The list adds no indentation of its own, so the column its items are
+  // measured from is the block's own text column. Both are needed: upstream
+  // indents every list by `1.2em` in `margin-left`, and zeroing only that would
+  // leave `ol`'s `list-style-position: inside` reading from a padding box.
+  const box = rule(list)
+  assert.equal(px(box, 'margin-left'), 0)
+  assert.equal(px(box, 'padding-left'), 0)
+  // The stock markers are dropped, so what is drawn is the theme's own below.
+  assert.equal(value(box, 'list-style'), 'none')
+
+  // The hanging indent, built the way the leading-emoji gutter is: the item
+  // carries its text column as padding, and pulls its first line back out of it
+  // by exactly the same distance, which is what leaves the marker beside the
+  // column rather than inside it. Anything else would leave the marker and the
+  // wrapped lines in different places.
+  const item = rule(`${list} > li`)
+  assert.equal(value(item, 'padding-left'), listGutter)
+  assert.equal(value(item, 'text-indent'), `calc(-1 * ${listGutter})`)
+
+  // The marker box is the gutter wide, so the text opening an item begins where
+  // the lines wrapping under it do. `min-width` rather than `width` so a marker
+  // wider than the gutter pushes its own line right instead of overrunning its
+  // own text.
+  const marker = rule(`${list} > li::before`)
+  assert.equal(value(marker, 'display'), 'inline-block')
+  assert.equal(value(marker, 'min-width'), listGutter)
+  // The item's negative indent inherits into the marker box, which would
+  // otherwise pull the marker itself a second gutter left.
+  assert.equal(px(marker, 'text-indent'), 0)
+
+  // Set in `em`, so the gutter is a measure of the block's own text rather than
+  // a fixed distance that drifts as the text is resized, and a graph can retune
+  // it from `custom.css`.
+  assert.match(css, /--hc-list-gutter:\s*[\d.]+em;/)
+
+  // Logseq wraps an item's text in a `<p>`, which would open a line below the
+  // marker. It flattens one inside an ordered list and nowhere else, so this is
+  // what an unordered list needs to sit its text beside its own marker.
+  assert.equal(value(rule(`${list} > li > p`), 'display'), 'initial')
+
+  // `text-indent` inherits, so a block the item holds — a nested list, a quote,
+  // a code block — would hang a line of its own back out of the gutter.
+  assert.equal(px(rule(`${list} > li > *`), 'text-indent'), 0)
+})
+
+test('a list marker is a glyph of the text, never one of the rail\'s bullets', () => {
+  // A filled disc. Upstream draws `circle`, a hollow ring at the size and shape
+  // the rail gives an expanded parent's bullet, which is what made a list item
+  // read as a block of its own.
+  assert.equal(value(rule('.block-body ul > li::before'), 'content'), '"\\2022"')
+  assert.ok(listMetrics.includes('ul{list-style:circle}'), 'upstream no longer draws the ring this replaces')
+
+  // Every rule is scoped to `.block-body`, the box Logseq renders a block's
+  // body into. Nothing here can reach the control column the rail draws its
+  // bullets, its rings and its line in, at any specificity.
+  for (const selector of [...rules.keys()].filter((key) => key.includes('--hc-list-gutter') === false && key.startsWith('.block-body :is(ul, ol)'))) {
+    assert.ok(!/bullet|block-control|block-main-container/.test(selector), `${selector} reaches the rail`)
+  }
+})
+
+test('an ordered list keeps the numbers its own text asks for', () => {
+  // Logseq writes each item's source number to `<li value>`, so a list that
+  // does not open at 1 renders the numbers it is written with. A CSS counter
+  // cannot read that attribute and would silently renumber from 1.
+  assert.equal(value(rule('.block-body ol > li[value]::before'), 'content'), 'attr(value) "."')
+
+  // The counter is the fallback for an item rendered without one. It has to
+  // lose to the attribute wherever both match, which it does on specificity
+  // rather than on order.
+  assert.equal(value(rule('.block-body ol > li::before'), 'content'), 'counter(list-item) "."')
+  assert.equal(
+    compare(specificity('.block-body ol > li[value]::before'), specificity('.block-body ol > li::before')) > 0,
+    true,
+    'the source number no longer out-ranks the counter'
+  )
+})
+
 test('the property toggle rides beside the bullet without changing rail geometry', () => {
   const selector = `${wrap} > [data-hc-property-toggle]`
   const control = rule(selector)
@@ -1489,7 +1604,7 @@ test(
     }
     for (const declaration of [
       ...admonitionMetrics, ...spacingMetrics, ...nestingMetrics, ...railMetrics, ...headingMetrics, ...titleMetrics,
-      ...popupMetrics, ...iconMetrics, ...tableMetrics, ...refsMetrics
+      ...popupMetrics, ...iconMetrics, ...tableMetrics, ...refsMetrics, ...listMetrics
     ]) {
       assert.ok(upstream.includes(declaration), `Logseq no longer ships "${declaration}"`)
     }
