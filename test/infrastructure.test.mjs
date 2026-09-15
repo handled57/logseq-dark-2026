@@ -62,6 +62,7 @@ test('repository documentation covers package ownership and independent migratio
 
 test('each workspace folder carries its product prefix without renaming the package', async () => {
   const identities = {
+    'packages/plugin-able-table': 'logseq-able-table',
     'packages/plugin-anno': 'logseq-anno',
     'packages/plugin-passage': 'logseq-passage',
     'packages/theme-dark-high-contrast': 'logseq-dark-high-contrast-theme'
