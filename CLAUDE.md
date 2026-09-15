@@ -2,7 +2,7 @@
 
 ## Project
 
-This repository is an npm-workspace monorepo of Logseq packages. `packages/theme-dark-high-contrast/` holds **Dark High Contrast**, a Logseq theme for classic/file graphs on desktop. It targets Logseq 0.10.15 and adapts Visual Studio Code's Dark High Contrast palette. `packages/plugin-passage/` holds **Passage** and `packages/plugin-anno/` holds **Anno**, plugins for the same target.
+This repository is an npm-workspace monorepo of Logseq packages. `packages/theme-dark-high-contrast/` holds **Dark High Contrast**, a Logseq theme for classic/file graphs on desktop. It targets Logseq 0.10.15 and adapts Visual Studio Code's Dark High Contrast palette. `packages/plugin-passage/` holds **Passage**, `packages/plugin-anno/` holds **Anno**, and `packages/plugin-able-table/` holds **Able Table**, plugins for the same target.
 
 The root `package.json` is a private coordinator: it declares `workspaces: ["packages/*"]`, aggregates each package's scripts, and owns no sources and no dependencies. Every package is intentionally installable without dependency installation or compilation. Keep release artifacts self-contained and package-specific, and do not add runtime network access, tracking, or remote CSS imports.
 
@@ -20,6 +20,7 @@ Paths below are relative to `packages/theme-dark-high-contrast/` unless noted.
 - `test/properties.test.mjs` behaviorally tests `index.js` against a stub host document.
 - `test/collapsible.test.mjs` drives the same entry over a stub page tree for the collapse control: which renders earn one, where it is hung, and that folding one touches nothing else.
 - `../plugin-anno/index.js` is Anno's canonical runtime: the **Anno: Import PDF** command, its prompt, and the asset-naming rule that decides which page Logseq collects a PDF's highlights on. `../plugin-anno/test/package.test.mjs` checks its structure and metadata; `../plugin-anno/test/anno.test.mjs` drives that runtime against a stub host document and file bridge.
+- `../plugin-able-table/index.js` is Able Table's canonical runtime: the plugin's lifecycle — load, observe, repaint, tear down — and the `data-able-table` marking that keys every rendered table by its block UUID and ordinal, so a later render finds its own state again. `../plugin-able-table/test/package.test.mjs` checks its structure and metadata; `../plugin-able-table/test/able-table.test.mjs` drives that runtime against a stub host document.
 - Each package's `package.json#release.files` is its exact package-owned archive allowlist.
 - Root `scripts/build-release.mjs` creates extracted packages and Marketplace ZIPs in root `dist/`; aggregate builds clean once and targeted workspace builds remove only their own outputs.
 - Root `scripts/verify-release.mjs` verifies exact archive contents, metadata agreement, and byte parity with canonical sources.
@@ -87,9 +88,9 @@ tag goes on the merge commit once the user approves. Semantic versioning
 decides the number — a bug fix is a patch, a feature is a minor, a breaking
 change is a major.
 
-Theme, Passage and Anno versions and release tags are independent, and each
-package is tagged in its own namespace: `theme-vX.Y.Z`, `passage-vX.Y.Z` and
-`anno-vX.Y.Z`. Pushing
+Theme, Passage, Anno and Able Table versions and release tags are independent,
+and each package is tagged in its own namespace: `theme-vX.Y.Z`,
+`passage-vX.Y.Z`, `anno-vX.Y.Z` and `able-table-vX.Y.Z`. Pushing
 such a tag runs `.github/workflows/publish.yml`, which calls
 `scripts/select-release.mjs` to select exactly one workspace, then builds and
 attaches only that package's archive. Selection asserts that the tag version,

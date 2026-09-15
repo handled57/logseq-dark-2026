@@ -2,21 +2,24 @@
 
 ## Package boundaries
 
-This repository contains three runtimes, not one application split across
-folders. Dark High Contrast, Passage and Anno have separate Logseq identities,
-settings, entry scripts, metadata, versions, archives, and lifecycles. None
-imports another or relies on sibling-package files.
+This repository contains four runtimes, not one application split across
+folders. Dark High Contrast, Passage, Anno and Able Table have separate Logseq
+identities, settings, entry scripts, metadata, versions, archives, and
+lifecycles. None imports another or relies on sibling-package files.
 
 The theme and Passage have one product-level agreement, the versioned
 [Passage v1 content contract](contracts/passage-v1.md). Passage writes ordinary
 block source; the theme independently reads that source and styles the render.
 The shared fixtures in the contract are driven by tests in both workspaces. Anno
 is party to no contract: what it writes is an asset and a plain Logseq link, and
-what reads them is Logseq itself.
+what reads them is Logseq itself. Able Table's scaffold release is likewise
+party to no contract; a later release reads, but never writes, the theme's own
+`data-hc-collapse` marker to learn whether a table's top-right corner is
+already taken.
 
 ## Host origin and `effect: true`
 
-All three packages inspect or augment Logseq's host document. Logseq 0.10.15
+All four packages inspect or augment Logseq's host document. Logseq 0.10.15
 moves a side-effect-free plugin entry to the `lsp://logseq.io/` origin, where
 browser same-origin rules prevent access to `parent.document` and to the host's
 own `parent.apis` bridge. Consequently every package's and manifest's metadata
@@ -28,9 +31,11 @@ it inserts its namespaced menu entry while that picker exists. The theme needs
 host access to classify rendered blocks and to hide only configured property
 tables. Anno needs it twice over: it draws its prompt in the host document, and
 the only route a plugin has to the graph folder is `parent.apis.doAction`, the
-host's IPC bridge, because no plugin API writes an asset. A future package that
-does not need host access should decide `effect` from its own requirements
-rather than copying this setting automatically.
+host's IPC bridge, because no plugin API writes an asset. Able Table needs host
+access because the plugin API renders no table of its own: every table it finds
+and marks is a `<table>` Logseq already put in `parent.document`. A future
+package that does not need host access should decide `effect` from its own
+requirements rather than copying this setting automatically.
 
 ## Theme cascade and bullet rail
 
@@ -229,16 +234,24 @@ Each runtime owns a namespace. Passage writes `data-passage-*`, element ids
 beginning `passage-`, and the `passage-dialog` style key. Anno writes
 `data-anno-*`, element ids beginning `anno-`, and the `anno-dialog` style key.
 Dark High Contrast writes `data-hc-*` and the `hc-hidden-properties` style key.
-None reads, clears, or reuses another's annotations.
+Able Table writes `data-able-*`, element ids beginning `able-table-`, and the
+`able-table` style key. None reads, clears, or reuses another's annotations;
+Able Table's later releases are the one deliberate, one-directional exception,
+reading the theme's own `data-hc-collapse` without ever writing it.
 
-The theme and Passage perform an initial repaint and observe the host document
-with `MutationObserver` because Logseq replaces rendered nodes during normal
-editing and navigation, and settings changes repaint without reload. Anno
-annotates nothing there and so watches nothing: its prompt is built when a
-command asks for it and removed when it closes. On `beforeunload`, each package
-disconnects any observer it has, removes its own nodes and attributes, clears
-its own style, and settles any open prompt without writing. Tests cover initial
-paint, mutations, settings, malformed settings, and cleanup.
+The theme, Passage and Able Table perform an initial repaint and observe the
+host document with `MutationObserver` because Logseq replaces rendered nodes
+during normal editing and navigation, and settings changes repaint without
+reload. Anno annotates nothing there and so watches nothing: its prompt is
+built when a command asks for it and removed when it closes. Able Table's
+scaffold release finds every table Logseq renders in the main editor —
+`#main-content-container div.table-wrapper > table` — and marks its wrapper
+`data-able-table`, keyed by the table's block UUID and its ordinal within that
+block; a table a pass no longer finds releases its mark. On `beforeunload`,
+each package disconnects any observer it has, removes its own nodes and
+attributes, clears its own style, and settles any open prompt without writing.
+Tests cover initial paint, mutations, settings, malformed settings, and
+cleanup.
 
 Dark High Contrast also replaces one host gesture rather than annotating it: a
 capture-phase `click` listener on the host document folds the block whose bullet

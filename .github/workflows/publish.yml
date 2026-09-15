@@ -6,6 +6,7 @@ on:
       - "theme-v*"
       - "passage-v*"
       - "anno-v*"
+      - "able-table-v*"
 
 permissions:
   contents: write

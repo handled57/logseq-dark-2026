@@ -29,6 +29,15 @@ test('release selection rejects legacy, unknown, and mismatched tags', async () 
   await assert.rejects(selectRelease('theme-v2.0.1'), /does not match .*package.json version/)
   await assert.rejects(selectRelease('passage-v1.0.0'), /does not match .*package.json version/)
   await assert.rejects(selectRelease('anno-v9.9.9'), /does not match .*package.json version/)
+  await assert.rejects(selectRelease('able-table-v9.9.9'), /does not match .*package.json version/)
+})
+
+test('able-table is a recognized release product with no shippable version yet', async () => {
+  // The scaffold's package.json version matches able-table-v0.1.0, but its
+  // changelog entry is deliberately left under Unreleased until the first
+  // user-visible stage dates it — so no able-table-v* tag can select an
+  // archive yet, and this rejection is the invariant that stage closes out.
+  await assert.rejects(selectRelease('able-table-v0.1.0'), /has no versioned entry/)
 })
 
 test('workflows validate all changes and publish only the selected archive', async () => {
@@ -41,6 +50,7 @@ test('workflows validate all changes and publish only the selected archive', asy
   assert.match(publishWorkflow, /- "theme-v\*"/)
   assert.match(publishWorkflow, /- "passage-v\*"/)
   assert.match(publishWorkflow, /- "anno-v\*"/)
+  assert.match(publishWorkflow, /- "able-table-v\*"/)
   assert.doesNotMatch(publishWorkflow, /- "v\*"/)
   assert.match(publishWorkflow, /scripts\/select-release\.mjs/)
   assert.match(publishWorkflow, /npm run check --workspace "\$\{\{ steps\.package\.outputs\.workspace \}\}"/)
