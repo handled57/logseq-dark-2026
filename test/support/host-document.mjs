@@ -44,6 +44,17 @@ export function node(tag, { id = '', classes = [], attributes = {}, ...rest } = 
     removeAttribute(name) { self.attributes.delete(name); if (name === 'id') self.id = '' },
     addEventListener(type, handler) { self.listeners.set(type, [...(self.listeners.get(type) ?? []), handler]) },
     appendChild(child) { child.parentElement = self; self.children.push(child); return child },
+    /* A node placed among siblings rather than after them: a script inserting
+     * a control beside content it does not own needs somewhere to put it. */
+    insertBefore(child, reference) {
+      const previous = child.parentElement?.children
+      if (previous) previous.splice(previous.indexOf(child), 1)
+      child.parentElement = self
+      const at = reference ? self.children.indexOf(reference) : -1
+      if (at === -1) self.children.push(child)
+      else self.children.splice(at, 0, child)
+      return child
+    },
     remove() {
       const siblings = self.parentElement?.children
       if (siblings) siblings.splice(siblings.indexOf(self), 1)
@@ -69,5 +80,15 @@ export function node(tag, { id = '', classes = [], attributes = {}, ...rest } = 
       for (const handler of self.listeners.get(type) ?? []) handler({ target: self, preventDefault() {}, stopPropagation() {}, ...event })
     }
   }
+
+  /* Read off the parent rather than stored, so it stays right through every
+   * insertion and removal above. */
+  Object.defineProperty(self, 'nextElementSibling', {
+    get() {
+      const siblings = self.parentElement?.children ?? []
+      return siblings[siblings.indexOf(self) + 1] ?? null
+    }
+  })
+
   return self
 }

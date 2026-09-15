@@ -11,7 +11,7 @@ dependencies, compilation, remote imports, or runtime network access.
 | **Dark High Contrast** | [`packages/theme-dark-high-contrast`](packages/theme-dark-high-contrast) | `2.1.0` | A pure-black, accessible theme for Logseq classic/file graphs. |
 | **Passage** | [`packages/plugin-passage`](packages/plugin-passage) | `0.6.1` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
 | **Anno** | [`packages/plugin-anno`](packages/plugin-anno) | `0.2.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
-| **Able Table** | [`packages/plugin-able-table`](packages/plugin-able-table) | `0.1.0` | Search and filter a rendered Markdown table in place. This scaffold release ships the plugin's lifecycle only; it changes nothing a reader sees yet. |
+| **Able Table** | [`packages/plugin-able-table`](packages/plugin-able-table) | `0.1.0` | A settings control on every rendered Markdown table, and a find-as-you-type field that searches it in place. |
 
 Install any one package by itself or install them together. None of them calls
 another. Dark High Contrast styles any
@@ -32,11 +32,15 @@ own highlights for that PDF on a page of the same name; see the
 select separate templates for new annotation pages and new PDF highlight
 blocks.
 
-Able Table will make a rendered Markdown table searchable and filterable in
-place, without editing the block or writing anything to the graph; see the
-[Able Table guide](packages/plugin-able-table/README.md). This release is a
-scaffold — it installs and marks every rendered table, but search and column
-filtering land in later releases.
+Able Table hangs a settings control on every Markdown table rendered in the
+main editor, and behind it a **Full table search** toggle that puts a
+find-as-you-type field across the top of the table: typing hides the rows that
+do not match, and clearing restores them. Rows are hidden rather than removed,
+and nothing is written to the graph; see the
+[Able Table guide](packages/plugin-able-table/README.md). Its control sits
+beside Dark High Contrast's collapse control rather than over it, through the
+[table controls v1 hook](docs/contracts/table-controls-v1.md), and needs no
+theme installed.
 
 ## Install
 
@@ -108,6 +112,9 @@ byte parity with canonical source files.
   settings and content, the separate Passage install, and local text-index path.
 - [Passage v1 content contract](docs/contracts/passage-v1.md) — the stable block
   shape the theme and Passage test independently.
+- [Table controls v1 hook](docs/contracts/table-controls-v1.md) — the
+  one-directional, read-only hook Able Table reads to sit beside the theme's
+  collapse control rather than over it.
 
 GitHub Actions currently validates pushes and pull requests and creates GitHub
 release assets for configured tags. It does not submit packages to the Logseq
