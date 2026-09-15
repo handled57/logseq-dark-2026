@@ -12,10 +12,12 @@ The theme and Passage have one product-level agreement, the versioned
 block source; the theme independently reads that source and styles the render.
 The shared fixtures in the contract are driven by tests in both workspaces. Anno
 is party to no contract: what it writes is an asset and a plain Logseq link, and
-what reads them is Logseq itself. Able Table's scaffold release is likewise
-party to no contract; a later release reads, but never writes, the theme's own
-`data-hc-collapse` marker to learn whether a table's top-right corner is
-already taken.
+what reads them is Logseq itself. The theme and Able Table have a second, narrower agreement, the versioned
+[Table controls v1 hook](contracts/table-controls-v1.md): the theme publishes
+`data-hc-collapse` as a direct child of `div.table-wrapper` sized by
+`--hc-collapse-control-size`, and Able Table reads it — in CSS alone, never
+writing, clearing or requiring it — to learn whether a table's top-right corner
+is already taken. Both sides pin the hook in their own suite.
 
 ## Host origin and `effect: true`
 
@@ -235,19 +237,34 @@ beginning `passage-`, and the `passage-dialog` style key. Anno writes
 `data-anno-*`, element ids beginning `anno-`, and the `anno-dialog` style key.
 Dark High Contrast writes `data-hc-*` and the `hc-hidden-properties` style key.
 Able Table writes `data-able-*`, element ids beginning `able-table-`, and the
-`able-table` style key. None reads, clears, or reuses another's annotations;
-Able Table's later releases are the one deliberate, one-directional exception,
-reading the theme's own `data-hc-collapse` without ever writing it.
+`able-table` style key. None reads, clears, or reuses another's annotations,
+with one deliberate, one-directional exception: Able Table's registered style
+detects the theme's own `data-hc-collapse` — in CSS alone, never from script —
+so its settings control steps left of the theme's collapse control instead of
+sitting over it, and it falls back to its own number when no theme declares
+`--hc-collapse-control-size`. Nothing of the theme's is written, measured, or
+required, and the theme reads nothing back. The hook is versioned in
+[Table controls v1](contracts/table-controls-v1.md), and pinned by a test on
+each side so it cannot drift silently.
 
 The theme, Passage and Able Table perform an initial repaint and observe the
 host document with `MutationObserver` because Logseq replaces rendered nodes
 during normal editing and navigation, and settings changes repaint without
 reload. Anno annotates nothing there and so watches nothing: its prompt is
-built when a command asks for it and removed when it closes. Able Table's
-scaffold release finds every table Logseq renders in the main editor —
+built when a command asks for it and removed when it closes. Able Table finds
+every table Logseq renders in the main editor —
 `#main-content-container div.table-wrapper > table` — and marks its wrapper
 `data-able-table`, keyed by the table's block UUID and its ordinal within that
-block; a table a pass no longer finds releases its mark. On `beforeunload`,
+block. Each pass hangs one `data-able-settings` control inside the wrapper and,
+when the reader has opened them, a `data-able-panel` and a `data-able-search`
+field beside it: both are siblings of the wrapper rather than children, because
+the wrapper is an `overflow: auto` scroller that would clip the panel and carry
+the field sideways with the table. Whether the toggle is on and what the field
+holds are a `Map` in the runtime under the same key, so a re-render comes back
+searched, and a row the search hides takes `data-able-filtered` and is hidden
+by one declaration of the plugin's own style — never removed, reordered or
+rewritten. A table a pass no longer finds gives back its mark, its control, its
+field and every row it was hiding. On `beforeunload`,
 each package disconnects any observer it has, removes its own nodes and
 attributes, clears its own style, and settles any open prompt without writing.
 Tests cover initial paint, mutations, settings, malformed settings, and

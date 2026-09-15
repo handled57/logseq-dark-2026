@@ -216,6 +216,28 @@ test('every supported kind of render is marked and given one control', async () 
   }
 })
 
+test('a table publishes the table controls v1 hook: the marker, as a direct child', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const wrapper = node('div', { classes: ['table-wrapper'] })
+  wrapper.appendChild(node('table'))
+  body.appendChild(wrapper)
+
+  await render(host)
+
+  /* docs/contracts/table-controls-v1.md. Able Table detects this control, in
+   * CSS alone, so that its own settings control can step left of it rather
+   * than over it. It reads the attribute name and the fact that the control is
+   * a direct child of the wrapper, and nothing else — so those two are pinned
+   * here, on the theme's own side, and cannot drift silently.
+   *
+   * The theme reads nothing back. It does not know the plugin exists. */
+  const published = wrapper.children.filter((child) => child.attributes.has('data-hc-collapse'))
+  assert.equal(published.length, 1, 'the hook is not published exactly once')
+  assert.equal(published[0].parentElement, wrapper, 'the control is not a direct child of the wrapper')
+  assert.equal(control(wrapper), published[0])
+})
+
 test('only the shells carry the word for what they hide', async () => {
   const { host, main } = editor()
   const boxes = KINDS.map(([, tag, classes]) => {

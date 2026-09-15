@@ -1054,6 +1054,20 @@ test('the collapse control is visible, focusable and in the theme palette', () =
   assert.doesNotMatch(css, /\[data-hc-collapse[^\]]*\][^{]*\{[^}]*(?:transition|animation):/)
 })
 
+test('the table controls v1 hook is published as the contract writes it', () => {
+  /* docs/contracts/table-controls-v1.md. Able Table reads these two names in
+   * CSS alone to step out of this control's way; the theme knows nothing of
+   * that plugin, but it may not rename or unsize the control without a new
+   * version of the hook. */
+  assert.match(css, /--hc-collapse-control-size:\s*1\.25rem;/)
+  assert.match(
+    css,
+    /\[data-hc-collapse\] \{[\s\S]*?height:\s*var\(--hc-collapse-control-size\);[\s\S]*?min-width:\s*var\(--hc-collapse-control-size\);/
+  )
+  // Pinned to the corner it shares, so a sibling control can offset past it.
+  assert.match(css, /\[data-hc-collapse\] \{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*0;\s*\n\s*right:\s*0;/)
+})
+
 test('the property toggle is a stable cyan rail control revealed by hover or focus', () => {
   assert.match(css, /\[data-hc-property-toggle\] \{[\s\S]*?position:\s*absolute;[\s\S]*?width:\s*20px;[\s\S]*?height:\s*20px;[\s\S]*?color:\s*var\(--vscode-hc-cyan\);[\s\S]*?background:\s*transparent;/)
   assert.match(css, /\[data-hc-property-toggle\]::before \{[\s\S]*?width:\s*8px;[\s\S]*?height:\s*8px;[\s\S]*?border-radius:\s*50%;[\s\S]*?background:\s*currentColor;[\s\S]*?opacity:\s*0;/)

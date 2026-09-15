@@ -22,15 +22,16 @@ const script = await readFile(resolve(root, 'index.js'), 'utf8')
  * without it. */
 const code = script.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
-test('this scaffold ships no user-visible behavior, so it carries no release yet', async () => {
+test('the released version matches the newest changelog entry', async () => {
+  // Pinning the version as a literal here would let package.json and the
+  // changelog drift apart; deriving it keeps one source of truth.
   const changelog = await readFile(resolve(root, 'CHANGELOG.md'), 'utf8')
-  assert.match(changelog, /^## Unreleased$/m, 'the changelog entry left Unreleased')
-  assert.doesNotMatch(
-    changelog,
-    /^## \d+\.\d+\.\d+ - \d{4}-\d{2}-\d{2}$/m,
-    'a dated heading was added before this stage ships a release'
-  )
-  assert.equal(pkg.version, '0.1.0')
+  const [, released] = changelog.match(/^## (\d+\.\d+\.\d+) - \d{4}-\d{2}-\d{2}$/m) ?? []
+
+  assert.ok(released, 'the changelog has no dated release heading')
+  assert.equal(pkg.version, released)
+  // Finished work ships as a release rather than accumulating unreleased.
+  assert.doesNotMatch(changelog, /^## Unreleased\s*\n\s*\n\s*-/m, 'the changelog left an entry unreleased')
 })
 
 test('the package is a plugin, not a theme, and carries no dependencies', () => {
@@ -111,12 +112,20 @@ test('the runtime observes the host document and marks tables, and offers no set
   assert.match(script, /TABLE_WRAPPER_SELECTOR/)
   assert.match(script, /logseq\.beforeunload/)
 
-  // No settings schema is registered in this stage.
+  /* Every control sits inside rendered block content, where a click of
+   * Logseq's own opens the block for editing; the capture phase is what keeps
+   * each one to itself. */
+  for (const type of ['mousedown', 'click', 'keydown', 'keyup', 'input']) {
+    assert.match(code, new RegExp(`'${type}'`), `${type} is not answered`)
+  }
+  assert.match(code, /addEventListener\(type, handler, true\)/)
+  assert.match(code, /removeEventListener\?\.\(type, handler, true\)/)
+
+  // Search is a per-table toggle in the panel, not a plugin-wide preference.
   assert.doesNotMatch(code, /useSettingsSchema/)
 })
 
 test('everything written into the host document is namespaced to Able Table', () => {
-  assert.doesNotMatch(code, /data-hc-/, 'the runtime writes a theme-owned attribute')
   assert.doesNotMatch(code, /data-passage-/, "the runtime writes Passage's attribute")
   assert.doesNotMatch(code, /data-anno-/, "the runtime writes Anno's attribute")
 
@@ -124,4 +133,26 @@ test('everything written into the host document is namespaced to Able Table', ()
     assert.match(attribute, /^'data-able-/, `${attribute} is not namespaced to Able Table`)
   }
   assert.match(code, /STYLE_KEY = 'able-table'/)
+})
+
+test("the theme's collapse control is read in CSS alone, and never written", () => {
+  /* docs/contracts/table-controls-v1.md: a one-directional, read-only hook.
+   * The plugin may notice the theme's control to step out of its way, and may
+   * do nothing else with it — no script reads it, and no package is a
+   * dependency of the other. */
+  assert.deepEqual(
+    [...new Set(code.match(/data-hc-[\w-]*/g) ?? [])],
+    ['data-hc-collapse'],
+    'the runtime names a theme attribute other than the published hook'
+  )
+  assert.match(code, /div\.table-wrapper:has\(> \[data-hc-collapse\]\) > \[data-able-settings\]/)
+  // Read through a selector, never through the DOM API and never as a value.
+  assert.doesNotMatch(code, /Attribute\(\s*[`'"]data-hc-/)
+  assert.doesNotMatch(code, /[`'"]data-hc-[\w-]*[`'"]/)
+
+  // Every number it borrows carries Able Table's own fallback, so the control
+  // is drawn and placed with no theme installed.
+  for (const use of code.match(/var\(--hc-[\w-]+[^)]*\)/g) ?? []) {
+    assert.match(use, /^var\(--hc-collapse-control-size, 1\.25rem\)$/, `${use} has no fallback`)
+  }
 })

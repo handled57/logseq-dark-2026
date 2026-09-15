@@ -27,14 +27,14 @@ behavior lives in one package:
   and the asset-naming rule that decides which page Logseq collects a PDF's
   highlights on.
 - Able Table behavior: `packages/plugin-able-table/index.js`, which owns the
-  plugin's lifecycle and, in later releases, the table search and column
-  filtering built on it.
+  plugin's lifecycle, the per-table settings control, and full table search.
 - Package identity and exact archive allowlist: each package's `package.json`,
   cross-checked with its `manifest.json`.
 - Shared SDK: `vendor/logseq/lsplugin.user.js`; never copy it into a source
   workspace.
 - Shared release logic and test fixtures: `scripts/` and `test/support/`.
 - Cross-package content semantics: `docs/contracts/passage-v1.md`.
+- Cross-package host-DOM hooks: `docs/contracts/table-controls-v1.md`.
 
 Keep package-specific tests, README, changelog, icons, and notices in that
 package. Update public documentation, changelog, and version metadata with

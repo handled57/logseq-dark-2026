@@ -1,30 +1,67 @@
 # Able Table for Logseq
 
-Able Table will make a rendered Markdown table searchable and filterable in
-place, without editing the block, restructuring the Markdown, or converting
-the table to a query. Everything it does is display-only: no filter, no
-search string, and no toggle state is ever written to the graph.
+Able Table makes a rendered Markdown table searchable in place, without
+editing the block, restructuring the Markdown, or converting the table to a
+query. Everything it does is display-only: no filter, no search string, and no
+toggle state is ever written to the graph.
 
-**This release is a scaffold.** It installs, runs its lifecycle, and marks
-every rendered table so a later render can find its own state again — but it
-changes nothing a reader sees. Search and column filtering land in later
-releases.
+## Searching a table
 
-## What this release does
+Every Markdown table in the main editor carries a small **⋯** control in its
+top-right corner. Press it — with the pointer, or with Enter or Space from the
+keyboard — and a panel opens beneath it holding one toggle:
 
-- Registers a style under its own `able-table` key.
-- Observes the host document for the re-renders Logseq performs during
-  ordinary editing and navigation, coalesced to one pass per animation frame.
-- On each pass, finds every table Logseq renders in the main editor
-  (`#main-content-container div.table-wrapper > table`), and marks its
-  wrapper with `data-able-table`, keyed by the table's block UUID and its
-  ordinal position within that block. A table the pass no longer finds — the
-  block was deleted, or its content no longer renders a table — releases its
-  mark.
-- Removes that mark, and nothing else, when the plugin unloads.
+**Full table search** puts a find-as-you-type field across the top of the
+table and focuses it. Type, and every row that does not match disappears as
+you go; backspace, and the rows come back.
 
-No control is drawn, no setting is offered, and no table is searched or
-filtered yet.
+- Matching is a **case-insensitive substring test** over the row's rendered
+  text, with runs of whitespace collapsed to one space. `ada` finds
+  `Ada Lovelace`. There is no tokenising, no fuzzy matching and no regular
+  expression support — one predictable rule is the point.
+- The **header row is never hidden**, so a table with nothing matching still
+  reads as a table rather than as an error.
+- The field says how many rows match out of how many the table holds, and
+  announces it politely to a screen reader as the count changes.
+- The **×** beside the field empties it and brings every row back. It is there
+  only while the field holds something.
+- Turning **Full table search** off takes the field away, clears it, and
+  restores every row.
+
+Dismiss the panel with Escape, with a click anywhere outside it, or by
+pressing the control again. Escape and a second press hand focus back to the
+control; a click outside leaves focus wherever you clicked it.
+
+## What it never does
+
+- **Nothing reaches the graph.** No block content, property or Markdown change
+  comes from opening the panel, toggling, typing, clearing, or unloading.
+- **No row is removed, reordered or rewritten.** A hidden row is marked
+  `data-able-filtered` and hidden by the plugin's own registered style;
+  dropping the mark is all it takes to restore it.
+- **No block is collapsed and no bullet is folded.** Every control answers
+  pointer and key events in the capture phase, before Logseq's own handlers
+  see them, so nothing you do to a table opens its block for editing or fires
+  a shortcut.
+- Editing a block replaces its render, which takes the controls with it; the
+  table comes back searched when the render comes back.
+
+## Where it works
+
+Scope is `#main-content-container div.table-wrapper > table`: Markdown tables
+in the main editor. Query-result tables, the All Pages table, and sidebar,
+whiteboard and dialog renders are left exactly as Logseq draws them.
+
+## Alongside Dark High Contrast
+
+[Dark High Contrast](../theme-dark-high-contrast/) hangs its own collapse
+control in the same corner. Able Table's control steps left of it when it is
+there and takes the corner when it is not, in CSS alone — nothing is measured,
+and neither package requires or modifies the other. The
+[table controls v1 hook](../../docs/contracts/table-controls-v1.md) is the
+whole of what they share, and both sides pin it in their own tests.
+
+With no theme installed, Able Table draws and places its own control.
 
 ## Compatibility
 
@@ -56,9 +93,10 @@ npm test --workspace packages/plugin-able-table            # the package's own s
 npm run check --workspace packages/plugin-able-table       # test, build and verify the ZIP
 ```
 
-`test/package.test.mjs` covers the package's structure and metadata;
-`test/able-table.test.mjs` drives the entry script against a stub host
-document, from initial paint through re-render and teardown.
+`test/package.test.mjs` covers the package's structure, its metadata, and the
+one-directional theme hook; `test/able-table.test.mjs` drives the entry script
+against a stub host document, from initial paint through the panel, the
+search field, re-render and teardown.
 
 ## Attribution
 
