@@ -213,7 +213,13 @@ and neither package requires or modifies the other. The
 [table controls v1 hook](../../docs/contracts/table-controls-v1.md) is the
 whole of what they share, and both sides pin it in their own tests.
 
-With no theme installed, Able Table draws and places its own control.
+That theme also hangs a table block's bullet a way into the box the table
+opens with, rather than at the top of the block. The full table search field
+takes that box's place, so it opens on the same line the bullet marks and the
+bullet still reads as belonging to it.
+
+With no theme installed, Able Table draws and places its own control, and the
+field opens at the top of the block where Logseq draws its own bullet.
 
 ## Compatibility
 

@@ -40,6 +40,17 @@ All notable changes to this package are documented here.
   How the table is ordered comes first because it is what every column is
   asked and costs nothing to undo; **Search column** is renamed **Find in
   column**, matching the field above the table.
+- **Fixed:** the part of a column menu that hung below its table was painted
+  over by the block underneath, which also took the clicks meant for it — the
+  last item, usually **Clear filter**, looked unbacked and could not be pressed
+  or hovered. A theme may lay each block out in a box of its own that no menu
+  can be lifted out of; the block a menu belongs to is now raised for as long
+  as it is open, so the whole menu is drawn and reachable. The same applies to
+  the settings panel.
+- **Fixed:** with Dark High Contrast installed, the full table search field
+  opened above the line the block's bullet marks, leaving the bullet floating
+  under the field. The field now opens on that line. With no theme moving the
+  bullet, the field stays at the top of the block where it has always been.
 
 ## 0.3.0 - 2026-09-16
 

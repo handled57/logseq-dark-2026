@@ -17,7 +17,12 @@ what reads them is Logseq itself. The theme and Able Table have a second, narrow
 `data-hc-collapse` as a direct child of `div.table-wrapper` sized by
 `--hc-collapse-control-size`, and Able Table reads it — in CSS alone, never
 writing, clearing or requiring it — to learn whether a table's top-right corner
-is already taken. Both sides pin the hook in their own suite.
+is already taken. The hook also publishes `--hc-rail-bullet-y`, the distance a
+block hangs its bullet below the top of its row, which Able Table reads the same
+way so the field it opens a table block with begins on the line that bullet
+marks. Every such read carries a fallback of Able Table's own, and the set of
+names read is pinned, so a third cannot be reached for without amending the
+contract. Both sides pin the hook in their own suite.
 
 ## Host origin and `effect: true`
 
@@ -246,6 +251,16 @@ sitting over it, and it falls back to its own number when no theme declares
 required, and the theme reads nothing back. The hook is versioned in
 [Table controls v1](contracts/table-controls-v1.md), and pinned by a test on
 each side so it cannot drift silently.
+
+Chrome that overhangs the block it belongs to is the one place a runtime styles
+a host element rather than its own. Logseq lays each block out in a
+`position: relative` box, and a theme may make that box a stacking context —
+Dark High Contrast isolates every row so the rail's line paints behind its
+bullets. Inside one, no `z-index` a panel or a menu gives itself can beat the
+block painted after it, so Able Table raises Logseq's own `.ls-block` while one
+is open, and only then. The raise is paint order alone: it declares no position,
+size or transform, so opening a menu never moves a reader's text, and the block
+returns to the host's own order the moment the menu closes.
 
 The theme, Passage and Able Table perform an initial repaint and observe the
 host document with `MutationObserver` because Logseq replaces rendered nodes

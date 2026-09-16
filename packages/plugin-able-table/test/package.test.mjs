@@ -182,9 +182,49 @@ test("the theme's collapse control is read in CSS alone, and never written", () 
   assert.doesNotMatch(code, /Attribute\(\s*[`'"]data-hc-/)
   assert.doesNotMatch(code, /[`'"]data-hc-[\w-]*[`'"]/)
 
-  // Every number it borrows carries Able Table's own fallback, so the control
-  // is drawn and placed with no theme installed.
+  // Every number it borrows carries Able Table's own fallback, so every control
+  // is drawn and placed with no theme installed. Which names are read is pinned
+  // too: each one is a fact the contract publishes, and a third cannot be
+  // reached for without amending it.
+  const borrowed = new Set()
   for (const use of code.match(/var\(--hc-[\w-]+[^)]*\)/g) ?? []) {
-    assert.match(use, /^var\(--hc-collapse-control-size, 1\.25rem\)$/, `${use} has no fallback`)
+    assert.match(use, /^var\(--hc-[\w-]+, [^)]+\)$/, `${use} has no fallback`)
+    borrowed.add(use.match(/--hc-[\w-]+/)[0])
   }
+  assert.deepEqual([...borrowed].sort(), ['--hc-collapse-control-size', '--hc-rail-bullet-y'])
+})
+
+/* docs/contracts/table-controls-v1.md: the second number the hook publishes.
+ * Logseq draws a block's bullet at the top of the block, which is where the
+ * row already is; Dark High Contrast hangs a table block's bullet a way into
+ * the box the table opens with, and the row has to follow it there or the
+ * bullet marks nothing. */
+test('the full table search field opens on the line the block\'s bullet marks', () => {
+  assert.match(code, /\[data-able-search\] \{[^}]*margin: var\(--hc-rail-bullet-y, 0px\) 0 0\.25rem;/)
+  // A fallback of none: with no theme declaring the drop, the row stays at the
+  // top of the block, where the host's own bullet is.
+  assert.doesNotMatch(code, /margin-top: 1\.75/)
+})
+
+/* A panel and a menu are the only things here that overhang the block they
+ * belong to, and a block is as far as z-index reaches: a theme may make each
+ * block a stacking context — Dark High Contrast isolates every row — and inside
+ * one, no z-index of the menu's own can beat the block painted after it. */
+test('a block showing a panel or a menu is raised over the block after it', () => {
+  for (const chrome of ['data-able-panel', 'data-able-column-menu']) {
+    assert.match(
+      code,
+      new RegExp(`#main-content-container \\.ls-block:has\\(> \\.block-main-container \\[${chrome}\\]\\)`),
+      `nothing raises a block showing ${chrome}`
+    )
+  }
+
+  /* The raise is on the host's block, because raising anything of Able Table's
+   * own would stay inside that stacking context and change nothing. */
+  assert.match(code, /\.block-main-container \[data-able-column-menu\]\) \{\s*\n\s*z-index: 1;\s*\n\s*\}/)
+
+  /* Paint order only. Giving the host's block a position, a transform or a
+   * size would move the reader's text to open a menu. */
+  const raise = code.match(/#main-content-container \.ls-block:has[\s\S]*?\}/)[0]
+  assert.doesNotMatch(raise, /position:|transform:|width:|height:|margin:|padding:/)
 })

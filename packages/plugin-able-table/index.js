@@ -101,6 +101,22 @@ const STYLE = `
   position: relative;
 }
 
+/* A panel or a menu is the one thing here that leaves the block it belongs to,
+ * and a block is as far as \`z-index\` reaches: Logseq lays every block out in
+ * its own \`position: relative\` box, and a theme may make that box a stacking
+ * context of its own — Dark High Contrast isolates each row so the rail's line
+ * paints behind its bullets. Inside such a context no number is large enough,
+ * because the whole context is painted in tree order, which puts the next block
+ * over anything of this one's that overhangs it. So the block that has
+ * something open is raised for as long as it is open, and the chrome's own
+ * z-index orders it within that block as before. Raising a block changes
+ * nothing about where it sits: \`z-index\` is paint order, not layout, and it
+ * returns to the host's own the moment the panel or the menu closes. */
+#main-content-container .ls-block:has(> .block-main-container [data-able-panel]),
+#main-content-container .ls-block:has(> .block-main-container [data-able-column-menu]) {
+  z-index: 1;
+}
+
 [data-able-settings] {
   position: absolute;
   top: 0;
@@ -201,12 +217,21 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
   opacity: 0.8;
 }
 
+/* The row opens the block, so it begins on the line the block's bullet marks.
+ * Logseq draws that bullet at the top of the block, where the row already is;
+ * a theme may hang it lower, and Dark High Contrast hangs a table block's
+ * bullet a way into the box the table opens with, which without this rule
+ * leaves the bullet floating under the field rather than beside it. The drop
+ * is the theme's own number, read with a fallback of none — with no theme
+ * installed, and in the document mode and right-hand fold layouts where the
+ * theme stands its rail down and declares nothing, the row stays where the
+ * host's own bullet is. */
 [data-able-search] {
   display: flex;
   align-items: center;
   gap: 0.375rem;
   width: 100%;
-  margin: 0 0 0.25rem;
+  margin: var(--hc-rail-bullet-y, 0px) 0 0.25rem;
 }
 
 [data-able-field] {
