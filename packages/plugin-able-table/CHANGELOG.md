@@ -2,6 +2,56 @@
 
 All notable changes to this package are documented here.
 
+## 0.4.0 - 2026-09-16
+
+- A table's settings are now **sticky**. Both panel switches, the full table
+  search text, the sorted column and its direction, and every committed column
+  filter survive a reload and a restart of Logseq, so a table you tune once is
+  still tuned the next time you open the graph. What is not kept is the
+  transient half — whether the panel was open, which field was mid-edit and
+  which column's menu was down — so a table you return to is set the way you
+  set it, without any of its menus waiting for you.
+- **None of it goes into your graph.** Able Table writes this to its own
+  settings file in Logseq's configuration directory, beside Logseq's own
+  preferences, and still changes no Markdown, no block and no property. A graph
+  synced to another machine carries none of it. Settings are held per graph,
+  per block and per table within that block, so two tables never share them and
+  the same block in two graphs never collides — and a table left at its
+  defaults is not written down at all.
+- A table that has changed shape since it was last opened degrades the way an
+  edit already does: a sorted column that is gone opens in the order Logseq
+  rendered it, and a filtered column that is gone drops that one filter. A
+  settings file that is unreadable, or hand-edited into a shape Able Table does
+  not recognise, is treated as absent and the table opens at its defaults.
+- Unloading the plugin still clears every `data-able-*` mark, removes every
+  control and disconnects the observer — it just no longer takes what your
+  tables were set to with it, since an ordinary reload unloads and reloads
+  every plugin.
+- **Fixed:** a committed filter on a column that stopped being rendered — a
+  block edited to drop a column — was kept and matched against a cell that was
+  no longer there, hiding every row in the table. That filter is now dropped on
+  its own, and the rest of the table's settings are left standing.
+- The full table search field's hint is now **Find in table** rather than
+  **Find in table 1**: the number told you nothing you could not see. Its
+  `aria-label` still names the table, because a screen reader meets the field
+  with nothing around it.
+- The column menu is reordered and reads **Sort A-Z**, **Sort Z-A**, a rule,
+  **Find in column**, and — only while that column has one — **Clear filter**.
+  How the table is ordered comes first because it is what every column is
+  asked and costs nothing to undo; **Search column** is renamed **Find in
+  column**, matching the field above the table.
+- **Fixed:** the part of a column menu that hung below its table was painted
+  over by the block underneath, which also took the clicks meant for it — the
+  last item, usually **Clear filter**, looked unbacked and could not be pressed
+  or hovered. A theme may lay each block out in a box of its own that no menu
+  can be lifted out of; the block a menu belongs to is now raised for as long
+  as it is open, so the whole menu is drawn and reachable. The same applies to
+  the settings panel.
+- **Fixed:** with Dark High Contrast installed, the full table search field
+  opened above the line the block's bullet marks, leaving the bullet floating
+  under the field. The field now opens on that line. With no theme moving the
+  bullet, the field stays at the top of the block where it has always been.
+
 ## 0.3.0 - 2026-09-16
 
 - A rendered table can now be **sorted by any one of its columns**. The menu

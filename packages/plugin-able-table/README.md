@@ -3,7 +3,9 @@
 Able Table makes a rendered Markdown table searchable, filterable and sortable
 in place, without editing the block, restructuring the Markdown, or converting
 the table to a query. Everything it does is display-only: no filter, no search
-string, no sort and no toggle state is ever written to the graph.
+string, no sort and no toggle state is ever written to the graph. What you set
+a table to is [remembered between sessions](#what-is-remembered), outside the
+graph, so a table you tune once stays tuned.
 
 ## Searching a table
 
@@ -11,7 +13,8 @@ Every Markdown table in the main editor carries a small **⋯** control in its
 top-right corner, beside the collapse control. Press it — with the pointer, or
 with Enter or Space from the keyboard — and a panel opens beneath it holding
 the table's two switches, **Full table search** and **Columns**. Each is
-that table's own, and neither is remembered anywhere outside the session.
+that table's own, and each is [remembered](#what-is-remembered) for the next
+time you open it.
 
 **Full table search** puts a find-as-you-type field across the top of the
 table and focuses it. Type, and every row that does not match disappears as
@@ -50,9 +53,10 @@ it — never pulls its neighbours off the line their own funnels are on. Hoverin
 the header, opening the menu or giving the control focus outlines the box it
 stands in.
 Press it — with the pointer, or with Enter or Space — and a menu opens under
-it:
+it. It reads **Sort A-Z**, **Sort Z-A**, a rule, **Find in column**, and —
+only while that column has a filter — **Clear filter**:
 
-**Search column** closes the menu and opens a field over the column name,
+**Find in column** closes the menu and opens a field over the column name,
 holding whatever that column last searched for, selected, so one keystroke
 refines or replaces it. Type, and every row whose cell **in that column** does
 not match disappears. Matching is the same case-insensitive substring test the
@@ -74,8 +78,8 @@ The rows move; nothing is hidden, added or renumbered.
   funnel, its header carries `aria-sort` for a screen reader, and the direction
   that is on is ticked in the menu.
 - **Pressing the direction that is on drops the sort** and gives the rows back
-  in the order Logseq rendered them. So does turning **Columns** off, unloading
-  the plugin, or removing the column it was sorted by.
+  in the order Logseq rendered them. So does turning **Columns** off or
+  removing the column it was sorted by.
 
 **Clear filter** is there only while that column has one, and drops it.
 
@@ -132,12 +136,46 @@ empty box a missing icon font would otherwise leave.
   Markdown cannot write but pasted HTML can — counts as not matching and is
   hidden. Spanned and ragged tables are not a supported shape.
 
+## What is remembered
+
+Tune a table once and it stays tuned. The next time it renders — after a page
+change, a reload, or a restart of Logseq — it comes back the way you left it.
+
+Per table, that is: both panel switches, the full table search text, the sorted
+column and its direction, and every committed column filter. What is *not* kept
+is the transient half — whether the settings panel was open, which field was
+mid-edit, and which column's menu was down — so a table you return to is set
+the way you set it without any of its menus waiting for you.
+
+- **It is kept outside your graph.** Able Table writes this to its own settings
+  file in Logseq's configuration directory — `settings/logseq-able-table.json`,
+  beside Logseq's own preferences — and never to your Markdown, a block, or a
+  property. A graph synced to another machine carries none of it, which is the
+  right answer for a display preference: the graph is your notes, not your view
+  of them.
+- **Each table is its own.** Settings are held per graph, per block, and per
+  table within that block, so two tables never share them and the same block in
+  two graphs never collides.
+- **A table you have not tuned is not written down at all**, and one you set
+  back to its defaults drops out again.
+- **A table that has changed shape degrades gracefully.** If the column it was
+  sorted by is gone, it opens in the order Logseq rendered it; if a filtered
+  column is gone, that one filter is dropped. Everything else you set is kept.
+- **A settings file that is unreadable or has been hand-edited into a shape
+  Able Table does not recognise is treated as absent**, so the table opens at
+  its defaults rather than failing.
+- **Unloading the plugin does not clear it.** An ordinary reload unloads and
+  reloads every plugin, and your tables have to come back.
+
+To forget everything at once, quit Logseq and delete that file.
+
 ## What it never does
 
 - **Nothing reaches the graph.** No block content, property or Markdown change
   comes from opening the panel, toggling, typing, filtering a column, sorting,
   clearing, or unloading. The Markdown behind a sorted table still holds its
-  rows in the order you wrote them, and the next load opens it unsorted.
+  rows in the order you wrote them. What a table is set to is remembered
+  [outside the graph](#what-is-remembered), never in it.
 - **No row is removed or rewritten.** A hidden row is marked
   `data-able-filtered` and hidden by the plugin's own registered style;
   dropping the mark is all it takes to restore it.
@@ -155,6 +193,10 @@ empty box a missing icon font would otherwise leave.
   rendered there.
 - Editing a block replaces its render, which takes the controls with it; the
   table comes back searched and filtered when the render comes back.
+- **Unloading the plugin gives the host document back exactly as it found
+  it**: every `data-able-*` mark cleared, every control removed, every hidden
+  row shown and every moved row returned. The one thing it leaves is its own
+  settings file, which is what makes a reload come back sticky.
 
 ## Where it works
 
@@ -171,7 +213,13 @@ and neither package requires or modifies the other. The
 [table controls v1 hook](../../docs/contracts/table-controls-v1.md) is the
 whole of what they share, and both sides pin it in their own tests.
 
-With no theme installed, Able Table draws and places its own control.
+That theme also hangs a table block's bullet a way into the box the table
+opens with, rather than at the top of the block. The full table search field
+takes that box's place, so it opens on the same line the bullet marks and the
+bullet still reads as belonging to it.
+
+With no theme installed, Able Table draws and places its own control, and the
+field opens at the top of the block where Logseq draws its own bullet.
 
 ## Compatibility
 
@@ -184,7 +232,8 @@ Able Table targets **Logseq 0.10.15 classic/file graphs on desktop**.
   is out of reach.
 - Able Table works with any theme, or none, and alongside Dark High Contrast,
   Passage and Anno with no attribute, style-key, id, or settings collision:
-  everything it writes is namespaced `data-able-*`.
+  everything it writes into the host document is namespaced `data-able-*`, and
+  what it remembers goes in its own plugin settings file.
 
 ## Load the repository as an unpacked plugin
 

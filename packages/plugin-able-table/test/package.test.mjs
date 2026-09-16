@@ -121,8 +121,40 @@ test('the runtime observes the host document and marks tables, and offers no set
   assert.match(code, /addEventListener\(type, handler, true\)/)
   assert.match(code, /removeEventListener\?\.\(type, handler, true\)/)
 
-  // Search is a per-table toggle in the panel, not a plugin-wide preference.
+  /* The settings file is where a table's own settings are remembered, but it
+   * is not a preferences screen: every switch here belongs to one table and is
+   * reached from that table's panel, so there is no schema for Logseq to draw
+   * a plugin-wide settings page from. */
   assert.doesNotMatch(code, /useSettingsSchema/)
+  assert.match(code, /logseq\.updateSettings\(/)
+  assert.match(code, /logseq\.settings/)
+})
+
+/* Sticky settings are the one thing this plugin keeps between sessions, and
+ * the whole point of keeping them in Logseq's own dotdir is that searching,
+ * sorting or filtering a table still changes nothing any graph tracks. */
+test('nothing a table is set to is written anywhere the graph can see', () => {
+  /* Every one of these would put a file, a block or a property inside the
+   * graph. The sandbox storage is on the list because Logseq resolves it
+   * against the current graph's assets root. */
+  for (const api of [
+    'makeSandboxStorage',
+    'FileStorage',
+    'Assets',
+    'logseq.Editor',
+    'logseq.DB',
+    'upsertBlockProperty',
+    'updateBlock',
+    'insertBlock',
+    'write_rootdir_file',
+    'writeFile'
+  ]) {
+    assert.doesNotMatch(code, new RegExp(api.replace(/\./g, '\\.')), `the runtime reaches for ${api}`)
+  }
+
+  // The graph is read, never written: it only says which branch of the store
+  // a table's settings belong under.
+  assert.match(code, /getCurrentGraph/)
 })
 
 test('everything written into the host document is namespaced to Able Table', () => {
@@ -150,9 +182,49 @@ test("the theme's collapse control is read in CSS alone, and never written", () 
   assert.doesNotMatch(code, /Attribute\(\s*[`'"]data-hc-/)
   assert.doesNotMatch(code, /[`'"]data-hc-[\w-]*[`'"]/)
 
-  // Every number it borrows carries Able Table's own fallback, so the control
-  // is drawn and placed with no theme installed.
+  // Every number it borrows carries Able Table's own fallback, so every control
+  // is drawn and placed with no theme installed. Which names are read is pinned
+  // too: each one is a fact the contract publishes, and a third cannot be
+  // reached for without amending it.
+  const borrowed = new Set()
   for (const use of code.match(/var\(--hc-[\w-]+[^)]*\)/g) ?? []) {
-    assert.match(use, /^var\(--hc-collapse-control-size, 1\.25rem\)$/, `${use} has no fallback`)
+    assert.match(use, /^var\(--hc-[\w-]+, [^)]+\)$/, `${use} has no fallback`)
+    borrowed.add(use.match(/--hc-[\w-]+/)[0])
   }
+  assert.deepEqual([...borrowed].sort(), ['--hc-collapse-control-size', '--hc-rail-bullet-y'])
+})
+
+/* docs/contracts/table-controls-v1.md: the second number the hook publishes.
+ * Logseq draws a block's bullet at the top of the block, which is where the
+ * row already is; Dark High Contrast hangs a table block's bullet a way into
+ * the box the table opens with, and the row has to follow it there or the
+ * bullet marks nothing. */
+test('the full table search field opens on the line the block\'s bullet marks', () => {
+  assert.match(code, /\[data-able-search\] \{[^}]*margin: var\(--hc-rail-bullet-y, 0px\) 0 0\.25rem;/)
+  // A fallback of none: with no theme declaring the drop, the row stays at the
+  // top of the block, where the host's own bullet is.
+  assert.doesNotMatch(code, /margin-top: 1\.75/)
+})
+
+/* A panel and a menu are the only things here that overhang the block they
+ * belong to, and a block is as far as z-index reaches: a theme may make each
+ * block a stacking context — Dark High Contrast isolates every row — and inside
+ * one, no z-index of the menu's own can beat the block painted after it. */
+test('a block showing a panel or a menu is raised over the block after it', () => {
+  for (const chrome of ['data-able-panel', 'data-able-column-menu']) {
+    assert.match(
+      code,
+      new RegExp(`#main-content-container \\.ls-block:has\\(> \\.block-main-container \\[${chrome}\\]\\)`),
+      `nothing raises a block showing ${chrome}`
+    )
+  }
+
+  /* The raise is on the host's block, because raising anything of Able Table's
+   * own would stay inside that stacking context and change nothing. */
+  assert.match(code, /\.block-main-container \[data-able-column-menu\]\) \{\s*\n\s*z-index: 1;\s*\n\s*\}/)
+
+  /* Paint order only. Giving the host's block a position, a transform or a
+   * size would move the reader's text to open a menu. */
+  const raise = code.match(/#main-content-container \.ls-block:has[\s\S]*?\}/)[0]
+  assert.doesNotMatch(raise, /position:|transform:|width:|height:|margin:|padding:/)
 })

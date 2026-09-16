@@ -21,9 +21,9 @@ test('package tags select one version-matched release archive', async () => {
     release_name: 'Anno 0.2.0',
     workspace: 'packages/plugin-anno'
   })
-  assert.deepEqual(await selectRelease('able-table-v0.3.0'), {
-    archive: 'dist/logseq-able-table-0.3.0.zip',
-    release_name: 'Able Table 0.3.0',
+  assert.deepEqual(await selectRelease('able-table-v0.4.0'), {
+    archive: 'dist/logseq-able-table-0.4.0.zip',
+    release_name: 'Able Table 0.4.0',
     workspace: 'packages/plugin-able-table'
   })
 })

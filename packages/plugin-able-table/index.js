@@ -19,6 +19,14 @@
  * render, so the kind is constant and the key carries the two parts that vary;
  * a column filter is held under that key by the column's own index.
  *
+ * That same key, under the graph it was read in, is what a table's settings
+ * are remembered by between sessions: the two switches, the search, the sort
+ * and every committed filter are written to this plugin's own settings file
+ * and read back when the table renders again. That file is Logseq's dotdir,
+ * not the graph — searching, sorting or filtering a table still changes no
+ * Markdown, no block and no property, and still writes nothing any graph
+ * tracks.
+ *
  * `parent.document` is reachable because package.json declares `effect: true`.
  * That flag keeps the plugin entry on the host's own `file://` origin;
  * side-effect-free packages are rewritten to `lsp://logseq.io/`, a different
@@ -91,6 +99,22 @@ const STYLE = `
  * Their parent is the box they are positioned against. */
 #main-content-container [data-able-anchor] {
   position: relative;
+}
+
+/* A panel or a menu is the one thing here that leaves the block it belongs to,
+ * and a block is as far as \`z-index\` reaches: Logseq lays every block out in
+ * its own \`position: relative\` box, and a theme may make that box a stacking
+ * context of its own — Dark High Contrast isolates each row so the rail's line
+ * paints behind its bullets. Inside such a context no number is large enough,
+ * because the whole context is painted in tree order, which puts the next block
+ * over anything of this one's that overhangs it. So the block that has
+ * something open is raised for as long as it is open, and the chrome's own
+ * z-index orders it within that block as before. Raising a block changes
+ * nothing about where it sits: \`z-index\` is paint order, not layout, and it
+ * returns to the host's own the moment the panel or the menu closes. */
+#main-content-container .ls-block:has(> .block-main-container [data-able-panel]),
+#main-content-container .ls-block:has(> .block-main-container [data-able-column-menu]) {
+  z-index: 1;
 }
 
 [data-able-settings] {
@@ -193,12 +217,21 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
   opacity: 0.8;
 }
 
+/* The row opens the block, so it begins on the line the block's bullet marks.
+ * Logseq draws that bullet at the top of the block, where the row already is;
+ * a theme may hang it lower, and Dark High Contrast hangs a table block's
+ * bullet a way into the box the table opens with, which without this rule
+ * leaves the bullet floating under the field rather than beside it. The drop
+ * is the theme's own number, read with a fallback of none — with no theme
+ * installed, and in the document mode and right-hand fold layouts where the
+ * theme stands its rail down and declares nothing, the row stays where the
+ * host's own bullet is. */
 [data-able-search] {
   display: flex;
   align-items: center;
   gap: 0.375rem;
   width: 100%;
-  margin: 0 0 0.25rem;
+  margin: var(--hc-rail-bullet-y, 0px) 0 0.25rem;
 }
 
 [data-able-field] {
@@ -402,6 +435,18 @@ html[data-theme=light] [data-able-column-control] {
   background: var(--ls-primary-background-color, #000000);
 }
 
+/* The rule between how the table is ordered and what is searched or dropped in
+ * it. It is one hairline in the host's own border colour rather than a gap,
+ * so the two halves of the menu read as two groups at a glance; it carries no
+ * item mark, so it is never focused, walked past with the arrow keys or
+ * pressed. */
+[data-able-column-menu] > [role="separator"] {
+  height: 1px;
+  margin: 0.25rem 0.375rem;
+  background: var(--ls-border-color, #6b6b6b);
+  opacity: 0.6;
+}
+
 /* The field stands in for the column name only: it stops at the control's
  * strip, so the menu that opened it is still there to be used. */
 [data-able-column-filter] {
@@ -503,7 +548,179 @@ function stateFor(key) {
   }
 
   tableState.set(key, created)
+  return restore(created, key)
+}
+
+/* What a table is remembered by between sessions, and where.
+ *
+ * The store is this plugin's own settings object, which Logseq keeps in its
+ * dotdir — `settings/logseq-able-table.json` beside the application's own
+ * preferences — rather than anywhere in the graph. That is the whole point of
+ * reaching for it: a reader who has tuned a table wants it tuned again next
+ * time, and nobody wants their Markdown, a block or a property rewritten to
+ * say so. A graph synced to another machine carries none of this, which is the
+ * right answer for a display preference.
+ *
+ * Everything lives under one key, as a branch per graph and a record per
+ * table, so one write says the whole truth: the host merges what it is given
+ * over the settings it holds, one level deep, and handing it the whole tree is
+ * what lets a table that no longer remembers anything drop out of it.
+ *
+ * Only what a reader chose is kept — a table left at its defaults writes no
+ * record at all — so the store stays about as long as the list of tables
+ * somebody has actually tuned. What it does not do is notice that a block was
+ * deleted: a record outlives the table it belongs to, costing a few dozen
+ * bytes, and there is no way to tell that block from one on a page nobody has
+ * opened yet. */
+const STORE_KEY = 'tables'
+
+/* Long enough that typing into a field is one write rather than one per
+ * keystroke, short enough that it has happened by the time anyone could act on
+ * it. Anything still waiting is written out on unload. */
+const SAVE_DELAY = 400
+
+let persisted = {}
+
+/* Which graph is open, or `null` while the host has not said yet. Resolving it
+ * takes a round trip, which is longer than the first render takes: a table
+ * that renders in the meantime opens at its defaults and is restored the
+ * moment the answer arrives, and nothing is written until then, so a record
+ * can never land in the wrong graph's branch. */
+let graph = null
+
+const DIRECTIONS = new Set(['asc', 'desc'])
+
+function plainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : null
+}
+
+function branchFor(create) {
+  const existing = plainObject(persisted[graph])
+  if (existing) return existing
+  if (!create) return null
+
+  const created = {}
+  persisted[graph] = created
   return created
+}
+
+/* Reading the store is total: every field is checked on its own, and anything
+ * that is not what it should be is treated as absent rather than raised. The
+ * file is a plain JSON file a person can open and edit, and a version of this
+ * plugin that has not been written yet may have left fields here that this one
+ * does not know — neither is a reason to render a table wrongly, or at all
+ * differently from one nothing was ever stored for. */
+function restore(state, key) {
+  const record = plainObject(branchFor(false)?.[key])
+  if (!record) return state
+
+  state.search = record.search === true
+  state.columns = record.columns === true
+  state.query = state.search && typeof record.query === 'string' ? record.query : ''
+
+  const sort = plainObject(record.sort)
+  const index = sort ? Number(sort.index) : Number.NaN
+  state.sort =
+    Number.isInteger(index) && index >= 0 && DIRECTIONS.has(sort.direction)
+      ? { index, direction: sort.direction }
+      : null
+
+  for (const [at, term] of Object.entries(plainObject(record.filters) ?? {})) {
+    const column = Number(at)
+    const value = typeof term === 'string' ? collapse(term) : ''
+    if (Number.isInteger(column) && column >= 0 && value) state.filters.set(column, value)
+  }
+
+  return state
+}
+
+/* What is worth remembering about a table, or nothing at all. The panel being
+ * open, the field being edited and the menu being down are all left out: they
+ * are the transient half of the state, discarded on every re-render already,
+ * and a reader returning to a page does not want its menus waiting for them. */
+function snapshot(state) {
+  const record = {}
+
+  if (state.search) record.search = true
+  if (state.columns) record.columns = true
+  if (state.search && state.query) record.query = state.query
+  if (state.sort) record.sort = { index: state.sort.index, direction: state.sort.direction }
+
+  if (state.filters.size) {
+    const filters = {}
+    for (const [index, term] of state.filters) filters[index] = term
+    record.filters = filters
+  }
+
+  return Object.keys(record).length ? record : null
+}
+
+function remember(key, state) {
+  if (graph === null) return
+
+  const branch = branchFor(true)
+  const record = snapshot(state)
+
+  /* Most passes change nothing, and a pass that changed nothing must not cost
+   * a file write: what the store already says is compared with what it would
+   * say now, and only a real difference is queued. */
+  if (JSON.stringify(branch[key] ?? null) === JSON.stringify(record)) return
+
+  if (record) branch[key] = record
+  else delete branch[key]
+
+  queueSave()
+}
+
+let saving = null
+
+function flush() {
+  if (saving === null) return
+
+  parent.clearTimeout(saving)
+  saving = null
+
+  try {
+    logseq.updateSettings({ [STORE_KEY]: persisted })
+  } catch (error) {
+    /* A store that cannot be written is a table that opens at its defaults
+     * next time, which is a great deal better than one that does not open. */
+    console.warn('[able-table] could not save table settings', error)
+  }
+}
+
+function queueSave() {
+  if (saving !== null) return
+  saving = parent.setTimeout(flush, SAVE_DELAY)
+}
+
+/* The host's answer to which graph is open, and the tables already rendered
+ * while it was on its way. A table the reader has touched in that moment keeps
+ * what they did — it is the only one whose state says anything — and every
+ * other one is restored from the store before the pass that follows. */
+async function scopeGraph() {
+  try {
+    const current = await logseq.App?.getCurrentGraph?.()
+    graph = (typeof current?.url === 'string' && current.url) || ''
+  } catch {
+    graph = ''
+  }
+
+  for (const [key, state] of tableState) {
+    if (!snapshot(state)) restore(state, key)
+  }
+
+  markTables()
+}
+
+/* Switching graphs inside the app does not reload this plugin, so the branch
+ * every table is read from and written to has to change under it. What is
+ * waiting goes to the graph it was read in, and every table starts again. */
+async function regraph() {
+  flush()
+  tableState.clear()
+  graph = null
+  await scopeGraph()
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i
@@ -780,6 +997,9 @@ function ensureSettings(wrapper, key, name, state) {
 const COLUMN_NOTE = 'A menu on every column header sorts and searches that column.'
 const NO_COLUMN_NOTE = 'This table renders no header row, so only full table search is available.'
 
+/* What the full table search field says while it is empty. */
+const FIELD_HINT = 'Find in table'
+
 /* The panel's switches, in the order they are read. `columns` is offered only
  * to a table that renders a head. */
 const OPTIONS = [
@@ -903,8 +1123,12 @@ function ensureSearch(wrapper, key, name, state) {
 
   const field = childWith(row, FIELD_ATTR)
   if (field) {
+    /* The label names the table, because a screen reader meets this field with
+     * nothing around it and several tables may be on the page. The hint does
+     * not: the reader can see which table it belongs to, and a number that
+     * counts up the page is one more thing to read for no gain. */
     field.setAttribute('aria-label', `Search ${name}`)
-    field.setAttribute('placeholder', `Find in ${name}`)
+    field.setAttribute('placeholder', FIELD_HINT)
     if (field.value !== state.query) field.value = state.query
   }
 
@@ -1085,13 +1309,18 @@ function applyColumn(cell, key, index, state, pass) {
 }
 
 /* The menu one column's control has open, built beside the wrapper and
- * measured against the control it belongs to. `Search column` and the two sort
- * directions are always there; `Clear filter` only while there is one to
- * clear. */
+ * measured against the control it belongs to.
+ *
+ * It reads in the order a reader reaches for: how the table is ordered first,
+ * because sorting is the one thing here that is asked of every column and
+ * costs nothing to undo, then a rule, then what narrows the table down.
+ * Everything above the rule is always there; below it, `Find in column` always
+ * is and `Clear filter` only while there is one to clear. */
 const MENU_ITEMS = [
-  { action: 'search', label: 'Search column' },
   { action: 'asc', label: 'Sort A-Z', direction: 'asc' },
   { action: 'desc', label: 'Sort Z-A', direction: 'desc' },
+  { action: 'separator', separator: true },
+  { action: 'search', label: 'Find in column' },
   /* Nothing to clear is not an item to press: it is hung and taken away with
    * the filter itself. */
   { action: 'clear', label: 'Clear filter', filtered: true }
@@ -1106,7 +1335,23 @@ function buildMenu(key, index) {
   return menu
 }
 
-function buildItem(key, index, { action, label, direction }) {
+/* The rule between the menu's two halves. It carries the action it is known by
+ * so the pass that maintains the menu finds it where it found everything else,
+ * and it carries no item mark: the arrow keys, the press handlers and focus
+ * all read that mark, so leaving it off is what makes this a line rather than
+ * something to land on. */
+function buildSeparator(key, index, action) {
+  const rule = doc.createElement('div')
+  rule.setAttribute(ACTION_ATTR, action)
+  rule.setAttribute(KEY_ATTR, key)
+  rule.setAttribute(COLUMN_ATTR, String(index))
+  rule.setAttribute('role', 'separator')
+  return rule
+}
+
+function buildItem(key, index, { action, label, direction, separator }) {
+  if (separator) return buildSeparator(key, index, action)
+
   const item = doc.createElement('button')
   item.setAttribute('type', 'button')
   item.setAttribute(ITEM_ATTR, '')
@@ -1205,6 +1450,18 @@ function applyColumns(table, key, state, pass) {
   /* A table that has lost the column it was sorted by is read in the order it
    * was rendered in again, rather than by a column that is no longer there. */
   if (state.sort && !cells[state.sort.index]) state.sort = null
+
+  /* A filter whose column has gone the same way is dropped on its own, and
+   * everything else the reader set is left standing. Left in place it would be
+   * a filter with nothing to read it beside, nothing to clear it from, and no
+   * cell to match — which would hide every row in the table. Losing a column
+   * happens when the block is edited, and now also when a filter stored
+   * against an older shape of the table is read back into a newer one. */
+  for (const index of [...state.filters.keys()]) {
+    if (!cells[index]) state.filters.delete(index)
+  }
+
+  if (state.editing && !cells[state.editing.index]) state.editing = null
 
   for (const [index, cell] of cells.entries()) applyColumn(cell, key, index, state, pass)
 
@@ -1327,6 +1584,14 @@ function markTables() {
     if (!live.has(key)) tableState.delete(key)
     wrapper.removeAttribute(TABLE_ATTR)
   }
+
+  /* Every pass ends by saying what each table it still holds is set to. One
+   * place rather than one per control: a toggle, a sort, a committed filter
+   * and a keystroke in a field all end up here, and what is written out is
+   * whatever the pass that answered them left behind. Giving up a table's
+   * in-memory state above is not forgetting it — that state is rebuilt from
+   * the store the next time the table renders. */
+  for (const [key, state] of tableState) remember(key, state)
 
   release(pass)
 }
@@ -1853,6 +2118,14 @@ const LISTENERS = [
  * plugin, so unloading has to leave none of it behind — and only its own. */
 let observer = null
 function teardown() {
+  /* The store is not this plugin's to clear, and unloading is not a reader
+   * saying they want their tables back at the defaults: an ordinary reload
+   * unloads and reloads this plugin, and every table has to come back the way
+   * it was left. What belongs here is the opposite — anything still waiting on
+   * the save's delay is written out now, while there is still a host to write
+   * it. */
+  flush()
+
   observer?.disconnect()
   observer = null
   tableState.clear()
@@ -1868,6 +2141,15 @@ function main() {
   logseq.beforeunload?.(async () => teardown())
 
   for (const [type, handler] of LISTENERS) doc.addEventListener(type, handler, true)
+
+  /* What every table was left set to, last time. The settings object is handed
+   * over as this plugin connects, so it is here to be read rather than waited
+   * for; which graph it is read under is the part that has to be asked. */
+  persisted = plainObject(logseq.settings?.[STORE_KEY]) ?? {}
+  scopeGraph().catch(console.error)
+  logseq.App?.onCurrentGraphChanged?.(() => {
+    regraph().catch(console.error)
+  })
 
   /* Logseq draws its own chrome in this face, so it is loaded long before a
    * table renders; asking costs nothing and repaints the controls that were

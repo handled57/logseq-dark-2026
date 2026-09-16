@@ -120,11 +120,45 @@ class FakeObserver {
 }
 FakeObserver.instances = []
 
-function load(host, fonts) {
+/* The plugin's own settings file, as Logseq keeps it: a JSON document in the
+ * application's dotdir, handed to the plugin as it connects and written back
+ * a level at a time. The fixture round-trips every write through JSON, the way
+ * the file does, so a record that could not survive the trip fails here rather
+ * than on somebody's disk.
+ *
+ * `settings` is what was in the file when this load started, and reading it
+ * back off one context and handing it to the next is what stands in for a
+ * reload or an app restart. */
+function settingsStore(initial) {
+  const stored = JSON.parse(JSON.stringify(initial ?? {}))
+  const writes = []
+
+  return {
+    stored,
+    writes,
+    update(patch) {
+      const written = JSON.parse(JSON.stringify(patch))
+      writes.push(written)
+      Object.assign(stored, written)
+    }
+  }
+}
+
+/* `graph` is the graph the host says is open; passing `null` stands for a host
+ * that answers with none, which is what Logseq does before a graph is picked
+ * and for the demo graph. */
+function load(host, fonts, { settings, graph = 'logseq_local_/graphs/one' } = {}) {
   FakeObserver.instances = []
   const unloads = []
   const provided = []
   const documentListeners = new Map()
+  const store = settingsStore(settings)
+  const graphListeners = []
+
+  /* The save is coalesced behind a timer, so the fixture holds the pending one
+   * rather than firing it: a test that wants the file written says so. */
+  const timers = new Map()
+  let nextTimer = 0
 
   const context = {
     console,
@@ -135,6 +169,14 @@ function load(host, fonts) {
        * scheduled. */
       requestAnimationFrame(callback) {
         callback()
+      },
+      setTimeout(callback) {
+        nextTimer += 1
+        timers.set(nextTimer, callback)
+        return nextTimer
+      },
+      clearTimeout(id) {
+        timers.delete(id)
       },
       document: {
         body: host,
@@ -154,6 +196,16 @@ function load(host, fonts) {
       }
     },
     logseq: {
+      settings: store.stored,
+      updateSettings(patch) {
+        store.update(patch)
+      },
+      App: {
+        getCurrentGraph: () => (graph === null ? null : { url: graph, name: 'one', path: '/graphs/one' }),
+        onCurrentGraphChanged(handler) {
+          graphListeners.push(handler)
+        }
+      },
       provideStyle(style) {
         provided.push(style)
       },
@@ -172,8 +224,23 @@ function load(host, fonts) {
   context.unloads = unloads
   context.observers = FakeObserver.instances
   context.documentListeners = documentListeners
+  context.store = store
   context.dispatchDocument = (type, event) => {
     for (const handler of documentListeners.get(type) ?? []) handler(event)
+  }
+
+  /* Fire whatever save is waiting, the way the delay would. */
+  context.runTimers = () => {
+    const pending = [...timers.values()]
+    timers.clear()
+    for (const callback of pending) callback()
+  }
+
+  context.pendingTimers = () => timers.size
+  context.changeGraph = async (next) => {
+    graph = next
+    for (const handler of graphListeners) handler()
+    await settle()
   }
 
   return context
@@ -350,10 +417,26 @@ function openSearch(context, wrapper) {
   return within(searchOf(wrapper), 'data-able-field')
 }
 
-async function render(host, fonts) {
-  const context = load(host, fonts)
-  await Promise.resolve()
+/* The entry asks the host which graph is open before it can read anything back
+ * for a table, so a render is not finished until that answer has landed and
+ * the pass it schedules has run. */
+async function settle() {
+  for (let at = 0; at < 4; at += 1) await Promise.resolve()
+}
+
+async function render(host, fonts, options) {
+  const context = load(host, fonts, options)
+  await settle()
   return context
+}
+
+/* A reload or an app restart: the plugin unloads, writing out whatever was
+ * waiting, and comes back against the same settings file and a freshly
+ * rendered page. */
+async function reload(context, host, options) {
+  const [unload] = context.unloads
+  await unload()
+  return render(host, undefined, { settings: context.store.stored, ...options })
 }
 
 /* Logseq's own font set, as much of it as the runtime asks: whether the Tabler
@@ -790,8 +873,11 @@ test('turning full table search on inserts a focused field above the table', asy
 
   assert.equal(field.tagName, 'INPUT')
   assert.equal(field.getAttribute('type'), 'text')
+  /* The label names the table, because a screen reader meets the field with
+   * nothing around it; the hint does not, because the reader can see which
+   * table it sits above. */
   assert.equal(field.getAttribute('aria-label'), 'Search table 1')
-  assert.equal(field.getAttribute('placeholder'), 'Find in table 1')
+  assert.equal(field.getAttribute('placeholder'), 'Find in table')
   assert.equal(field.focused, true, 'the field did not take focus')
   assert.equal(within(panelOf(wrapper), 'data-able-toggle').getAttribute('aria-checked'), 'true')
 })
@@ -1133,12 +1219,23 @@ test('pressing the control opens a menu beside the wrapper rather than inside it
   assert.equal(controlOf(name).getAttribute('aria-expanded'), 'true')
 
   const search = itemIn(menu, 'search')
-  assert.ok(search, 'the menu offers no Search column')
-  assert.equal(search.textContent, 'Search column')
+  assert.ok(search, 'the menu offers no Find in column')
+  assert.equal(search.textContent, 'Find in column')
   assert.equal(search.getAttribute('role'), 'menuitem')
-  assert.equal(search.focused, true, 'the menu did not take focus')
   // Nothing to clear yet, so nothing offers to.
   assert.equal(itemIn(menu, 'clear'), null)
+
+  /* How the table is ordered first, then a rule, then what narrows it down.
+   * The rule is a separator rather than an item: it carries no item mark, so
+   * nothing focuses it or walks onto it. */
+  assert.deepEqual(
+    menu.children.map((child) => child.getAttribute('data-able-action')),
+    ['asc', 'desc', 'separator', 'search']
+  )
+  const rule = itemIn(menu, 'separator')
+  assert.equal(rule.getAttribute('role'), 'separator')
+  assert.equal(rule.matches('[data-able-menu-item]'), false, 'the rule is an item')
+  assert.equal(itemIn(menu, 'asc').focused, true, 'the menu did not take focus on its first item')
 
   // A second press closes it and hands focus back to the control.
   controlOf(name).focused = false
@@ -1564,16 +1661,27 @@ test('a column menu is operated from the keyboard', async () => {
   const menu = menuOf(wrapper)
   assert.ok(menu, 'Enter on the control opened no menu')
 
+  /* The menu opens on its first item, and the arrow keys walk the items — over
+   * the rule between them, which is not one — and wrap at the end. */
   const search = itemIn(menu, 'search')
-  const stepped = key(context, search, 'ArrowDown')
+  const [asc, desc] = [itemIn(menu, 'asc'), itemIn(menu, 'desc')]
+  assert.equal(asc.focused, true, 'Enter on the control focused no item')
+
+  const stepped = key(context, asc, 'ArrowDown')
   assert.equal(stepped.prevented, true)
   assert.equal(stepped.stopped, true)
-  // One item, so the arrow keys wrap back to it rather than leaving the menu.
-  assert.equal(search.focused, true)
+  assert.equal(desc.focused, true)
+
+  key(context, desc, 'ArrowDown')
+  assert.equal(search.focused, true, 'the rule was landed on rather than stepped over')
+
+  asc.focused = false
+  key(context, search, 'ArrowDown')
+  assert.equal(asc.focused, true, 'the last item did not wrap back to the first')
 
   key(context, search, ' ')
   const field = within(name, 'data-able-column-filter')
-  assert.ok(field, 'Space on Search column opened no field')
+  assert.ok(field, 'Space on Find in column opened no field')
 
   type(context, field, 'grace')
   key(context, field, 'Enter')
@@ -1919,4 +2027,314 @@ test('unloading removes every node and mark this plugin wrote, and its listeners
   // The theme's own control is left exactly where it was.
   assert.equal(theirs.parentElement, wrapper)
   assert.equal(theirs.getAttribute('data-hc-collapse'), '')
+})
+
+/* Sticky settings: what a table is left set to, read back the next time it
+ * renders. The store is this plugin's own settings file — Logseq keeps it in
+ * its dotdir, not in the graph — so a reload here is an unload, which writes
+ * out whatever was waiting, followed by a fresh load against the same file. */
+
+const GRAPH = 'logseq_local_/graphs/one'
+const OTHER_GRAPH = 'logseq_local_/graphs/two'
+
+function branch(context, graph = GRAPH) {
+  return context.store.stored.tables?.[graph] ?? null
+}
+
+function recordFor(context, uuid, { ordinal = 0, graph = GRAPH } = {}) {
+  return branch(context, graph)?.[`${uuid}:${ordinal}`] ?? null
+}
+
+/* A store as it would be on disk, one branch per graph and one record per
+ * table, for the tests that start from something already written. */
+function store(uuid, record, graph = GRAPH) {
+  return { tables: { [graph]: { [`${uuid}:0`]: record } } }
+}
+
+test('both panel switches are remembered, and are back on the next load', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  switchOption(context, wrapper, 'search')
+  turnColumnsOn(context, wrapper)
+  context.runTimers()
+
+  assert.deepEqual(recordFor(context, uuid), { search: true, columns: true })
+
+  const next = await reload(context, host)
+  // Not the panel: which popup was open is the transient half of the state.
+  assert.equal(panelOf(wrapper), null, 'the panel came back open')
+  assert.ok(searchOf(wrapper), 'full table search did not come back on')
+  assert.equal(controlOf(headCells(wrapper)[0]).getAttribute('data-able-key'), `${uuid}:0`)
+
+  press(next, settings(wrapper))
+  assert.equal(option(panelOf(wrapper), 'search').getAttribute('aria-checked'), 'true')
+  assert.equal(option(panelOf(wrapper), 'columns').getAttribute('aria-checked'), 'true')
+})
+
+test('the search text, the sort and every committed filter come back', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  const field = openSearch(context, wrapper)
+  type(context, field, 'e')
+  turnColumnsOn(context, wrapper)
+  filterColumn(context, wrapper, 1, 'engineer')
+  sortColumn(context, wrapper, 0, 'desc')
+  context.runTimers()
+
+  assert.deepEqual(recordFor(context, uuid), {
+    search: true,
+    columns: true,
+    query: 'e',
+    sort: { index: 0, direction: 'desc' },
+    filters: { 1: 'engineer' }
+  })
+
+  const before = visible(rows)
+  await reload(context, host)
+
+  assert.equal(within(searchOf(wrapper), 'data-able-field').value, 'e')
+  assert.equal(within(headCells(wrapper)[1], 'data-able-column-term').textContent, 'engineer')
+  assert.equal(headCells(wrapper)[0].getAttribute('aria-sort'), 'descending')
+  assert.equal(controlOf(headCells(wrapper)[0]).getAttribute('data-able-sort'), 'desc')
+  assert.deepEqual(visible(rows), before)
+  assert.deepEqual(order(wrapper), ['Grace Admiral', 'Alan Engineer', 'Ada Engineer'])
+})
+
+test('a table left at its defaults is never written down, and one reset drops out', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  /* Opening the panel and closing it again is not a setting: only what the
+   * reader chose is kept, so the store stays about as long as the list of
+   * tables somebody has actually tuned. */
+  const context = await render(host)
+  press(context, settings(wrapper))
+  press(context, settings(wrapper))
+  context.runTimers()
+  assert.deepEqual(context.store.writes, [], 'a table nobody tuned was written down')
+
+  switchOption(context, wrapper, 'search')
+  context.runTimers()
+  assert.deepEqual(recordFor(context, uuid), { search: true })
+
+  switchOption(context, wrapper, 'search')
+  context.runTimers()
+  assert.equal(recordFor(context, uuid), null, 'the record outlived the setting')
+  assert.deepEqual(branch(context), {})
+})
+
+test('the save is coalesced, and a pass that changed nothing costs no write', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  const field = openSearch(context, wrapper)
+  for (const value of ['g', 'gr', 'gra', 'grac', 'grace']) type(context, field, value)
+
+  assert.equal(context.store.writes.length, 0, 'the file was written before the delay')
+  context.runTimers()
+  assert.equal(context.store.writes.length, 1, 'typing cost more than one write')
+
+  /* A re-render changes nothing about what the table is set to, so it must not
+   * queue another one. */
+  context.observers[0].callback()
+  assert.equal(context.pendingTimers(), 0, 'an unchanged pass queued a write')
+})
+
+test('unloading writes out what was waiting and keeps the store', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  const field = openSearch(context, wrapper)
+  type(context, field, 'grace')
+  assert.equal(context.store.writes.length, 0, 'the file was written before the delay')
+
+  const [unload] = context.unloads
+  await unload()
+
+  assert.equal(context.store.writes.length, 1, 'the pending save was lost on unload')
+  assert.deepEqual(recordFor(context, uuid), { search: true, query: 'grace' })
+  // An ordinary reload is an unload, so clearing the store here would be the
+  // opposite of sticky.
+  assert.equal(host.querySelectorAll('[data-able-search]').length, 0)
+})
+
+test('two tables in one block, and one table in two graphs, keep their own settings', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const first = table(body, STAFF)
+  const second = table(body, STAFF)
+
+  const context = await render(host)
+  switchOption(context, first.wrapper, 'search')
+  turnColumnsOn(context, second.wrapper)
+  context.runTimers()
+
+  assert.deepEqual(recordFor(context, uuid), { search: true })
+  assert.deepEqual(recordFor(context, uuid, { ordinal: 1 }), { columns: true })
+
+  /* The same block UUID in another graph is another table, so it opens at its
+   * defaults and writes its own branch. */
+  const elsewhere = await reload(context, host, { graph: OTHER_GRAPH })
+  assert.equal(searchOf(first.wrapper), null, 'another graph restored these settings')
+  assert.equal(headCells(second.wrapper)[0].getAttribute('data-able-head'), null)
+
+  switchOption(elsewhere, second.wrapper, 'search')
+  elsewhere.runTimers()
+  assert.deepEqual(recordFor(elsewhere, uuid, { ordinal: 1, graph: OTHER_GRAPH }), { search: true })
+  assert.deepEqual(recordFor(elsewhere, uuid, { graph: GRAPH }), { search: true }, 'the first graph was overwritten')
+
+  // And back: each graph still says what it said.
+  const home = await reload(elsewhere, host, { graph: GRAPH })
+  assert.ok(searchOf(first.wrapper), 'the first graph lost its settings')
+  assert.equal(searchOf(second.wrapper), null)
+  assert.equal(home.store.writes.length, 0, 'restoring a table rewrote the store')
+})
+
+test('switching graphs inside the app moves which branch a table is read from', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  switchOption(context, wrapper, 'search')
+  context.runTimers()
+
+  await context.changeGraph(OTHER_GRAPH)
+  assert.equal(searchOf(wrapper), null, 'the other graph restored the first graph settings')
+
+  switchOption(context, wrapper, 'columns')
+  context.runTimers()
+  assert.deepEqual(recordFor(context, uuid, { graph: OTHER_GRAPH }), { columns: true })
+  assert.deepEqual(recordFor(context, uuid), { search: true }, 'the first graph was written over')
+
+  await context.changeGraph(GRAPH)
+  assert.ok(searchOf(wrapper), 'coming back did not restore the first graph')
+})
+
+test('a host that names no graph still renders, and remembers under its own branch', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host, undefined, { graph: null })
+  switchOption(context, wrapper, 'search')
+  context.runTimers()
+
+  assert.deepEqual(recordFor(context, uuid, { graph: '' }), { search: true })
+  assert.ok(await reload(context, host, { graph: null }))
+  assert.ok(searchOf(wrapper), 'a host with no graph did not come back sticky')
+})
+
+test('a stored sort or filter whose column has gone is dropped on its own', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  /* The block was edited between sessions and the table is narrower than it
+   * was: the sort and the filter that pointed past its last column go, and
+   * everything else the reader set stays. */
+  const context = await render(host, undefined, {
+    settings: store(uuid, {
+      search: true,
+      columns: true,
+      query: 'e',
+      sort: { index: 5, direction: 'asc' },
+      filters: { 0: 'ad', 4: 'gone' }
+    })
+  })
+
+  assert.deepEqual(order(wrapper), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+  assert.equal(headCells(wrapper)[0].getAttribute('aria-sort'), null)
+  assert.equal(within(headCells(wrapper)[0], 'data-able-column-term').textContent, 'ad')
+  /* The filter with no column left to read it against is dropped rather than
+   * left to match no cell, which would have hidden every row in the table. */
+  assert.deepEqual(visible(rows), ['Ada Engineer'])
+  assert.ok(searchOf(wrapper), 'the switches went with the sort')
+
+  context.runTimers()
+  assert.deepEqual(recordFor(context, uuid), {
+    search: true,
+    columns: true,
+    query: 'e',
+    filters: { 0: 'ad' }
+  })
+})
+
+test('a store that is malformed or from another version renders as if it were empty', async () => {
+  const shapes = [
+    'nonsense',
+    { tables: 'nonsense' },
+    { tables: { [GRAPH]: ['nope'] } },
+    { tables: { [GRAPH]: { 'not-a-key:0': { search: true } } } }
+  ]
+
+  for (const shape of shapes) {
+    const { host, main } = editor()
+    const { body } = block(main)
+    const { wrapper, rows } = table(body, STAFF)
+
+    const named = JSON.stringify(shape)
+    await render(host, undefined, { settings: shape })
+    assert.equal(searchOf(wrapper), null, `${named} turned search on`)
+    assert.equal(headCells(wrapper)[0].getAttribute('data-able-head'), null, `${named} turned columns on`)
+    assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'], named)
+  }
+})
+
+test('a record with fields of the wrong shape keeps the fields that are right', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host, undefined, {
+    settings: store(uuid, {
+      search: 'yes',
+      columns: true,
+      query: 42,
+      sort: { index: 'first', direction: 'asc' },
+      filters: { 0: 'ada', 1: null, wrong: 'engineer' }
+    })
+  })
+
+  // Neither the switch, the query nor the sort survives; the one good filter does.
+  assert.equal(searchOf(wrapper), null, 'a non-boolean switch was believed')
+  assert.equal(headCells(wrapper)[0].getAttribute('aria-sort'), null)
+  assert.equal(within(headCells(wrapper)[0], 'data-able-column-term').textContent, 'ada')
+  assert.deepEqual(visible(rows), ['Ada Engineer'])
+
+  context.runTimers()
+  assert.deepEqual(recordFor(context, uuid), { columns: true, filters: { 0: 'ada' } })
+})
+
+test('a table whose page is left keeps what it was set to for when it comes back', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  switchOption(context, wrapper, 'search')
+  const field = within(searchOf(wrapper), 'data-able-field')
+  type(context, field, 'grace')
+  context.runTimers()
+
+  /* Navigating away: the render goes, and with it the in-memory state — the
+   * store is what brings the table back the way it was. */
+  wrapper.remove()
+  context.observers[0].callback()
+  assert.deepEqual(recordFor(context, uuid), { search: true, query: 'grace' })
+
+  body.appendChild(wrapper)
+  context.observers[0].callback()
+  assert.equal(within(searchOf(wrapper), 'data-able-field').value, 'grace')
 })
