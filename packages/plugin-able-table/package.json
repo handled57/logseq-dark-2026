@@ -1,6 +1,6 @@
 {
   "name": "logseq-able-table",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Search and filter a rendered Markdown table in place, without editing the block, restructuring the Markdown, or writing anything to the graph.",
   "author": "Peter Cole",
   "license": "MIT",

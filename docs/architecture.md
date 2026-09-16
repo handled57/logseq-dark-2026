@@ -281,9 +281,35 @@ arrived in before the first move, so dropping the sort, turning the column
 switch off or unloading restores that order and takes the stamp off again. A
 table a pass no longer finds gives back its mark, its control, its fields,
 every attribute it wrote on a head cell, every row it was hiding, and the order
-it was rendered in. On `beforeunload`,
+it was rendered in.
+
+Able Table is also the one package that keeps state between sessions. What a
+table is set to — both switches, the search text, the sort and every committed
+filter — is mirrored at the end of every pass into the plugin's own settings
+object under one `tables` key, as a branch per graph and a record per table
+key, and written through `logseq.updateSettings` behind a short delay so a
+burst of keystrokes costs one write. Logseq keeps that object in its dotdir,
+`settings/logseq-able-table.json`, which is why this is not a graph write: no
+Markdown, block or property changes because a table was searched, sorted or
+filtered, and the store is deliberately not carried by a synced graph. The
+graph is read once, through `logseq.App.getCurrentGraph`, only to name the
+branch; nothing is written until it answers, and `onCurrentGraphChanged` moves
+the branch under a table rather than letting a record land in the wrong graph.
+The transient half of the state — the open panel, the field being edited, the
+open menu — is never stored. Reading is total: a malformed record, or a field
+of the wrong shape within one, is treated as absent rather than raised, and a
+stored sort or filter whose column the table no longer renders is dropped the
+way losing that column mid-session already drops it. A table left at its
+defaults writes no record, so the store stays about as long as the list of
+tables somebody has tuned. No package declares a settings schema, so none of
+this is a plugin-wide preference screen.
+
+On `beforeunload`,
 each package disconnects any observer it has, removes its own nodes and
 attributes, clears its own style, and settles any open prompt without writing.
+Able Table additionally flushes a pending settings write there, and leaves its
+store alone: an ordinary reload unloads and reloads the plugin, so clearing it
+would be the opposite of what it is for.
 Tests cover initial paint, mutations, settings, malformed settings, and
 cleanup.
 

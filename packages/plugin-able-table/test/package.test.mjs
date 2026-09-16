@@ -121,8 +121,40 @@ test('the runtime observes the host document and marks tables, and offers no set
   assert.match(code, /addEventListener\(type, handler, true\)/)
   assert.match(code, /removeEventListener\?\.\(type, handler, true\)/)
 
-  // Search is a per-table toggle in the panel, not a plugin-wide preference.
+  /* The settings file is where a table's own settings are remembered, but it
+   * is not a preferences screen: every switch here belongs to one table and is
+   * reached from that table's panel, so there is no schema for Logseq to draw
+   * a plugin-wide settings page from. */
   assert.doesNotMatch(code, /useSettingsSchema/)
+  assert.match(code, /logseq\.updateSettings\(/)
+  assert.match(code, /logseq\.settings/)
+})
+
+/* Sticky settings are the one thing this plugin keeps between sessions, and
+ * the whole point of keeping them in Logseq's own dotdir is that searching,
+ * sorting or filtering a table still changes nothing any graph tracks. */
+test('nothing a table is set to is written anywhere the graph can see', () => {
+  /* Every one of these would put a file, a block or a property inside the
+   * graph. The sandbox storage is on the list because Logseq resolves it
+   * against the current graph's assets root. */
+  for (const api of [
+    'makeSandboxStorage',
+    'FileStorage',
+    'Assets',
+    'logseq.Editor',
+    'logseq.DB',
+    'upsertBlockProperty',
+    'updateBlock',
+    'insertBlock',
+    'write_rootdir_file',
+    'writeFile'
+  ]) {
+    assert.doesNotMatch(code, new RegExp(api.replace(/\./g, '\\.')), `the runtime reaches for ${api}`)
+  }
+
+  // The graph is read, never written: it only says which branch of the store
+  // a table's settings belong under.
+  assert.match(code, /getCurrentGraph/)
 })
 
 test('everything written into the host document is namespaced to Able Table', () => {
