@@ -1,16 +1,16 @@
 # Able Table for Logseq
 
-Able Table makes a rendered Markdown table searchable and filterable in place,
-without editing the block, restructuring the Markdown, or converting the table
-to a query. Everything it does is display-only: no filter, no search string,
-and no toggle state is ever written to the graph.
+Able Table makes a rendered Markdown table searchable, filterable and sortable
+in place, without editing the block, restructuring the Markdown, or converting
+the table to a query. Everything it does is display-only: no filter, no search
+string, no sort and no toggle state is ever written to the graph.
 
 ## Searching a table
 
 Every Markdown table in the main editor carries a small **⋯** control in its
 top-right corner, beside the collapse control. Press it — with the pointer, or
 with Enter or Space from the keyboard — and a panel opens beneath it holding
-the table's two switches, **Full table search** and **Column menus**. Each is
+the table's two switches, **Full table search** and **Columns**. Each is
 that table's own, and neither is remembered anywhere outside the session.
 
 **Full table search** puts a find-as-you-type field across the top of the
@@ -36,10 +36,10 @@ column's menu, or by pressing the control again. Escape and a second press hand
 focus back to the control; a click outside leaves focus wherever you clicked
 it.
 
-## Filtering a column
+## Sorting and filtering a column
 
-Turn **Column menus** on in the same panel, and every column header takes a
-filter control of its own — a funnel — inside the cell's right-hand divider and
+Turn **Columns** on in the same panel, and every column header takes a
+control of its own — a funnel — inside the cell's right-hand divider and
 on the line the column name is set on, drawn in cyan. It is that colour under
 every theme, so one colour always means "filter this column", whatever else the
 theme you run is accented with; on a light Logseq it is taken down to a deeper
@@ -57,6 +57,25 @@ holding whatever that column last searched for, selected, so one keystroke
 refines or replaces it. Type, and every row whose cell **in that column** does
 not match disappears. Matching is the same case-insensitive substring test the
 full table search uses, read off that one cell rather than off the whole row.
+
+**Sort A-Z** and **Sort Z-A** order the whole table by that column, in place.
+The rows move; nothing is hidden, added or renumbered.
+
+- Values are compared by your own locale's collation, **case- and
+  accent-insensitively**, with **runs of digits read as numbers**: `Item 2`
+  comes before `Item 10`, and a column of numbers sorts as numbers rather than
+  as text. One predictable rule, as with the search.
+- **Rows that read the same keep the order Logseq rendered them in**, so
+  sorting one column never shuffles what you could already see in the others,
+  and sorting the same column twice gives the same table both times.
+- **A table is sorted by one column at a time.** Sorting by another column
+  replaces the sort rather than adding to it.
+- The sorted column's control shows an **arrow** — ↑ or ↓ — in place of the
+  funnel, its header carries `aria-sort` for a screen reader, and the direction
+  that is on is ticked in the menu.
+- **Pressing the direction that is on drops the sort** and gives the rows back
+  in the order Logseq rendered them. So does turning **Columns** off, unloading
+  the plugin, or removing the column it was sorted by.
 
 **Clear filter** is there only while that column has one, and drops it.
 
@@ -81,14 +100,18 @@ emphasis — is still exactly where it was when the field goes.
 - **The column name itself is still Logseq's.** Clicking it opens the block for
   editing exactly as it always did; only the filter control belongs to Able
   Table.
+- **Sorting and filtering are independent.** A sorted table is searched and
+  filtered exactly as an unsorted one is; a hidden row is hidden where the sort
+  put it, and comes back in that place.
 - Turning **Full table search** off clears the search field alone. Turning
-  **Column menus** off takes away every control, menu, field and committed
-  filter on that table and restores every row it was hiding — nothing is left
-  narrowing what you read once the affordance that would drop it is gone.
+  **Columns** off takes away every control, menu, field and committed
+  filter on that table, restores every row it was hiding, and puts the rows
+  back in the order Logseq rendered them — nothing is left narrowing or
+  reordering what you read once the affordance that would drop it is gone.
 
 A long filter wraps under the column name over a line or two, and can change
 how the table shares its width between columns. It never widens the table or
-puts a horizontal scrollbar on a table that had none. Turning **Column menus**
+puts a horizontal scrollbar on a table that had none. Turning **Columns**
 on reserves the strip the filter control stands in, which can also change that
 share; nothing moves as you use the menus.
 
@@ -102,8 +125,8 @@ empty box a missing icon font would otherwise leave.
 
 - **A header row.** Logseq renders one only for a Markdown table that declares
   a header separator row — the `| --- | --- |` line. A table that renders no
-  header row has no column names to filter by, so it is offered no **Column
-  menus** switch at all, and the settings panel says why.
+  header row has no column names to sort or filter by, so it is offered no
+  **Columns** switch at all, and the settings panel says why.
 - **A cell at that index.** Cells are matched to columns by position, so a row
   with no cell at the filtered column's index — a ragged or spanned row, which
   Markdown cannot write but pasted HTML can — counts as not matching and is
@@ -112,11 +135,16 @@ empty box a missing icon font would otherwise leave.
 ## What it never does
 
 - **Nothing reaches the graph.** No block content, property or Markdown change
-  comes from opening the panel, toggling, typing, filtering a column,
-  clearing, or unloading.
-- **No row is removed, reordered or rewritten.** A hidden row is marked
+  comes from opening the panel, toggling, typing, filtering a column, sorting,
+  clearing, or unloading. The Markdown behind a sorted table still holds its
+  rows in the order you wrote them, and the next load opens it unsorted.
+- **No row is removed or rewritten.** A hidden row is marked
   `data-able-filtered` and hidden by the plugin's own registered style;
   dropping the mark is all it takes to restore it.
+- **A sort moves the rendered rows and nothing else.** Each row is stamped with
+  the position it was rendered in, within the group it was rendered in, before
+  the first move, so dropping the sort puts every one of them back and takes
+  the stamp off again.
 - **No block is collapsed and no bullet is folded.** Every control answers
   pointer and key events in the capture phase, before Logseq's own handlers
   see them, so nothing you do to one of Able Table's controls opens its block
@@ -178,7 +206,7 @@ npm run check --workspace packages/plugin-able-table       # test, build and ver
 `test/package.test.mjs` covers the package's structure, its metadata, and the
 one-directional theme hook; `test/able-table.test.mjs` drives the entry script
 against a stub host document, from initial paint through the panel, the search
-field, column filters, re-render and teardown.
+field, column filters, column sorting, re-render and teardown.
 
 ## Attribution
 
