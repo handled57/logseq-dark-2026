@@ -54,10 +54,16 @@ function block(parent, uuid = nextUuid()) {
   return { host, wrapper, body, uuid }
 }
 
-/* Logseq renders a Markdown table with a head and a body. `textContent` on the
- * stub is the node's own text rather than its descendants', so each row is
- * given the text the browser would read off its cells. */
-function table(parent, rows = [], { head = 'Name Role' } = {}) {
+/* Logseq renders a Markdown table the way mldoc writes one: the head as
+ * `thead > tr > th`, every body group as `tbody > tr > td`, and no `thead` at
+ * all for a table that declares no header separator row.
+ *
+ * `textContent` on the stub is the node's own text rather than its
+ * descendants', so a row is given both its cells and the text a browser would
+ * read off it — which is the cells run together, with nothing between them.
+ * A row written as a plain string has no cells, and stands for the shape the
+ * column tests cannot read. */
+function table(parent, rows = [], { head = ['Name', 'Role'] } = {}) {
   const wrapper = node('div', { classes: ['table-wrapper'] })
   const el = node('table')
   const body = node('tbody')
@@ -65,14 +71,28 @@ function table(parent, rows = [], { head = 'Name Role' } = {}) {
   if (head !== null) {
     const thead = node('thead')
     const headRow = node('tr')
-    headRow.textContent = head
+    headRow.textContent = head.join('')
+
+    for (const name of head) {
+      const cell = node('th')
+      cell.textContent = name
+      headRow.appendChild(cell)
+    }
+
     thead.appendChild(headRow)
     el.appendChild(thead)
   }
 
   const cells = rows.map((text) => {
     const row = node('tr')
-    row.textContent = text
+    row.textContent = Array.isArray(text) ? text.join('') : text
+
+    for (const value of Array.isArray(text) ? text : []) {
+      const cell = node('td')
+      cell.textContent = value
+      row.appendChild(cell)
+    }
+
     body.appendChild(row)
     return row
   })
@@ -187,8 +207,32 @@ function within(row, attribute) {
   return row?.children.find((child) => child.matches(`[${attribute}]`)) ?? null
 }
 
+/* A row as a reader sees it: its cells with a space between them, which is not
+ * what `textContent` gives back. */
+function label(row) {
+  return row.children.length ? row.children.map((cell) => cell.textContent).join(' ') : row.textContent
+}
+
 function visible(rows) {
-  return rows.filter((row) => !row.attributes.has('data-able-filtered')).map((row) => row.textContent)
+  return rows.filter((row) => !row.attributes.has('data-able-filtered')).map(label)
+}
+
+function headCells(wrapper) {
+  return wrapper.querySelectorAll('th')
+}
+
+/* Focus leaving a field, as the host delivers it. */
+function blur(context, field) {
+  context.dispatchDocument('focusout', { target: field, preventDefault() {}, stopPropagation() {} })
+}
+
+/* Open a column's filter field, type into it, and let it close. */
+function filterColumn(context, cell, value) {
+  press(context, cell)
+  const field = within(cell, 'data-able-column-filter')
+  type(context, field, value)
+  blur(context, field)
+  return within(cell, 'data-able-column-term')
 }
 
 function press(context, target, event = {}) {
@@ -450,6 +494,22 @@ test('the control steps left of the theme’s collapse control, and stands alone
 
   // A hidden row is hidden by one declaration, so dropping the mark restores it.
   assert.match(style, /\[data-able-filtered\] \{\s*display: none !important;\s*\}/)
+
+  /* The filter field is laid over its header cell rather than in it, so
+   * opening and closing one cannot reflow the table. */
+  const filter = style.match(/\[data-able-column-filter\] \{[^}]+\}/)[0]
+  assert.match(filter, /position: absolute;/)
+  assert.match(filter, /inset: 0;/)
+  assert.match(filter, /box-sizing: border-box;/)
+
+  /* The committed filter is in flow under the name and laid out across the
+   * cell rather than across its own text, so it cannot put a horizontal
+   * scrollbar on a table that had none. */
+  const term = style.match(/\[data-able-column-term\] \{[^}]+\}/)[0]
+  assert.match(term, /display: block;/)
+  assert.match(term, /width: 0;/)
+  assert.match(term, /min-width: 100%;/)
+  assert.match(term, /overflow-wrap: anywhere;/)
 })
 
 test('pressing the control opens a panel beside the wrapper rather than inside it', async () => {
@@ -787,7 +847,7 @@ test('the runtime answers pointer, key and input events in the capture phase', a
 
   assert.deepEqual(
     [...context.documentListeners.keys()].sort(),
-    ['click', 'input', 'keydown', 'keyup', 'mousedown']
+    ['click', 'focusout', 'input', 'keydown', 'keyup', 'mousedown']
   )
 })
 
@@ -804,6 +864,435 @@ test('a table with no head keeps its first row standing', async () => {
   assert.equal(within(searchOf(wrapper), 'data-able-status').textContent, '1 of 2 rows')
 })
 
+/* Column filters: opened from a header cell, committed under the column name,
+ * and dropped by clicking what they committed. */
+
+const STAFF = [
+  ['Ada', 'Engineer'],
+  ['Grace', 'Admiral'],
+  ['Alan', 'Engineer']
+]
+
+test('every header cell is marked, keyed by its own column index, and focusable', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  await render(host)
+  const [name, role] = headCells(wrapper)
+  const key = wrapper.getAttribute('data-able-table')
+
+  for (const [index, cell] of [name, role].entries()) {
+    assert.equal(cell.getAttribute('data-able-head'), '')
+    assert.equal(cell.getAttribute('data-able-key'), key)
+    assert.equal(cell.getAttribute('data-able-column'), String(index))
+    // Reachable from the keyboard in its own right.
+    assert.equal(cell.getAttribute('tabindex'), '0')
+  }
+
+  assert.equal(name.getAttribute('title'), 'Filter by Name')
+  assert.equal(role.getAttribute('title'), 'Filter by Role')
+  // A header carries nothing else until the reader asks for it.
+  assert.equal(within(name, 'data-able-column-filter'), null)
+  assert.equal(within(name, 'data-able-column-term'), null)
+})
+
+test('clicking a column name opens a focused field, and what Logseq rendered stays where it was', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(wrapper)
+  /* The header cell holds rendered Markdown — a link, code, emphasis. The
+   * field is laid over it rather than put in its place. */
+  const link = name.appendChild(node('a'))
+
+  const record = press(context, name)
+  // Neither the press nor the click reaches Logseq, so the block never opens.
+  assert.equal(record.stopped, true)
+  assert.equal(record.prevented, true)
+
+  const field = within(name, 'data-able-column-filter')
+  assert.ok(field, 'no filter field was opened')
+  assert.equal(field.tagName, 'INPUT')
+  assert.equal(field.getAttribute('type'), 'text')
+  assert.equal(field.getAttribute('data-able-key'), wrapper.getAttribute('data-able-table'))
+  assert.equal(field.getAttribute('data-able-column'), '0')
+  assert.equal(field.getAttribute('aria-label'), 'Filter Name')
+  assert.equal(field.getAttribute('placeholder'), 'Name')
+  assert.equal(field.value, '')
+  assert.equal(field.focused, true, 'the field did not take focus')
+
+  // The cell's own markup is untouched, and still first.
+  assert.equal(name.children[0], link)
+  assert.equal(link.parentElement, name)
+})
+
+test('typing narrows the table to that column alone, and backspacing restores it', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(wrapper)
+  press(context, name)
+  const field = within(name, 'data-able-column-filter')
+
+  /* A term that matches another column's cells matches nothing here: the test
+   * is against the cell at this column's index, not against the row. */
+  const record = type(context, field, 'engineer')
+  assert.equal(record.stopped, true, 'the keystroke reached Logseq')
+  assert.deepEqual(visible(rows), [])
+
+  type(context, field, 'a')
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+
+  type(context, field, 'ADA')
+  assert.deepEqual(visible(rows), ['Ada Engineer'])
+
+  type(context, field, '')
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+})
+
+test('a row with no cell at that column index matches nothing', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, [['Ada', 'Engineer'], ['Grace']])
+
+  const context = await render(host)
+  const [, role] = headCells(wrapper)
+  filterColumn(context, role, 'engineer')
+
+  assert.deepEqual(visible(rows), ['Ada Engineer'])
+  assert.equal(rows[1].getAttribute('data-able-filtered'), '')
+})
+
+test('losing focus commits the filter under the column name', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(wrapper)
+  const link = name.appendChild(node('a'))
+
+  const term = filterColumn(context, name, 'ada')
+
+  assert.equal(within(name, 'data-able-column-filter'), null, 'the field stayed open')
+  assert.ok(term, 'nothing was committed under the column name')
+  assert.equal(term.tagName, 'BUTTON')
+  assert.equal(term.textContent, 'ada')
+  assert.equal(term.getAttribute('data-able-key'), wrapper.getAttribute('data-able-table'))
+  assert.equal(term.getAttribute('data-able-column'), '0')
+  assert.equal(term.getAttribute('aria-label'), 'Clear the filter on Name')
+  assert.equal(term.getAttribute('title'), term.getAttribute('aria-label'))
+  assert.deepEqual(visible(rows), ['Ada Engineer'])
+
+  // The cell's own markup came back exactly as it was, and first.
+  assert.equal(name.children[0], link)
+})
+
+test('a field that closes empty commits nothing and leaves the header as it was', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(wrapper)
+
+  press(context, name)
+  blur(context, within(name, 'data-able-column-filter'))
+
+  assert.equal(within(name, 'data-able-column-filter'), null)
+  assert.equal(within(name, 'data-able-column-term'), null)
+  assert.deepEqual(name.children, [])
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+})
+
+test('clicking the committed filter drops it, and never reopens the field', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(wrapper)
+  const term = filterColumn(context, name, 'ada')
+  name.focused = false
+
+  const record = press(context, term)
+  assert.equal(record.stopped, true)
+  assert.equal(record.prevented, true)
+
+  assert.equal(within(name, 'data-able-column-term'), null)
+  assert.equal(within(name, 'data-able-column-filter'), null, 'clearing the filter opened the field')
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+  assert.equal(rows.some((row) => row.attributes.has('data-able-filtered')), false)
+  assert.equal(name.focused, true, 'focus was not handed back to the header')
+})
+
+test('clicking the column name again reopens the field holding the committed text, selected', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(wrapper)
+  filterColumn(context, name, 'ada')
+
+  press(context, name)
+  const field = within(name, 'data-able-column-filter')
+
+  assert.ok(field, 'the field did not reopen')
+  assert.equal(field.value, 'ada')
+  assert.equal(field.focused, true)
+  // Selected, so the next keystroke refines or discards it.
+  assert.equal(field.selectionStart, 0)
+  assert.equal(field.selectionEnd, 3)
+  // The committed line is still there under the name while the field is open.
+  assert.equal(within(name, 'data-able-column-term').textContent, 'ada')
+})
+
+test('Escape restores the last committed filter; Enter commits what the field holds', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(wrapper)
+  filterColumn(context, name, 'ada')
+
+  // Escape: the draft goes, the committed filter stands.
+  press(context, name)
+  type(context, within(name, 'data-able-column-filter'), 'grace')
+  assert.deepEqual(visible(rows), ['Grace Admiral'])
+
+  name.focused = false
+  const abandoned = key(context, within(name, 'data-able-column-filter'), 'Escape')
+  assert.equal(abandoned.prevented, true)
+  assert.equal(abandoned.stopped, true)
+  assert.equal(within(name, 'data-able-column-filter'), null)
+  assert.equal(within(name, 'data-able-column-term').textContent, 'ada')
+  assert.deepEqual(visible(rows), ['Ada Engineer'])
+  assert.equal(name.focused, true, 'focus was not left on the header')
+
+  // Enter: what the field holds is committed and the field closes.
+  press(context, name)
+  type(context, within(name, 'data-able-column-filter'), 'grace')
+  name.focused = false
+  const committed = key(context, within(name, 'data-able-column-filter'), 'Enter')
+  assert.equal(committed.prevented, true)
+  assert.equal(committed.stopped, true)
+  assert.equal(within(name, 'data-able-column-filter'), null)
+  assert.equal(within(name, 'data-able-column-term').textContent, 'grace')
+  assert.deepEqual(visible(rows), ['Grace Admiral'])
+  assert.equal(name.focused, true)
+})
+
+test('column filters combine with each other and with the full table search', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name, role] = headCells(wrapper)
+
+  filterColumn(context, role, 'engineer')
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Alan Engineer'])
+
+  // A second column narrows what the first left, in either order.
+  filterColumn(context, name, 'alan')
+  assert.deepEqual(visible(rows), ['Alan Engineer'])
+  assert.equal(within(name, 'data-able-column-term').textContent, 'alan')
+  assert.equal(within(role, 'data-able-column-term').textContent, 'engineer')
+
+  // And the search narrows what both of them left.
+  const field = openSearch(context, wrapper)
+  type(context, field, 'engineer')
+  assert.deepEqual(visible(rows), ['Alan Engineer'])
+  type(context, field, 'ada')
+  assert.deepEqual(visible(rows), [])
+})
+
+test('turning full table search off clears the search and keeps every column filter', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(wrapper)
+  const term = filterColumn(context, name, 'a')
+
+  const field = openSearch(context, wrapper)
+  type(context, field, 'engineer')
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Alan Engineer'])
+
+  press(context, within(panelOf(wrapper), 'data-able-toggle'))
+  assert.equal(searchOf(wrapper), null)
+  // The reader's own column filter is not the toggle's to clear.
+  assert.equal(within(name, 'data-able-column-term').textContent, 'a')
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+
+  // Dropping the last column filter restores every row.
+  press(context, term)
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+  assert.equal(host.querySelectorAll('[data-able-filtered]').length, 0)
+})
+
+test('the search counts what the column filters leave standing', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  const [, role] = headCells(wrapper)
+  filterColumn(context, role, 'engineer')
+  openSearch(context, wrapper)
+
+  assert.equal(within(searchOf(wrapper), 'data-able-status').textContent, '2 of 3 rows')
+})
+
+test('the full table search reads a row as its cells with a space between them', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, [['Ada', 'Lovelace'], ['Grace', 'Hopper']])
+
+  const context = await render(host)
+  const field = openSearch(context, wrapper)
+
+  /* A browser concatenates a row's cells with nothing in between, so reading
+   * the row's own text would find `AdaLovelace` and never what the reader can
+   * see. */
+  type(context, field, 'ada lovelace')
+  assert.deepEqual(visible(rows), ['Ada Lovelace'])
+})
+
+test('a table that renders no header row offers no columns, and the panel says so', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const headless = table(body, ['Name Role', 'Ada Lovelace'], { head: null })
+  const { body: otherBody } = block(main)
+  const headed = table(otherBody, STAFF)
+
+  const context = await render(host)
+  assert.equal(host.querySelectorAll('[data-able-head]').length, 2)
+
+  press(context, settings(headless.wrapper))
+  assert.equal(
+    within(panelOf(headless.wrapper), 'data-able-note').textContent,
+    'This table renders no header row, so only full table search is available.'
+  )
+
+  press(context, settings(headed.wrapper))
+  assert.equal(
+    within(panelOf(headed.wrapper), 'data-able-note').textContent,
+    'Click a column name to filter that column.'
+  )
+})
+
+test('a header cell and its filter are operated from the keyboard', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(wrapper)
+
+  const opened = key(context, name, 'Enter')
+  assert.equal(opened.prevented, true)
+  assert.equal(opened.stopped, true)
+  const field = within(name, 'data-able-column-filter')
+  assert.ok(field, 'Enter on the header opened no field')
+
+  type(context, field, 'grace')
+  key(context, field, 'Enter')
+  assert.deepEqual(visible(rows), ['Grace Admiral'])
+
+  const cleared = key(context, within(name, 'data-able-column-term'), ' ')
+  assert.equal(cleared.prevented, true)
+  assert.equal(cleared.stopped, true)
+  assert.equal(within(name, 'data-able-column-term'), null)
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+})
+
+test('two tables in the same block filter their columns independently', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const first = table(body, STAFF)
+  const second = table(body, STAFF)
+
+  const context = await render(host)
+  filterColumn(context, headCells(first.wrapper)[0], 'ada')
+
+  assert.deepEqual(visible(first.rows), ['Ada Engineer'])
+  assert.deepEqual(visible(second.rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+  assert.equal(within(headCells(second.wrapper)[0], 'data-able-column-term'), null)
+})
+
+test('a re-render of the block brings every committed filter and its line back', async () => {
+  const { host, main } = editor()
+  const { body, uuid } = block(main)
+  const first = table(body, STAFF)
+
+  const context = await render(host)
+  filterColumn(context, headCells(first.wrapper)[0], 'ada')
+
+  // Editing the block replaces the whole render.
+  first.wrapper.remove()
+  context.markTables()
+  const rendered = table(body, STAFF)
+  context.markTables()
+
+  assert.equal(rendered.wrapper.getAttribute('data-able-table'), `${uuid}:0`)
+  assert.equal(within(headCells(rendered.wrapper)[0], 'data-able-column-term').textContent, 'ada')
+  assert.deepEqual(visible(rendered.rows), ['Ada Engineer'])
+})
+
+test('a block being edited commits the field that was open', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const first = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(first.wrapper)
+  press(context, name)
+  type(context, within(name, 'data-able-column-filter'), 'grace')
+
+  // The render goes while the field is still open.
+  first.wrapper.remove()
+  context.markTables()
+  const rendered = table(body, STAFF)
+  context.markTables()
+
+  const [restored] = headCells(rendered.wrapper)
+  assert.equal(within(restored, 'data-able-column-filter'), null, 'the field came back open')
+  assert.equal(within(restored, 'data-able-column-term').textContent, 'grace')
+  assert.deepEqual(visible(rendered.rows), ['Grace Admiral'])
+})
+
+test('a table the pass no longer claims gives its header cells back unmarked', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  const [name] = headCells(wrapper)
+  filterColumn(context, name, 'ada')
+  assert.ok(within(name, 'data-able-column-term'))
+
+  /* The cells stay in the document — what goes is the render this plugin was
+   * reading them out of. A header cell is Logseq's own node, so what has to
+   * come back is every attribute written on it. */
+  wrapper.classList.delete('table-wrapper')
+  context.markTables()
+
+  for (const attribute of ['data-able-head', 'data-able-key', 'data-able-column', 'tabindex', 'title']) {
+    assert.equal(name.getAttribute(attribute), null, `${attribute} was left on the header cell`)
+  }
+  assert.equal(within(name, 'data-able-column-term'), null)
+  assert.equal(host.querySelectorAll('[data-able-column-term]').length, 0)
+})
+
 test('unloading removes every node and mark this plugin wrote, and its listeners', async () => {
   const { host, main } = editor()
   const { body } = block(main)
@@ -817,6 +1306,10 @@ test('unloading removes every node and mark this plugin wrote, and its listeners
   type(context, field, 'grace')
   assert.ok(panelOf(wrapper), 'the panel is not open')
 
+  const [name] = headCells(wrapper)
+  filterColumn(context, name, 'grace')
+  press(context, name)
+
   const [unload] = context.unloads
   await unload()
 
@@ -826,6 +1319,13 @@ test('unloading removes every node and mark this plugin wrote, and its listeners
   assert.equal(host.querySelectorAll('[data-able-search]').length, 0)
   assert.equal(host.querySelectorAll('[data-able-filtered]').length, 0)
   assert.equal(host.querySelectorAll('[data-able-anchor]').length, 0)
+  assert.equal(host.querySelectorAll('[data-able-head]').length, 0)
+  assert.equal(host.querySelectorAll('[data-able-column]').length, 0)
+  assert.equal(host.querySelectorAll('[data-able-column-filter]').length, 0)
+  assert.equal(host.querySelectorAll('[data-able-column-term]').length, 0)
+  // The header cell is Logseq's own node, so every attribute written on it goes.
+  assert.equal(name.getAttribute('tabindex'), null)
+  assert.equal(name.getAttribute('title'), null)
   assert.deepEqual(visible(rows), ['Ada Lovelace', 'Grace Hopper'])
 
   for (const handlers of context.documentListeners.values()) assert.deepEqual(handlers, [])

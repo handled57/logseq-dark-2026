@@ -11,7 +11,7 @@ dependencies, compilation, remote imports, or runtime network access.
 | **Dark High Contrast** | [`packages/theme-dark-high-contrast`](packages/theme-dark-high-contrast) | `2.1.0` | A pure-black, accessible theme for Logseq classic/file graphs. |
 | **Passage** | [`packages/plugin-passage`](packages/plugin-passage) | `0.6.1` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
 | **Anno** | [`packages/plugin-anno`](packages/plugin-anno) | `0.2.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
-| **Able Table** | [`packages/plugin-able-table`](packages/plugin-able-table) | `0.1.0` | A settings control on every rendered Markdown table, and a find-as-you-type field that searches it in place. |
+| **Able Table** | [`packages/plugin-able-table`](packages/plugin-able-table) | `0.2.0` | A settings control on every rendered Markdown table, a find-as-you-type field that searches it in place, and a filter on every column header. |
 
 Install any one package by itself or install them together. None of them calls
 another. Dark High Contrast styles any
@@ -35,8 +35,10 @@ blocks.
 Able Table hangs a settings control on every Markdown table rendered in the
 main editor, and behind it a **Full table search** toggle that puts a
 find-as-you-type field across the top of the table: typing hides the rows that
-do not match, and clearing restores them. Rows are hidden rather than removed,
-and nothing is written to the graph; see the
+do not match, and clearing restores them. Clicking a column name opens a filter
+field in that header cell, narrowing the table to the rows matching that one
+column; several columns and the search filter together. Rows are hidden rather
+than removed, and nothing is written to the graph; see the
 [Able Table guide](packages/plugin-able-table/README.md). Its control sits
 beside Dark High Contrast's collapse control rather than over it, through the
 [table controls v1 hook](docs/contracts/table-controls-v1.md), and needs no
