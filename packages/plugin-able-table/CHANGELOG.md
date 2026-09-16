@@ -7,10 +7,12 @@ All notable changes to this package are documented here.
 - A rendered table can now be filtered one column at a time. The settings panel
   holds a second switch, **Column menus**; turn it on and every column header
   takes a filter control inside the cell's right-hand divider, drawn at full
-  strength in the host theme's accent colour so it reads as something to press
-  rather than as part of the column name, with a menu of its own behind it. It
-  fills the strip the header reserves for it, so being legible costs the table
-  no width it had not already given up.
+  strength in cyan so it reads as something to press rather than as part of the
+  column name, with a menu of its own behind it. It is that colour under every
+  theme rather than the theme's own accent, and is taken down to a deeper cyan
+  on a light host, where the brighter one would be lost. It fills the strip the
+  header reserves for it, so being legible costs the table no width it had not
+  already given up.
 - That control is a funnel from **Tabler Icons**, the face Logseq already loads
   for its own interface: naming it downloads nothing, ships no font with the
   plugin, and adds no dependency. Because a private-use glyph has no fallback,

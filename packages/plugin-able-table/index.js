@@ -254,11 +254,11 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
 
 /* Pinned to the top right of the cell — inside the divider, beside the name
  * rather than under it — so a wrapped name or a committed filter never moves
- * it. It takes the host's accent at full strength rather than the header's own
- * colour, so it reads as something to press rather than as part of the column
- * name, and a theme that restates the accent restates this too. It fills the
- * strip the header reserves for it — 1.25rem inside 1.5rem, the size the
- * theme's own controls are drawn at — so making it easier to see costs the
+ * it. It is drawn in cyan rather than in the host's accent: one colour means
+ * "filter this column" whatever theme is running, it is nothing the header's
+ * own text can be, and it does not go amber under a theme whose accent is. It
+ * fills the strip the header reserves for it — 1.25rem inside 1.5rem, the size
+ * the theme's own controls are drawn at — so making it easier to see costs the
  * table no width it had not already given up. */
 [data-able-column-control] {
   position: absolute;
@@ -276,11 +276,19 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;
-  color: var(--ls-active-primary-color, #6fc3df);
+  color: #6fc3df;
   background: var(--ls-secondary-background-color, #0a0a0a);
   border: 1px solid transparent;
   border-radius: 2px;
   cursor: pointer;
+}
+
+/* The same cyan taken down to where it can still be read: a light host draws
+ * the header behind this control in near-white, and a cyan bright enough for a
+ * dark theme all but disappears on it. Logseq marks the host element itself,
+ * so the rule answers the setting rather than the operating system. */
+html[data-theme=light] [data-able-column-control] {
+  color: #0f6b8a;
 }
 
 [data-able-column-control]::after {

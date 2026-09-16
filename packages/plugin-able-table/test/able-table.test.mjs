@@ -568,11 +568,15 @@ test('the control steps left of the theme’s collapse control, and stands alone
   const control = style.match(/\[data-able-column-control\] \{[^}]+\}/)[0]
   assert.match(control, /position: absolute;/)
   assert.match(control, /right: 0\.25rem;/)
-  /* Coloured with the host's accent rather than with the header's own text
-   * colour, so the control reads as a control; the fallback keeps it coloured
-   * with no theme declaring one, and nothing fades it at rest. */
-  assert.match(control, /color: var\(--ls-active-primary-color, #6fc3df\);/)
+  /* Cyan of its own rather than the header's text colour or the host's accent,
+   * so the control reads as a control and means the same thing under a theme
+   * whose accent is some other colour. Nothing fades it at rest. */
+  assert.match(control, /color: #6fc3df;/)
+  assert.doesNotMatch(control, /--ls-active-primary-color/)
   assert.doesNotMatch(control, /opacity:/)
+  // A light host draws the header near-white, where that cyan is unreadable.
+  const light = style.match(/html\[data-theme=light\] \[data-able-column-control\] \{[^}]+\}/)[0]
+  assert.match(light, /color: #0f6b8a;/)
   /* It fills the 1.5rem strip the header reserves rather than standing in the
    * middle of it, so it is legible without taking any more of the column. */
   assert.match(control, /width: 1\.25rem;/)
