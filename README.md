@@ -37,8 +37,10 @@ main editor, and behind it a **Full table search** toggle that puts a
 find-as-you-type field across the top of the table: typing hides the rows that
 do not match, and clearing restores them. A second toggle gives every column
 header a menu whose **Search column** narrows the table to the rows matching
-that one column; several columns and the search filter together. Rows are
-hidden rather than removed, and nothing is written to the graph; see the
+that one column, and whose **Sort A-Z** and **Sort Z-A** order the whole table
+by it; several columns and the search filter together. Rows are hidden rather
+than removed, a sort moves the rendered rows and is handed back on demand, and
+nothing is written to the graph; see the
 [Able Table guide](packages/plugin-able-table/README.md). Its control sits
 beside Dark High Contrast's collapse control rather than over it, through the
 [table controls v1 hook](docs/contracts/table-controls-v1.md), and needs no

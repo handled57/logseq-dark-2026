@@ -269,13 +269,19 @@ being searched, and a `data-able-column-term` line under its name once a filter
 is committed. The field is positioned over the cell rather than substituted for
 its content, so no markup Logseq rendered is moved and no column changes width
 as a field opens or closes; the column name itself is never claimed, and a
-click on it opens the block for editing as it always did. Whether the toggle is on, what the search field holds and what each
-column is filtered by are a `Map` in the runtime under the same key, so a
-re-render comes back searched and filtered, and a row that fails the search or
-any column filter takes `data-able-filtered` and is hidden by one declaration
-of the plugin's own style — never removed, reordered or rewritten. A table a
-pass no longer finds gives back its mark, its control, its fields, every
-attribute it wrote on a head cell, and every row it was hiding. On `beforeunload`,
+click on it opens the block for editing as it always did. Whether the toggle is on, what the search field holds, what each
+column is filtered by and which column the table is sorted by are a `Map` in
+the runtime under the same key, so a re-render comes back searched, filtered
+and sorted, and a row that fails the search or any column filter takes
+`data-able-filtered` and is hidden by one declaration of the plugin's own
+style — never removed or rewritten. Sorting is the one thing any package here
+does that moves a node Logseq rendered: rows are reordered within the group
+they were rendered in, each one stamped `data-able-row` with the position it
+arrived in before the first move, so dropping the sort, turning the column
+switch off or unloading restores that order and takes the stamp off again. A
+table a pass no longer finds gives back its mark, its control, its fields,
+every attribute it wrote on a head cell, every row it was hiding, and the order
+it was rendered in. On `beforeunload`,
 each package disconnects any observer it has, removes its own nodes and
 attributes, clears its own style, and settles any open prompt without writing.
 Tests cover initial paint, mutations, settings, malformed settings, and

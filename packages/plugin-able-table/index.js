@@ -1,11 +1,14 @@
 /* Able Table: finds and keys every rendered Markdown table, hangs one settings
  * control on it, and — behind that control's one toggle — searches it in
- * place, a column at a time from its own header or across every cell at once.
+ * place, a column at a time from its own header or across every cell at once,
+ * and sorts it by any one of its columns.
  *
  * Everything here is display-only. Typing in a field hides the rows that do
- * not match by marking them; no row is removed, reordered or rewritten, no
- * block is collapsed, and nothing at all reaches the graph. Closing a field
- * or unloading the plugin leaves the table exactly as Logseq rendered it.
+ * not match by marking them; sorting moves rendered rows within the group they
+ * were rendered in, remembering the order they arrived in so it can be handed
+ * back. No row is removed or rewritten, no block is collapsed, and nothing at
+ * all reaches the graph. Closing a field, dropping the sort or unloading the
+ * plugin leaves the table exactly as Logseq rendered it.
  *
  * Keying a table by its block's UUID and its ordinal within that block —
  * rather than by the DOM node Logseq happens to have rendered right now — is
@@ -52,6 +55,8 @@ const ACTION_ATTR = 'data-able-action'
 const COLUMN_FILTER_ATTR = 'data-able-column-filter'
 const COLUMN_TERM_ATTR = 'data-able-column-term'
 const ICON_ATTR = 'data-able-icon'
+const SORT_ATTR = 'data-able-sort'
+const ROW_ATTR = 'data-able-row'
 const FILTERED_ATTR = 'data-able-filtered'
 const KEY_ATTR = 'data-able-key'
 const PANEL_TOP_PROPERTY = '--able-panel-top'
@@ -318,6 +323,34 @@ html[data-theme=light] [data-able-column-control] {
   font-weight: 400;
 }
 
+/* A column this table is sorted by says so on its own control, in place of the
+ * funnel: one arrow, pointing the way the column now reads. It is drawn in the
+ * document's own face rather than the icon face, so it is there whether or not
+ * the host loaded Tabler Icons, and it is declared after the funnel so it wins
+ * the glyph on a column that is both sorted and filtered — what that column is
+ * filtered by is already written under its name. */
+[data-able-column-control][data-able-sort='asc']::after {
+  content: "\\2191";
+  font-family: inherit;
+  font-weight: 700;
+}
+
+[data-able-column-control][data-able-sort='desc']::after {
+  content: "\\2193";
+  font-family: inherit;
+  font-weight: 700;
+}
+
+/* The menu's own sort items carry their state as a mark rather than as a
+ * colour, so the one that is on reads the same under every host theme. */
+[data-able-menu-item][aria-checked='true'] {
+  font-weight: 700;
+}
+
+[data-able-menu-item][aria-checked='true']::after {
+  content: "\\00a0\\2713";
+}
+
 /* The control is drawn at full strength already, so hovering it, opening its
  * menu or giving it focus outlines the box it stands in rather than
  * brightening the glyph. */
@@ -446,8 +479,9 @@ html[data-theme=light] [data-able-column-control] {
  *
  * `search` and `columns` are the panel's two toggles. `filters` holds one
  * committed term per column index, `editing` the one field that is open on
- * this table, if any, with what it currently holds, and `menu` the column
- * whose menu is open. `names` remembers each column's name, read while the
+ * this table, if any, with what it currently holds, `menu` the column whose
+ * menu is open, and `sort` the one column the table is ordered by and the
+ * direction it is read in. `names` remembers each column's name, read while the
  * cell was still the one Logseq rendered, so a field covering a name can still
  * be labelled with it. */
 const tableState = new Map()
@@ -464,7 +498,8 @@ function stateFor(key) {
     filters: new Map(),
     names: new Map(),
     editing: null,
-    menu: null
+    menu: null,
+    sort: null
   }
 
   tableState.set(key, created)
@@ -590,6 +625,99 @@ function bodyRows(table) {
   return table.querySelector?.('thead') ? rows : rows.slice(1)
 }
 
+/* Sorting is the one thing this plugin does that moves a node Logseq rendered,
+ * so the order they were rendered in is written down before the first move:
+ * every body row is stamped with its position within the group it arrived in,
+ * and no row is ever stamped twice. Dropping the sort, turning the columns off
+ * or unloading the plugin puts the rows back in that order and takes the
+ * stamps off again, which is what keeps a display-only feature display-only. */
+function groupsOf(rows) {
+  const groups = new Map()
+
+  for (const row of rows) {
+    const parent = row.parentElement
+    if (!parent) continue
+
+    const group = groups.get(parent)
+    if (group) group.push(row)
+    else groups.set(parent, [row])
+  }
+
+  return groups
+}
+
+function stampRows(group) {
+  for (const [at, row] of group.entries()) {
+    if (row.getAttribute(ROW_ATTR) === null) row.setAttribute(ROW_ATTR, String(at))
+  }
+}
+
+function renderedAt(row) {
+  return Number(row.getAttribute(ROW_ATTR) ?? 0)
+}
+
+/* One predictable rule, read off the cell in that column: the reader's own
+ * collation, case- and accent-insensitive like the search is, with runs of
+ * digits compared as numbers so `Item 2` comes before `Item 10` and a column
+ * of numbers sorts as numbers rather than as text. */
+function compareCells(a, b, index) {
+  const left = collapse(cellsOf(a)[index]?.textContent)
+  const right = collapse(cellsOf(b)[index]?.textContent)
+
+  return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })
+}
+
+/* Rows that read the same in the sorted column keep the order they were
+ * rendered in, so sorting by one column never shuffles what the reader could
+ * already see in the others — and sorting the same column twice puts the table
+ * in the same order both times. */
+function sortedRows(group, sort) {
+  const rows = [...group]
+  if (!sort) return rows.sort((a, b) => renderedAt(a) - renderedAt(b))
+
+  const direction = sort.direction === 'desc' ? -1 : 1
+  return rows.sort((a, b) => compareCells(a, b, sort.index) * direction || renderedAt(a) - renderedAt(b))
+}
+
+/* The rows are placed into the slots they already occupy, in the wanted order,
+ * so nothing but a body row moves and a headless table's first row — which
+ * stands in for a head — keeps its place at the top of the group.
+ *
+ * A row already in its slot is left alone. That matters: the observer that
+ * schedules this pass sees the moves it makes, and a pass that reordered an
+ * already sorted table would schedule another one for ever. */
+function orderRows(parent, group, wanted) {
+  let at = 0
+
+  for (const row of wanted) {
+    const children = parent.children ?? []
+    while (at < children.length && !group.has(children[at])) at += 1
+
+    const slot = children[at] ?? null
+    if (slot !== row) parent.insertBefore(row, slot)
+    at += 1
+  }
+}
+
+function applySort(table, state, pass) {
+  const rows = bodyRows(table)
+
+  /* A table nobody has sorted is left exactly as Logseq rendered it: no stamp
+   * is written until the first sort, and no order is restored unless there is
+   * a stamp saying what to restore it to. */
+  if (!state.sort && !rows.some((row) => row.getAttribute(ROW_ATTR) !== null)) return
+
+  for (const [parent, group] of groupsOf(rows)) {
+    if (state.sort) stampRows(group)
+    orderRows(parent, new Set(group), sortedRows(group, state.sort))
+  }
+
+  for (const row of rows) {
+    if (state.sort) pass.rows.add(row)
+    else row.removeAttribute(ROW_ATTR)
+  }
+}
+
 /* The search and every column filter are answered in one pass, conjunctively:
  * a row is shown when it satisfies all of them, in whatever order they were
  * applied. */
@@ -649,14 +777,14 @@ function ensureSettings(wrapper, key, name, state) {
  * head only where it declares a header separator row, and a table with no head
  * has no column names to filter by; saying so is the difference between a
  * feature that is missing and one that is broken. */
-const COLUMN_NOTE = 'A menu on every column header searches that column.'
+const COLUMN_NOTE = 'A menu on every column header sorts and searches that column.'
 const NO_COLUMN_NOTE = 'This table renders no header row, so only full table search is available.'
 
 /* The panel's switches, in the order they are read. `columns` is offered only
  * to a table that renders a head. */
 const OPTIONS = [
   { name: 'search', label: 'Full table search' },
-  { name: 'columns', label: 'Column menus' }
+  { name: 'columns', label: 'Columns' }
 ]
 
 function buildToggle(key, option) {
@@ -904,6 +1032,19 @@ function applyColumn(cell, key, index, state, pass) {
 
   const control = childWith(cell, COLUMN_CONTROL_ATTR) ?? cell.appendChild(buildControl(key, index))
   if (iconFont()) control.setAttribute(ICON_ATTR, 'filter')
+
+  /* Which column the table is sorted by is said on the header itself, in the
+   * one attribute a screen reader already knows to read, and drawn on that
+   * column's own control as an arrow. */
+  const direction = state.sort?.index === index ? state.sort.direction : ''
+  if (direction) {
+    cell.setAttribute('aria-sort', direction === 'asc' ? 'ascending' : 'descending')
+    control.setAttribute(SORT_ATTR, direction)
+  } else {
+    cell.removeAttribute('aria-sort')
+    control.removeAttribute(SORT_ATTR)
+  }
+
   const label = `Column options for ${name}`
   control.setAttribute('aria-expanded', state.menu === index ? 'true' : 'false')
   control.setAttribute('aria-label', label)
@@ -944,10 +1085,13 @@ function applyColumn(cell, key, index, state, pass) {
 }
 
 /* The menu one column's control has open, built beside the wrapper and
- * measured against the control it belongs to. `Search column` is always there;
- * `Clear filter` only while there is one to clear. */
+ * measured against the control it belongs to. `Search column` and the two sort
+ * directions are always there; `Clear filter` only while there is one to
+ * clear. */
 const MENU_ITEMS = [
   { action: 'search', label: 'Search column' },
+  { action: 'asc', label: 'Sort A-Z', direction: 'asc' },
+  { action: 'desc', label: 'Sort Z-A', direction: 'desc' },
   /* Nothing to clear is not an item to press: it is hung and taken away with
    * the filter itself. */
   { action: 'clear', label: 'Clear filter', filtered: true }
@@ -962,14 +1106,16 @@ function buildMenu(key, index) {
   return menu
 }
 
-function buildItem(key, index, { action, label }) {
+function buildItem(key, index, { action, label, direction }) {
   const item = doc.createElement('button')
   item.setAttribute('type', 'button')
   item.setAttribute(ITEM_ATTR, '')
   item.setAttribute(ACTION_ATTR, action)
   item.setAttribute(KEY_ATTR, key)
   item.setAttribute(COLUMN_ATTR, String(index))
-  item.setAttribute('role', 'menuitem')
+  /* The two directions are one choice with a state, not two commands: a radio
+   * is what says so, and what lets the item that is on be pressed again. */
+  item.setAttribute('role', direction ? 'menuitemradio' : 'menuitem')
   item.textContent = label
   return item
 }
@@ -1024,11 +1170,18 @@ function ensureMenu(wrapper, key, state, cells, pass) {
   menu.setAttribute('aria-label', `Column options for ${name}`)
 
   for (const option of MENU_ITEMS) {
-    const item = itemIn(menu, option.action)
     const wanted = !option.filtered || state.filters.has(index)
+    let item = itemIn(menu, option.action)
 
-    if (wanted && !item) menu.appendChild(buildItem(key, index, option))
-    else if (!wanted && item) item.remove()
+    if (wanted && !item) item = menu.appendChild(buildItem(key, index, option))
+    else if (!wanted && item) {
+      item.remove()
+      item = null
+    }
+
+    if (!item || !option.direction) continue
+    const on = state.sort?.index === index && state.sort.direction === option.direction
+    item.setAttribute('aria-checked', on ? 'true' : 'false')
   }
 
   anchorMenu(menu, childWith(cells[index], COLUMN_CONTROL_ATTR), wrapper.parentElement)
@@ -1045,8 +1198,13 @@ function applyColumns(table, key, state, pass) {
     state.filters.clear()
     state.editing = null
     state.menu = null
+    state.sort = null
     return { head: cells.length > 0, cells: [] }
   }
+
+  /* A table that has lost the column it was sorted by is read in the order it
+   * was rendered in again, rather than by a column that is no longer there. */
+  if (state.sort && !cells[state.sort.index]) state.sort = null
 
   for (const [index, cell] of cells.entries()) applyColumn(cell, key, index, state, pass)
 
@@ -1083,6 +1241,10 @@ function applyTable(wrapper, table, key, name, pass) {
   const { head, cells } = applyColumns(table, key, state, pass)
   ensureMenu(wrapper, key, state, cells, pass)
 
+  /* Sorted before the rows are counted and filtered, so what the search hides
+   * and what the status says are read off the table in front of the reader. */
+  applySort(table, state, pass)
+
   const panel = ensurePanel(wrapper, key, name, state, head)
   if (panel) pass.panels.add(panel)
 
@@ -1112,6 +1274,7 @@ function emptyPass() {
     panels: new Set(),
     searches: new Set(),
     filtered: new Set(),
+    rows: new Set(),
     columns: new Set(),
     columnControls: new Set(),
     menus: new Set(),
@@ -1204,8 +1367,23 @@ function release(pass) {
    * attribute this plugin wrote on it rather than the cell itself. */
   for (const cell of doc.querySelectorAll(`[${HEAD_ATTR}]`)) {
     if (pass.columns.has(cell)) continue
-    for (const attribute of [HEAD_ATTR, KEY_ATTR, COLUMN_ATTR]) cell.removeAttribute(attribute)
+    for (const attribute of [HEAD_ATTR, KEY_ATTR, COLUMN_ATTR, 'aria-sort']) cell.removeAttribute(attribute)
   }
+
+  /* A stamped row this pass did not reach belongs to a table that is no longer
+   * rendered, or to a plugin that is unloading: it goes back where it was
+   * rendered and gives its stamp back, so nothing of a sort outlives the
+   * feature that applied it. */
+  const stale = []
+  for (const row of doc.querySelectorAll(`[${ROW_ATTR}]`)) {
+    if (!pass.rows.has(row)) stale.push(row)
+  }
+
+  for (const [parent, group] of groupsOf(stale)) {
+    orderRows(parent, new Set(group), sortedRows(group, null))
+  }
+
+  for (const row of stale) row.removeAttribute(ROW_ATTR)
 
   for (const row of doc.querySelectorAll(`[${FILTERED_ATTR}]`)) {
     if (!pass.filtered.has(row)) row.removeAttribute(FILTERED_ATTR)
@@ -1406,8 +1584,9 @@ function toggleMenu(control) {
 }
 
 /* The menu's items. `Search column` closes the menu and opens the field over
- * the column name, holding what that column last searched for; `Clear filter`
- * drops it. */
+ * the column name, holding what that column last searched for; `Sort A-Z` and
+ * `Sort Z-A` order the whole table by that column; `Clear filter` drops the
+ * column's filter. */
 function activateItem(item) {
   const column = columnOf(item)
   if (!column) return
@@ -1417,8 +1596,30 @@ function activateItem(item) {
 
   if (action === 'clear') return clearColumn(item)
   if (action === 'search') return openColumn(item)
+  if (action === 'asc' || action === 'desc') return sortColumn(item, action)
 
   markTables()
+}
+
+/* Ordering the table by one column. A table is sorted by one column at a time,
+ * so sorting by another replaces it, and the direction that is already on is
+ * pressed again to drop the sort and read the table in the order Logseq
+ * rendered it. Nothing is written to the graph either way: the markdown behind
+ * the table is untouched, and the next load opens it unsorted. */
+function sortColumn(node, direction) {
+  const column = columnOf(node)
+  if (!column) return
+
+  /* An open field anywhere commits what it holds rather than losing it,
+   * exactly as it does when the reader clicks away. */
+  for (const state of tableState.values()) commit(state)
+
+  const current = column.state.sort
+  const on = current?.index === column.index && current.direction === direction
+  column.state.sort = on ? null : { index: column.index, direction }
+
+  markTables()
+  focusIn(COLUMN_CONTROL_ATTR, column.key, column.index)
 }
 
 /* Moving through an open menu from the keyboard. */

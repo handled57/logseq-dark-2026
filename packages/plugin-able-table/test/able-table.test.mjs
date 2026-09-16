@@ -241,6 +241,20 @@ function itemIn(menu, action) {
   return menu?.children.find((child) => child.getAttribute('data-able-action') === action) ?? null
 }
 
+/* The order the reader sees, read off the document rather than off the array
+ * the fixture built: sorting moves the rendered rows, and the array it built
+ * them from never changes. */
+function order(el) {
+  return el.querySelectorAll('tr').filter((row) => row.parentElement?.tagName !== 'THEAD').map(label)
+}
+
+/* Sort a column the way a reader does: its control, then the direction in the
+ * menu behind it. */
+function sortColumn(context, wrapper, index, action) {
+  press(context, controlOf(headCells(wrapper)[index]))
+  return press(context, itemIn(menuOf(wrapper), action))
+}
+
 /* Focus leaving a field, as the host delivers it. */
 function blur(context, field) {
   context.dispatchDocument('focusout', { target: field, preventDefault() {}, stopPropagation() {} })
@@ -1052,7 +1066,7 @@ test('no header carries a control until the table’s column switch is on', asyn
   press(context, settings(wrapper))
   const toggle = option(panelOf(wrapper), 'columns')
   assert.ok(toggle, 'the panel offers no column switch')
-  assert.equal(toggle.textContent, 'Column menus')
+  assert.equal(toggle.textContent, 'Columns')
   assert.equal(toggle.getAttribute('role'), 'switch')
   assert.equal(toggle.getAttribute('aria-checked'), 'false')
 
@@ -1531,7 +1545,7 @@ test('a table that renders no header row is offered no column switch, and the pa
   assert.ok(option(panelOf(headed.wrapper), 'columns'))
   assert.equal(
     within(panelOf(headed.wrapper), 'data-able-note').textContent,
-    'A menu on every column header searches that column.'
+    'A menu on every column header sorts and searches that column.'
   )
 })
 
@@ -1586,6 +1600,207 @@ test('two tables in the same block filter their columns independently', async ()
   assert.deepEqual(visible(second.rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
   // The switch is the table's own, so the second table has no controls at all.
   assert.equal(headCells(second.wrapper)[0].getAttribute('data-able-head'), null)
+})
+
+/* Column sorting: the same menu's two directions, ordering the rendered rows
+ * in place. Every test here also reads the rows back, because this is the one
+ * feature that moves a node Logseq rendered. */
+
+test('Sort A-Z orders the table by that column and says so on its header', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, table: el, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  const [name] = headCells(wrapper)
+
+  const menu = (press(context, controlOf(name)), menuOf(wrapper))
+  const ascending = itemIn(menu, 'asc')
+  const descending = itemIn(menu, 'desc')
+  assert.ok(ascending && descending, 'the menu offers no sort')
+  assert.equal(ascending.textContent, 'Sort A-Z')
+  assert.equal(descending.textContent, 'Sort Z-A')
+  assert.equal(ascending.getAttribute('role'), 'menuitemradio')
+  assert.equal(ascending.getAttribute('aria-checked'), 'false')
+
+  const record = press(context, ascending)
+  assert.equal(record.stopped, true)
+  assert.equal(record.prevented, true)
+
+  assert.deepEqual(order(el), ['Ada Engineer', 'Alan Engineer', 'Grace Admiral'])
+  // Display-only: the rows are the nodes Logseq rendered, moved and not remade.
+  assert.equal(rows.every((row) => row.parentElement?.tagName === 'TBODY'), true)
+  assert.deepEqual(visible(rows).sort(), ['Ada Engineer', 'Alan Engineer', 'Grace Admiral'])
+
+  // The menu closes, the control takes focus back, and the header says which
+  // way it is read.
+  assert.equal(menuOf(wrapper), null)
+  assert.equal(controlOf(name).focused, true)
+  assert.equal(name.getAttribute('aria-sort'), 'ascending')
+  assert.equal(controlOf(name).getAttribute('data-able-sort'), 'asc')
+
+  press(context, controlOf(name))
+  assert.equal(itemIn(menuOf(wrapper), 'asc').getAttribute('aria-checked'), 'true')
+  assert.equal(itemIn(menuOf(wrapper), 'desc').getAttribute('aria-checked'), 'false')
+})
+
+test('Sort Z-A reverses it, and sorting another column replaces the sort', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, table: el } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+
+  sortColumn(context, wrapper, 0, 'desc')
+  assert.deepEqual(order(el), ['Grace Admiral', 'Alan Engineer', 'Ada Engineer'])
+  assert.equal(headCells(wrapper)[0].getAttribute('aria-sort'), 'descending')
+
+  /* One column at a time: the table is read by the role now, and the name has
+   * nothing left to say about it. Rows that read the same in the sorted column
+   * keep the order they were rendered in. */
+  sortColumn(context, wrapper, 1, 'asc')
+  assert.deepEqual(order(el), ['Grace Admiral', 'Ada Engineer', 'Alan Engineer'])
+  assert.equal(headCells(wrapper)[0].getAttribute('aria-sort'), null)
+  assert.equal(controlOf(headCells(wrapper)[0]).getAttribute('data-able-sort'), null)
+  assert.equal(headCells(wrapper)[1].getAttribute('aria-sort'), 'ascending')
+})
+
+test('pressing the direction that is on drops the sort and gives the rendered order back', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, table: el } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  sortColumn(context, wrapper, 0, 'asc')
+  assert.deepEqual(order(el), ['Ada Engineer', 'Alan Engineer', 'Grace Admiral'])
+
+  sortColumn(context, wrapper, 0, 'asc')
+  assert.deepEqual(order(el), STAFF.map((row) => row.join(' ')))
+  assert.equal(headCells(wrapper)[0].getAttribute('aria-sort'), null)
+  // Nothing of the sort is left on the rows it moved.
+  assert.equal(host.querySelectorAll('[data-able-row]').length, 0)
+})
+
+test('runs of digits sort as numbers, whatever case the words are in', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, table: el } = table(body, [
+    ['Item 10', 'b'],
+    ['item 2', 'a'],
+    ['ITEM 1', 'c']
+  ])
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  sortColumn(context, wrapper, 0, 'asc')
+
+  assert.deepEqual(order(el), ['ITEM 1 c', 'item 2 a', 'Item 10 b'])
+})
+
+test('a sorted table is still searched, and the status counts what is left', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, table: el, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  sortColumn(context, wrapper, 0, 'asc')
+  filterColumn(context, wrapper, 1, 'engineer')
+
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Alan Engineer'])
+  // A hidden row is hidden where it now sits, and never moved out of the way.
+  assert.deepEqual(order(el), ['Ada Engineer', 'Alan Engineer', 'Grace Admiral'])
+
+  type(context, openSearch(context, wrapper), 'alan')
+  assert.equal(within(searchOf(wrapper), 'data-able-status').textContent, '1 of 3 rows')
+})
+
+test('turning the column switch off gives the rows back in the order they were rendered', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, table: el } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  sortColumn(context, wrapper, 0, 'desc')
+  assert.deepEqual(order(el), ['Grace Admiral', 'Alan Engineer', 'Ada Engineer'])
+
+  switchOption(context, wrapper, 'columns')
+  assert.deepEqual(order(el), STAFF.map((row) => row.join(' ')))
+  assert.equal(host.querySelectorAll('[data-able-row]').length, 0)
+})
+
+test('a sort survives a re-render of the block', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const first = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, first.wrapper)
+  sortColumn(context, first.wrapper, 0, 'asc')
+
+  panelOf(first.wrapper)?.remove()
+  first.wrapper.remove()
+  context.markTables()
+  const rendered = table(body, STAFF)
+  context.markTables()
+
+  assert.deepEqual(order(rendered.table), ['Ada Engineer', 'Alan Engineer', 'Grace Admiral'])
+  assert.equal(headCells(rendered.wrapper)[0].getAttribute('aria-sort'), 'ascending')
+})
+
+test('a table that stops rendering is left in the order Logseq rendered it', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, table: el } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  sortColumn(context, wrapper, 0, 'desc')
+
+  wrapper.classList.delete('table-wrapper')
+  context.markTables()
+
+  assert.deepEqual(order(el), STAFF.map((row) => row.join(' ')))
+  assert.equal(host.querySelectorAll('[data-able-row]').length, 0)
+})
+
+test('a sort is applied from the keyboard, and the key never reaches Logseq', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, table: el } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  const [name] = headCells(wrapper)
+
+  press(context, controlOf(name))
+  const record = key(context, itemIn(menuOf(wrapper), 'desc'), 'Enter')
+  assert.equal(record.stopped, true)
+  assert.equal(record.prevented, true)
+
+  assert.deepEqual(order(el), ['Grace Admiral', 'Alan Engineer', 'Ada Engineer'])
+  assert.equal(controlOf(name).focused, true)
+})
+
+test('unloading gives every moved row back where Logseq rendered it', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, table: el } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  sortColumn(context, wrapper, 0, 'asc')
+
+  const [unload] = context.unloads
+  await unload()
+
+  assert.deepEqual(order(el), STAFF.map((row) => row.join(' ')))
+  assert.equal(host.querySelectorAll('[data-able-row]').length, 0)
+  assert.equal(headCells(wrapper)[0].attributes.size, 0)
 })
 
 test('a re-render of the block brings every committed filter and its line back', async () => {

@@ -2,6 +2,30 @@
 
 All notable changes to this package are documented here.
 
+## 0.3.0 - 2026-09-16
+
+- A rendered table can now be **sorted by any one of its columns**. The menu
+  behind a column's control holds **Sort A-Z** and **Sort Z-A**, which order
+  the whole table by that column in place. Values are compared by the reader's
+  own locale collation, case- and accent-insensitively — the way the search
+  matches — with runs of digits read as numbers, so `Item 2` comes before
+  `Item 10` and a column of numbers sorts as numbers. Rows that read the same
+  in the sorted column keep the order Logseq rendered them in, so sorting one
+  column never shuffles what the reader could already see in the others.
+- A table is sorted by one column at a time: sorting by another replaces the
+  sort, and pressing the direction that is already on drops it. The sorted
+  column's control draws an arrow in place of its funnel, its header carries
+  `aria-sort`, and the direction that is on is ticked in the menu as a radio.
+- Sorting is display-only, like everything else here. It moves the rows Logseq
+  rendered, within the group it rendered them in, and stamps each one with the
+  position it arrived in before the first move — so dropping the sort, turning
+  the columns switch off, losing the sorted column or unloading the plugin
+  hands every row back where it was and takes the stamp with it. Nothing is
+  written to the graph: the Markdown behind a sorted table still holds its rows
+  in the order they were typed, and the next load opens it unsorted.
+- The settings panel's second switch is now called **Columns** rather than
+  **Column menus**, because the menu it turns on does more than search.
+
 ## 0.2.0 - 2026-09-16
 
 - A rendered table can now be filtered one column at a time. The settings panel
