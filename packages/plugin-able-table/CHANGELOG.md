@@ -4,31 +4,46 @@ All notable changes to this package are documented here.
 
 ## 0.2.0 - 2026-09-15
 
-- A rendered table can now be filtered one column at a time from its own
-  header. Clicking a column name — or pressing Enter or Space on it — opens a
-  filter field in that header cell and focuses it; typing hides every row whose
-  cell in that column does not match, by the same case-insensitive substring
-  rule the full table search uses.
-- The field is laid over the header cell rather than put in its place, so
-  opening and closing one never reflows the table, and the markup Logseq
-  rendered there — a link, code, emphasis — is never moved or rebuilt.
+- A rendered table can now be filtered one column at a time. The settings panel
+  holds a second switch, **Column menus**; turn it on and every column header
+  takes a small **⋮** control inside the cell's right-hand divider, with a menu
+  of its own behind it.
+- **Search column** closes that menu and opens a field over the column name,
+  holding whatever the column last searched for, selected, so one keystroke
+  refines or replaces it. Typing hides every row whose cell in that column does
+  not match, by the same case-insensitive substring rule the full table search
+  uses. **Clear filter** is offered only while that column has one, and drops
+  it.
+- The field is laid over the header cell rather than put in its place, and
+  stops short of the control's strip, so the column keeps its width, the menu
+  stays reachable, and the markup Logseq rendered there — a link, code,
+  emphasis — is never moved or rebuilt.
 - A field that closes commits what it holds: the filter is shown in small text
-  under the column name, and clicking that text drops the filter and restores
-  the rows it hid. Clicking the column name again reopens the field holding the
-  committed text, selected, so one keystroke refines or discards it. Escape
-  restores the last committed filter, Enter commits what the field holds and
-  leaves focus on the header, and a field that closes empty commits nothing.
+  under the column name, where clicking it drops the filter and restores the
+  rows it hid. Escape closes the field and restores the last committed filter,
+  Enter commits what it holds, and both leave focus on the control. A field
+  that closes empty commits nothing.
+- The column name itself is left to Logseq: clicking it opens the block for
+  editing exactly as it always did. Only the control, its menu, the field and
+  the committed filter answer to this plugin, and all four take their events in
+  the capture phase.
+- The menu is rendered beside the table rather than inside it — the wrapper is
+  an `overflow: auto` scroller that would clip it — measured against the
+  control it belongs to and held inside the block, so a menu on the last column
+  opens inward and one on a narrow first column does not run off the other
+  edge. Scrolling the table closes it.
 - Filters on several columns combine with each other and with the full table
   search: a row is shown only when it satisfies all of them, whatever order
   they were applied in. Turning **Full table search** off clears the search
-  field alone — the reader's column filters are their own and stay.
+  field alone; turning **Column menus** off takes away every control, menu,
+  field and committed filter on that table and restores every row it was
+  hiding.
 - Column filters live beside the search state in the runtime, keyed by block
   UUID, ordinal and column index. Every table opens unfiltered, a re-render
   finds its filters again, and nothing is written to the graph.
-- The settings panel now says what the table under it offers. Logseq renders a
-  header row only for a Markdown table that declares a header separator row; a
-  table that renders none offers full table search alone, and the panel says
-  so rather than leaving a reader clicking at nothing.
+- A table that renders no header row — Markdown writes one only where a header
+  separator row is declared — is offered no **Column menus** switch at all, and
+  the panel says why.
 - Cells are matched to columns by index. A row with no cell at that index —
   a ragged or spanned row, which Markdown cannot write but pasted HTML can —
   is treated as not matching.

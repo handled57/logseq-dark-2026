@@ -8,17 +8,20 @@ and no toggle state is ever written to the graph.
 ## Searching a table
 
 Every Markdown table in the main editor carries a small **⋯** control in its
-top-right corner. Press it — with the pointer, or with Enter or Space from the
-keyboard — and a panel opens beneath it holding one toggle:
+top-right corner, beside the collapse control. Press it — with the pointer, or
+with Enter or Space from the keyboard — and a panel opens beneath it holding
+the table's two switches, **Full table search** and **Column menus**. Each is
+that table's own, and neither is remembered anywhere outside the session.
 
 **Full table search** puts a find-as-you-type field across the top of the
 table and focuses it. Type, and every row that does not match disappears as
 you go; backspace, and the rows come back.
 
-- Matching is a **case-insensitive substring test** over the row's rendered
-  text, with runs of whitespace collapsed to one space. `ada` finds
-  `Ada Lovelace`. There is no tokenising, no fuzzy matching and no regular
-  expression support — one predictable rule is the point.
+- Matching is a **case-insensitive substring test** over the row's cells, read
+  with a space between them and runs of whitespace collapsed to one. `ada`
+  finds `Ada Lovelace`, and so does `ada lovelace` in a row whose first two
+  cells are `Ada` and `Lovelace`. There is no tokenising, no fuzzy matching
+  and no regular expression support — one predictable rule is the point.
 - The **header row is never hidden**, so a table with nothing matching still
   reads as a table rather than as an error.
 - The field says how many rows match out of how many the table holds, and
@@ -28,49 +31,62 @@ you go; backspace, and the rows come back.
 - Turning **Full table search** off takes the field away, clears it, and
   restores every row.
 
-Dismiss the panel with Escape, with a click anywhere outside it, or by
-pressing the control again. Escape and a second press hand focus back to the
-control; a click outside leaves focus wherever you clicked it.
+Dismiss the panel with Escape, with a click anywhere outside it, by opening a
+column's menu, or by pressing the control again. Escape and a second press hand
+focus back to the control; a click outside leaves focus wherever you clicked
+it.
 
 ## Filtering a column
 
-Click a column name — or press Enter or Space on it, since every header is
-focusable — and a filter field opens in that header cell. Type, and every row
-whose cell **in that column** does not match disappears. Matching is the same
-case-insensitive substring test the full table search uses, read off that one
-cell rather than off the whole row.
+Turn **Column menus** on in the same panel, and every column header takes a
+small **⋮** control of its own, inside the cell's right-hand divider. Press it
+— with the pointer, or with Enter or Space — and a menu opens under it:
 
-The field is laid over the header cell rather than put in its place, so the
-column keeps its width and the table never reflows as a field opens and
-closes. Whatever Logseq rendered in that header — a link, code, emphasis — is
-still exactly where it was when the field goes.
+**Search column** closes the menu and opens a field over the column name,
+holding whatever that column last searched for, selected, so one keystroke
+refines or replaces it. Type, and every row whose cell **in that column** does
+not match disappears. Matching is the same case-insensitive substring test the
+full table search uses, read off that one cell rather than off the whole row.
+
+**Clear filter** is there only while that column has one, and drops it.
+
+The field is laid over the header cell rather than put in its place, and stops
+short of the ⋮ control, so the column keeps its width, the menu stays
+reachable, and whatever Logseq rendered in that header — a link, code,
+emphasis — is still exactly where it was when the field goes.
 
 - **Losing focus commits** what the field holds. The filter is shown in small
   text under the column name, so you can see at a glance which columns are
   narrowing the table and by what. A field that closes empty commits nothing.
-- **Click the committed filter** to drop it and bring back the rows it hid.
-  That is the only thing clicking it does — it never reopens the field.
-- **Click the column name again** to reopen the field holding the committed
-  text, selected, so one keystroke refines or discards it.
+- **Click the committed filter** to drop it and bring back the rows it hid —
+  the same thing **Clear filter** does, without opening the menu. It never
+  reopens the field.
 - **Escape** closes the field and restores the last committed filter. **Enter**
-  commits what the field holds and closes it, leaving focus on the header.
+  commits what the field holds and closes it. Both leave focus on the ⋮
+  control, so the next thing is a keystroke away.
 - **Several columns filter together.** A row is shown only when it satisfies
   every committed column filter *and* the full table search. The order they
   were applied in does not matter, and dropping the last one restores every
   row.
-- Turning **Full table search** off clears the search field alone. Column
-  filters are yours, and stay until you drop them.
+- **The column name itself is still Logseq's.** Clicking it opens the block for
+  editing exactly as it always did; only the ⋮ control belongs to Able Table.
+- Turning **Full table search** off clears the search field alone. Turning
+  **Column menus** off takes away every control, menu, field and committed
+  filter on that table and restores every row it was hiding — nothing is left
+  narrowing what you read once the affordance that would drop it is gone.
 
 A long filter wraps under the column name over a line or two, and can change
 how the table shares its width between columns. It never widens the table or
-puts a horizontal scrollbar on a table that had none.
+puts a horizontal scrollbar on a table that had none. Turning **Column menus**
+on reserves the strip the ⋮ control stands in, which can also change that
+share; nothing moves as you use the menus.
 
 ### What a column filter needs
 
 - **A header row.** Logseq renders one only for a Markdown table that declares
   a header separator row — the `| --- | --- |` line. A table that renders no
-  header row has no column names to filter by; it offers full table search
-  only, and the settings panel says so.
+  header row has no column names to filter by, so it is offered no **Column
+  menus** switch at all, and the settings panel says why.
 - **A cell at that index.** Cells are matched to columns by position, so a row
   with no cell at the filtered column's index — a ragged or spanned row, which
   Markdown cannot write but pasted HTML can — counts as not matching and is
@@ -86,10 +102,11 @@ puts a horizontal scrollbar on a table that had none.
   dropping the mark is all it takes to restore it.
 - **No block is collapsed and no bullet is folded.** Every control answers
   pointer and key events in the capture phase, before Logseq's own handlers
-  see them, so nothing you do to a table — including clicking its headers —
-  opens its block for editing or fires a shortcut.
-- **No header is rewritten.** A filter field is laid over its header cell and
-  the committed filter is added under the name; neither replaces what Logseq
+  see them, so nothing you do to one of Able Table's controls opens its block
+  for editing or fires a shortcut. What is not one of its controls — the column
+  name, the cells, the rest of the block — is left entirely to Logseq.
+- **No header is rewritten.** The ⋮ control, the filter field and the committed
+  filter are added to the header cell; none of them replaces what Logseq
   rendered there.
 - Editing a block replaces its render, which takes the controls with it; the
   table comes back searched and filtered when the render comes back.

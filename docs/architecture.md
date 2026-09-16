@@ -259,13 +259,17 @@ block. Each pass hangs one `data-able-settings` control inside the wrapper and,
 when the reader has opened them, a `data-able-panel` and a `data-able-search`
 field beside it: both are siblings of the wrapper rather than children, because
 the wrapper is an `overflow: auto` scroller that would clip the panel and carry
-the field sideways with the table. Each head cell of a table that renders one
-is marked `data-able-head` with its own column index, and carries a
-`data-able-column-filter` field while that column is being filtered and a
-`data-able-column-term` line under its name once a filter is committed. The
-field is positioned over the cell rather than substituted for its content, so
-no markup Logseq rendered is moved and no column changes width as a field opens
-or closes. Whether the toggle is on, what the search field holds and what each
+the field sideways with the table. Behind the panel's second switch, each head cell of a
+table that renders one is marked `data-able-head` with its own column index and
+carries a `data-able-column-control`; that control opens a
+`data-able-column-menu`, a sibling of the wrapper like the panel and for the
+same reason, measured against the control and held inside the block. The menu
+hangs a `data-able-column-filter` field over the cell while that column is
+being searched, and a `data-able-column-term` line under its name once a filter
+is committed. The field is positioned over the cell rather than substituted for
+its content, so no markup Logseq rendered is moved and no column changes width
+as a field opens or closes; the column name itself is never claimed, and a
+click on it opens the block for editing as it always did. Whether the toggle is on, what the search field holds and what each
 column is filtered by are a `Map` in the runtime under the same key, so a
 re-render comes back searched and filtered, and a row that fails the search or
 any column filter takes `data-able-filtered` and is hidden by one declaration

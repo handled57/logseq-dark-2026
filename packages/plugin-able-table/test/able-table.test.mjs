@@ -221,18 +221,57 @@ function headCells(wrapper) {
   return wrapper.querySelectorAll('th')
 }
 
+/* The panel's switches are told apart by which option they are. */
+function option(panel, name) {
+  return panel?.children.find(
+    (child) => child.matches('[data-able-toggle]') && child.getAttribute('data-able-option') === name
+  ) ?? null
+}
+
+function controlOf(cell) {
+  return within(cell, 'data-able-column-control')
+}
+
+function menuOf(wrapper) {
+  return besideWith(wrapper, 'data-able-column-menu')
+}
+
+function itemIn(menu, action) {
+  return menu?.children.find((child) => child.getAttribute('data-able-action') === action) ?? null
+}
+
 /* Focus leaving a field, as the host delivers it. */
 function blur(context, field) {
   context.dispatchDocument('focusout', { target: field, preventDefault() {}, stopPropagation() {} })
 }
 
-/* Open a column's filter field, type into it, and let it close. */
-function filterColumn(context, cell, value) {
-  press(context, cell)
-  const field = within(cell, 'data-able-column-filter')
+/* Press one of the panel's switches, opening the panel first where something
+ * else — a column menu, a click on the page — has closed it. */
+function switchOption(context, wrapper, name) {
+  if (!panelOf(wrapper)) press(context, settings(wrapper))
+  press(context, option(panelOf(wrapper), name))
+}
+
+/* Turn a table's column menus on, the way a reader does: the settings control,
+ * then the switch behind it. */
+function turnColumnsOn(context, wrapper) {
+  switchOption(context, wrapper, 'columns')
+}
+
+/* Open one column's filter field through its own menu. */
+function openColumn(context, wrapper, index) {
+  const cell = headCells(wrapper)[index]
+  press(context, controlOf(cell))
+  press(context, itemIn(menuOf(wrapper), 'search'))
+  return within(cell, 'data-able-column-filter')
+}
+
+/* Search a column and let the field close, committing what it holds. */
+function filterColumn(context, wrapper, index, value) {
+  const field = openColumn(context, wrapper, index)
   type(context, field, value)
   blur(context, field)
-  return within(cell, 'data-able-column-term')
+  return within(headCells(wrapper)[index], 'data-able-column-term')
 }
 
 function press(context, target, event = {}) {
@@ -292,8 +331,7 @@ function type(context, field, value) {
 /* Open the panel and turn full table search on, which is how every search test
  * starts. */
 function openSearch(context, wrapper) {
-  press(context, settings(wrapper))
-  press(context, within(panelOf(wrapper), 'data-able-toggle'))
+  switchOption(context, wrapper, 'search')
   return within(searchOf(wrapper), 'data-able-field')
 }
 
@@ -496,11 +534,29 @@ test('the control steps left of the theme’s collapse control, and stands alone
   assert.match(style, /\[data-able-filtered\] \{\s*display: none !important;\s*\}/)
 
   /* The filter field is laid over its header cell rather than in it, so
-   * opening and closing one cannot reflow the table. */
+   * opening and closing one cannot reflow the table. It stops short of the
+   * strip the column control stands in. */
   const filter = style.match(/\[data-able-column-filter\] \{[^}]+\}/)[0]
   assert.match(filter, /position: absolute;/)
-  assert.match(filter, /inset: 0;/)
+  assert.match(filter, /inset: 0 1\.5rem 0 0;/)
   assert.match(filter, /box-sizing: border-box;/)
+
+  /* The control sits inside the cell's right divider, in a strip reserved for
+   * it, so it never stands over the column name. */
+  const head = style.match(/\[data-able-head\] \{[^}]+\}/)[0]
+  assert.match(head, /position: relative;/)
+  assert.match(head, /padding-right: 1\.5rem;/)
+
+  const control = style.match(/\[data-able-column-control\] \{[^}]+\}/)[0]
+  assert.match(control, /position: absolute;/)
+  assert.match(control, /right: 0\.25rem;/)
+
+  /* The menu is positioned against the box the wrapper sits in, like the
+   * panel, because the wrapper itself is a scroller that would clip it. */
+  const menu = style.match(/\[data-able-column-menu\] \{[^}]+\}/)[0]
+  assert.match(menu, /position: absolute;/)
+  assert.match(menu, /top: var\(--able-menu-top, 0px\);/)
+  assert.match(menu, /left: var\(--able-menu-left, 0px\);/)
 
   /* The committed filter is in flow under the name and laid out across the
    * cell rather than across its own text, so it cannot put a horizontal
@@ -847,7 +903,7 @@ test('the runtime answers pointer, key and input events in the capture phase', a
 
   assert.deepEqual(
     [...context.documentListeners.keys()].sort(),
-    ['click', 'focusout', 'input', 'keydown', 'keyup', 'mousedown']
+    ['click', 'focusout', 'input', 'keydown', 'keyup', 'mousedown', 'scroll']
   )
 })
 
@@ -864,8 +920,9 @@ test('a table with no head keeps its first row standing', async () => {
   assert.equal(within(searchOf(wrapper), 'data-able-status').textContent, '1 of 2 rows')
 })
 
-/* Column filters: opened from a header cell, committed under the column name,
- * and dropped by clicking what they committed. */
+/* Column menus: hung on every header cell once the table's own switch is on,
+ * opened from the control beside the cell divider, and searching, committing
+ * and clearing one column from the menu they open. */
 
 const STAFF = [
   ['Ada', 'Engineer'],
@@ -873,60 +930,130 @@ const STAFF = [
   ['Alan', 'Engineer']
 ]
 
-test('every header cell is marked, keyed by its own column index, and focusable', async () => {
-  const { host, main } = editor()
-  const { body } = block(main)
-  const { wrapper } = table(body, STAFF)
-
-  await render(host)
-  const [name, role] = headCells(wrapper)
-  const key = wrapper.getAttribute('data-able-table')
-
-  for (const [index, cell] of [name, role].entries()) {
-    assert.equal(cell.getAttribute('data-able-head'), '')
-    assert.equal(cell.getAttribute('data-able-key'), key)
-    assert.equal(cell.getAttribute('data-able-column'), String(index))
-    // Reachable from the keyboard in its own right.
-    assert.equal(cell.getAttribute('tabindex'), '0')
-  }
-
-  assert.equal(name.getAttribute('title'), 'Filter by Name')
-  assert.equal(role.getAttribute('title'), 'Filter by Role')
-  // A header carries nothing else until the reader asks for it.
-  assert.equal(within(name, 'data-able-column-filter'), null)
-  assert.equal(within(name, 'data-able-column-term'), null)
-})
-
-test('clicking a column name opens a focused field, and what Logseq rendered stays where it was', async () => {
+test('no header carries a control until the table’s column switch is on', async () => {
   const { host, main } = editor()
   const { body } = block(main)
   const { wrapper } = table(body, STAFF)
 
   const context = await render(host)
+  assert.equal(host.querySelectorAll('[data-able-head]').length, 0)
+  assert.equal(host.querySelectorAll('[data-able-column-control]').length, 0)
+
+  press(context, settings(wrapper))
+  const toggle = option(panelOf(wrapper), 'columns')
+  assert.ok(toggle, 'the panel offers no column switch')
+  assert.equal(toggle.textContent, 'Column menus')
+  assert.equal(toggle.getAttribute('role'), 'switch')
+  assert.equal(toggle.getAttribute('aria-checked'), 'false')
+
+  press(context, toggle)
+  assert.equal(toggle.getAttribute('aria-checked'), 'true')
+
+  const key = wrapper.getAttribute('data-able-table')
+  for (const [index, cell] of headCells(wrapper).entries()) {
+    assert.equal(cell.getAttribute('data-able-head'), '')
+    assert.equal(cell.getAttribute('data-able-key'), key)
+    assert.equal(cell.getAttribute('data-able-column'), String(index))
+    /* The name itself is Logseq's: nothing makes it focusable or clickable. */
+    assert.equal(cell.getAttribute('tabindex'), null)
+
+    const control = controlOf(cell)
+    assert.ok(control, 'the header carries no control')
+    assert.equal(control.tagName, 'BUTTON')
+    assert.equal(control.getAttribute('aria-haspopup'), 'menu')
+    assert.equal(control.getAttribute('aria-expanded'), 'false')
+    assert.equal(control.getAttribute('data-able-column'), String(index))
+  }
+
+  assert.equal(controlOf(headCells(wrapper)[0]).getAttribute('aria-label'), 'Column options for Name')
+})
+
+test('a click on the column name itself is left to Logseq', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
   const [name] = headCells(wrapper)
-  /* The header cell holds rendered Markdown — a link, code, emphasis. The
-   * field is laid over it rather than put in its place. */
-  const link = name.appendChild(node('a'))
 
   const record = press(context, name)
-  // Neither the press nor the click reaches Logseq, so the block never opens.
+  // The header opens the block for editing exactly as it always did.
+  assert.equal(record.stopped, false)
+  assert.equal(record.prevented, false)
+  assert.equal(within(name, 'data-able-column-filter'), null)
+  assert.equal(menuOf(wrapper), null)
+})
+
+test('pressing the control opens a menu beside the wrapper rather than inside it', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  const [name] = headCells(wrapper)
+
+  const record = press(context, controlOf(name))
   assert.equal(record.stopped, true)
   assert.equal(record.prevented, true)
 
+  const menu = menuOf(wrapper)
+  assert.ok(menu, 'no menu was opened')
+  /* Outside the wrapper, which is an overflow scroller that would clip it. */
+  assert.equal(menu.parentElement, wrapper.parentElement)
+  assert.equal(menu.getAttribute('role'), 'menu')
+  assert.equal(menu.getAttribute('aria-label'), 'Column options for Name')
+  assert.equal(menu.getAttribute('data-able-column'), '0')
+  assert.equal(wrapper.children.some((child) => child.matches('[data-able-column-menu]')), false)
+  assert.equal(controlOf(name).getAttribute('aria-expanded'), 'true')
+
+  const search = itemIn(menu, 'search')
+  assert.ok(search, 'the menu offers no Search column')
+  assert.equal(search.textContent, 'Search column')
+  assert.equal(search.getAttribute('role'), 'menuitem')
+  assert.equal(search.focused, true, 'the menu did not take focus')
+  // Nothing to clear yet, so nothing offers to.
+  assert.equal(itemIn(menu, 'clear'), null)
+
+  // A second press closes it and hands focus back to the control.
+  controlOf(name).focused = false
+  press(context, controlOf(name))
+  assert.equal(menuOf(wrapper), null)
+  assert.equal(controlOf(name).getAttribute('aria-expanded'), 'false')
+  assert.equal(controlOf(name).focused, true)
+})
+
+test('Search column closes the menu and opens the field over the column name', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  /* The header cell holds rendered Markdown — a link, code, emphasis — which
+   * is there before this plugin hangs anything on the cell. The field is laid
+   * over it rather than put in its place. */
+  const [name] = headCells(wrapper)
+  const link = name.appendChild(node('a'))
+  turnColumnsOn(context, wrapper)
+
+  press(context, controlOf(name))
+  press(context, itemIn(menuOf(wrapper), 'search'))
+
+  assert.equal(menuOf(wrapper), null, 'the menu stayed open')
   const field = within(name, 'data-able-column-filter')
   assert.ok(field, 'no filter field was opened')
   assert.equal(field.tagName, 'INPUT')
-  assert.equal(field.getAttribute('type'), 'text')
   assert.equal(field.getAttribute('data-able-key'), wrapper.getAttribute('data-able-table'))
   assert.equal(field.getAttribute('data-able-column'), '0')
-  assert.equal(field.getAttribute('aria-label'), 'Filter Name')
+  assert.equal(field.getAttribute('aria-label'), 'Search Name')
   assert.equal(field.getAttribute('placeholder'), 'Name')
-  assert.equal(field.value, '')
   assert.equal(field.focused, true, 'the field did not take focus')
 
   // The cell's own markup is untouched, and still first.
   assert.equal(name.children[0], link)
-  assert.equal(link.parentElement, name)
+  // The control is still there beside it, so the menu can be used again.
+  assert.ok(controlOf(name))
 })
 
 test('typing narrows the table to that column alone, and backspacing restores it', async () => {
@@ -935,9 +1062,8 @@ test('typing narrows the table to that column alone, and backspacing restores it
   const { wrapper, rows } = table(body, STAFF)
 
   const context = await render(host)
-  const [name] = headCells(wrapper)
-  press(context, name)
-  const field = within(name, 'data-able-column-filter')
+  turnColumnsOn(context, wrapper)
+  const field = openColumn(context, wrapper, 0)
 
   /* A term that matches another column's cells matches nothing here: the test
    * is against the cell at this column's index, not against the row. */
@@ -961,8 +1087,8 @@ test('a row with no cell at that column index matches nothing', async () => {
   const { wrapper, rows } = table(body, [['Ada', 'Engineer'], ['Grace']])
 
   const context = await render(host)
-  const [, role] = headCells(wrapper)
-  filterColumn(context, role, 'engineer')
+  turnColumnsOn(context, wrapper)
+  filterColumn(context, wrapper, 1, 'engineer')
 
   assert.deepEqual(visible(rows), ['Ada Engineer'])
   assert.equal(rows[1].getAttribute('data-able-filtered'), '')
@@ -976,8 +1102,9 @@ test('losing focus commits the filter under the column name', async () => {
   const context = await render(host)
   const [name] = headCells(wrapper)
   const link = name.appendChild(node('a'))
+  turnColumnsOn(context, wrapper)
 
-  const term = filterColumn(context, name, 'ada')
+  const term = filterColumn(context, wrapper, 0, 'ada')
 
   assert.equal(within(name, 'data-able-column-filter'), null, 'the field stayed open')
   assert.ok(term, 'nothing was committed under the column name')
@@ -986,7 +1113,6 @@ test('losing focus commits the filter under the column name', async () => {
   assert.equal(term.getAttribute('data-able-key'), wrapper.getAttribute('data-able-table'))
   assert.equal(term.getAttribute('data-able-column'), '0')
   assert.equal(term.getAttribute('aria-label'), 'Clear the filter on Name')
-  assert.equal(term.getAttribute('title'), term.getAttribute('aria-label'))
   assert.deepEqual(visible(rows), ['Ada Engineer'])
 
   // The cell's own markup came back exactly as it was, and first.
@@ -999,51 +1125,29 @@ test('a field that closes empty commits nothing and leaves the header as it was'
   const { wrapper, rows } = table(body, STAFF)
 
   const context = await render(host)
+  turnColumnsOn(context, wrapper)
   const [name] = headCells(wrapper)
-
-  press(context, name)
-  blur(context, within(name, 'data-able-column-filter'))
+  const field = openColumn(context, wrapper, 0)
+  blur(context, field)
 
   assert.equal(within(name, 'data-able-column-filter'), null)
   assert.equal(within(name, 'data-able-column-term'), null)
-  assert.deepEqual(name.children, [])
+  // Nothing but the control this plugin hangs on every header.
+  assert.deepEqual(name.children.map((child) => child.getAttribute('data-able-column-control')), [''])
   assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
 })
 
-test('clicking the committed filter drops it, and never reopens the field', async () => {
-  const { host, main } = editor()
-  const { body } = block(main)
-  const { wrapper, rows } = table(body, STAFF)
-
-  const context = await render(host)
-  const [name] = headCells(wrapper)
-  const term = filterColumn(context, name, 'ada')
-  name.focused = false
-
-  const record = press(context, term)
-  assert.equal(record.stopped, true)
-  assert.equal(record.prevented, true)
-
-  assert.equal(within(name, 'data-able-column-term'), null)
-  assert.equal(within(name, 'data-able-column-filter'), null, 'clearing the filter opened the field')
-  assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
-  assert.equal(rows.some((row) => row.attributes.has('data-able-filtered')), false)
-  assert.equal(name.focused, true, 'focus was not handed back to the header')
-})
-
-test('clicking the column name again reopens the field holding the committed text, selected', async () => {
+test('Search column reopens the field holding the committed text, selected', async () => {
   const { host, main } = editor()
   const { body } = block(main)
   const { wrapper } = table(body, STAFF)
 
   const context = await render(host)
+  turnColumnsOn(context, wrapper)
   const [name] = headCells(wrapper)
-  filterColumn(context, name, 'ada')
+  filterColumn(context, wrapper, 0, 'ada')
 
-  press(context, name)
-  const field = within(name, 'data-able-column-filter')
-
-  assert.ok(field, 'the field did not reopen')
+  const field = openColumn(context, wrapper, 0)
   assert.equal(field.value, 'ada')
   assert.equal(field.focused, true)
   // Selected, so the next keystroke refines or discards it.
@@ -1053,40 +1157,147 @@ test('clicking the column name again reopens the field holding the committed tex
   assert.equal(within(name, 'data-able-column-term').textContent, 'ada')
 })
 
+test('Clear filter is offered only while there is one, and drops it', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  const [name] = headCells(wrapper)
+  filterColumn(context, wrapper, 0, 'ada')
+
+  press(context, controlOf(name))
+  const clear = itemIn(menuOf(wrapper), 'clear')
+  assert.ok(clear, 'the menu offers no Clear filter')
+  assert.equal(clear.textContent, 'Clear filter')
+
+  controlOf(name).focused = false
+  press(context, clear)
+
+  assert.equal(menuOf(wrapper), null)
+  assert.equal(within(name, 'data-able-column-term'), null)
+  assert.equal(within(name, 'data-able-column-filter'), null, 'clearing the filter opened the field')
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+  assert.equal(controlOf(name).focused, true, 'focus was not handed back to the control')
+})
+
+test('clicking the committed filter drops it, and never reopens the field', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  const [name] = headCells(wrapper)
+  const term = filterColumn(context, wrapper, 0, 'ada')
+
+  const record = press(context, term)
+  assert.equal(record.stopped, true)
+  assert.equal(record.prevented, true)
+
+  assert.equal(within(name, 'data-able-column-term'), null)
+  assert.equal(within(name, 'data-able-column-filter'), null, 'clearing the filter opened the field')
+  assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+  assert.equal(rows.some((row) => row.attributes.has('data-able-filtered')), false)
+})
+
 test('Escape restores the last committed filter; Enter commits what the field holds', async () => {
   const { host, main } = editor()
   const { body } = block(main)
   const { wrapper, rows } = table(body, STAFF)
 
   const context = await render(host)
+  turnColumnsOn(context, wrapper)
   const [name] = headCells(wrapper)
-  filterColumn(context, name, 'ada')
+  filterColumn(context, wrapper, 0, 'ada')
 
   // Escape: the draft goes, the committed filter stands.
-  press(context, name)
-  type(context, within(name, 'data-able-column-filter'), 'grace')
+  type(context, openColumn(context, wrapper, 0), 'grace')
   assert.deepEqual(visible(rows), ['Grace Admiral'])
 
-  name.focused = false
+  controlOf(name).focused = false
   const abandoned = key(context, within(name, 'data-able-column-filter'), 'Escape')
   assert.equal(abandoned.prevented, true)
   assert.equal(abandoned.stopped, true)
   assert.equal(within(name, 'data-able-column-filter'), null)
   assert.equal(within(name, 'data-able-column-term').textContent, 'ada')
   assert.deepEqual(visible(rows), ['Ada Engineer'])
-  assert.equal(name.focused, true, 'focus was not left on the header')
+  assert.equal(controlOf(name).focused, true, 'focus was not left on the control')
 
   // Enter: what the field holds is committed and the field closes.
-  press(context, name)
-  type(context, within(name, 'data-able-column-filter'), 'grace')
-  name.focused = false
+  type(context, openColumn(context, wrapper, 0), 'grace')
+  controlOf(name).focused = false
   const committed = key(context, within(name, 'data-able-column-filter'), 'Enter')
   assert.equal(committed.prevented, true)
   assert.equal(committed.stopped, true)
   assert.equal(within(name, 'data-able-column-filter'), null)
   assert.equal(within(name, 'data-able-column-term').textContent, 'grace')
   assert.deepEqual(visible(rows), ['Grace Admiral'])
-  assert.equal(name.focused, true)
+  assert.equal(controlOf(name).focused, true)
+})
+
+test('the menu is dismissed by Escape, by a click outside it, and by scrolling', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  const [name] = headCells(wrapper)
+
+  press(context, controlOf(name))
+  controlOf(name).focused = false
+  const escaped = key(context, itemIn(menuOf(wrapper), 'search'), 'Escape')
+  assert.equal(escaped.prevented, true)
+  assert.equal(escaped.stopped, true)
+  assert.equal(menuOf(wrapper), null)
+  assert.equal(controlOf(name).focused, true)
+
+  // A click on the page outside the menu.
+  press(context, controlOf(name))
+  const elsewhere = body.appendChild(node('div'))
+  const outside = press(context, elsewhere)
+  assert.equal(menuOf(wrapper), null)
+  assert.equal(outside.stopped, false)
+  assert.equal(outside.prevented, false)
+
+  /* The table scrolling under a menu measured against its control leaves the
+   * menu pointing at nothing, so it goes. */
+  press(context, controlOf(name))
+  assert.ok(menuOf(wrapper))
+  context.dispatchDocument('scroll', { target: wrapper })
+  assert.equal(menuOf(wrapper), null)
+})
+
+test('one popup is open at a time, whichever kind it is', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const first = table(body, STAFF)
+  const second = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, first.wrapper)
+  turnColumnsOn(context, second.wrapper)
+
+  // A column menu dismisses the settings panel that was left open.
+  press(context, settings(first.wrapper))
+  press(context, controlOf(headCells(first.wrapper)[0]))
+  assert.ok(menuOf(first.wrapper))
+  assert.equal(panelOf(first.wrapper), null)
+
+  // And another column's menu dismisses it.
+  press(context, controlOf(headCells(first.wrapper)[1]))
+  assert.equal(menuOf(first.wrapper).getAttribute('data-able-column'), '1')
+  assert.equal(
+    first.wrapper.parentElement.children.filter((child) => child.matches('[data-able-column-menu]')).length,
+    1
+  )
+
+  // Including another table's.
+  press(context, controlOf(headCells(second.wrapper)[0]))
+  assert.equal(menuOf(first.wrapper), null)
+  assert.ok(menuOf(second.wrapper))
 })
 
 test('column filters combine with each other and with the full table search', async () => {
@@ -1095,16 +1306,16 @@ test('column filters combine with each other and with the full table search', as
   const { wrapper, rows } = table(body, STAFF)
 
   const context = await render(host)
-  const [name, role] = headCells(wrapper)
+  turnColumnsOn(context, wrapper)
 
-  filterColumn(context, role, 'engineer')
+  filterColumn(context, wrapper, 1, 'engineer')
   assert.deepEqual(visible(rows), ['Ada Engineer', 'Alan Engineer'])
 
   // A second column narrows what the first left, in either order.
-  filterColumn(context, name, 'alan')
+  filterColumn(context, wrapper, 0, 'alan')
   assert.deepEqual(visible(rows), ['Alan Engineer'])
-  assert.equal(within(name, 'data-able-column-term').textContent, 'alan')
-  assert.equal(within(role, 'data-able-column-term').textContent, 'engineer')
+  assert.equal(within(headCells(wrapper)[0], 'data-able-column-term').textContent, 'alan')
+  assert.equal(within(headCells(wrapper)[1], 'data-able-column-term').textContent, 'engineer')
 
   // And the search narrows what both of them left.
   const field = openSearch(context, wrapper)
@@ -1120,23 +1331,45 @@ test('turning full table search off clears the search and keeps every column fil
   const { wrapper, rows } = table(body, STAFF)
 
   const context = await render(host)
-  const [name] = headCells(wrapper)
-  const term = filterColumn(context, name, 'a')
+  turnColumnsOn(context, wrapper)
+  filterColumn(context, wrapper, 0, 'a')
 
   const field = openSearch(context, wrapper)
   type(context, field, 'engineer')
   assert.deepEqual(visible(rows), ['Ada Engineer', 'Alan Engineer'])
 
-  press(context, within(panelOf(wrapper), 'data-able-toggle'))
+  switchOption(context, wrapper, 'search')
   assert.equal(searchOf(wrapper), null)
-  // The reader's own column filter is not the toggle's to clear.
-  assert.equal(within(name, 'data-able-column-term').textContent, 'a')
+  // The reader's own column filter is not the search switch's to clear.
+  assert.equal(within(headCells(wrapper)[0], 'data-able-column-term').textContent, 'a')
   assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
+})
 
-  // Dropping the last column filter restores every row.
-  press(context, term)
+test('turning the column switch off takes every control, filter and mark with it', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper, rows } = table(body, STAFF)
+
+  const context = await render(host)
+  turnColumnsOn(context, wrapper)
+  const [name] = headCells(wrapper)
+  filterColumn(context, wrapper, 0, 'ada')
+  assert.deepEqual(visible(rows), ['Ada Engineer'])
+
+  switchOption(context, wrapper, 'columns')
+
+  assert.equal(host.querySelectorAll('[data-able-head]').length, 0)
+  assert.equal(host.querySelectorAll('[data-able-column-control]').length, 0)
+  assert.equal(host.querySelectorAll('[data-able-column-term]').length, 0)
+  assert.equal(name.getAttribute('data-able-key'), null)
+  /* Nothing may be left narrowing what the reader sees once the affordance
+   * that would drop it is gone. */
   assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
   assert.equal(host.querySelectorAll('[data-able-filtered]').length, 0)
+
+  // And it comes back unfiltered rather than holding what was dropped.
+  switchOption(context, wrapper, 'columns')
+  assert.equal(within(headCells(wrapper)[0], 'data-able-column-term'), null)
 })
 
 test('the search counts what the column filters leave standing', async () => {
@@ -1145,8 +1378,8 @@ test('the search counts what the column filters leave standing', async () => {
   const { wrapper } = table(body, STAFF)
 
   const context = await render(host)
-  const [, role] = headCells(wrapper)
-  filterColumn(context, role, 'engineer')
+  turnColumnsOn(context, wrapper)
+  filterColumn(context, wrapper, 1, 'engineer')
   openSearch(context, wrapper)
 
   assert.equal(within(searchOf(wrapper), 'data-able-status').textContent, '2 of 3 rows')
@@ -1167,7 +1400,7 @@ test('the full table search reads a row as its cells with a space between them',
   assert.deepEqual(visible(rows), ['Ada Lovelace'])
 })
 
-test('a table that renders no header row offers no columns, and the panel says so', async () => {
+test('a table that renders no header row is offered no column switch, and the panel says so', async () => {
   const { host, main } = editor()
   const { body } = block(main)
   const headless = table(body, ['Name Role', 'Ada Lovelace'], { head: null })
@@ -1175,42 +1408,56 @@ test('a table that renders no header row offers no columns, and the panel says s
   const headed = table(otherBody, STAFF)
 
   const context = await render(host)
-  assert.equal(host.querySelectorAll('[data-able-head]').length, 2)
 
   press(context, settings(headless.wrapper))
+  assert.equal(option(panelOf(headless.wrapper), 'columns'), null, 'a switch that could do nothing was offered')
+  assert.ok(option(panelOf(headless.wrapper), 'search'), 'the search switch went with it')
   assert.equal(
     within(panelOf(headless.wrapper), 'data-able-note').textContent,
     'This table renders no header row, so only full table search is available.'
   )
 
   press(context, settings(headed.wrapper))
+  assert.ok(option(panelOf(headed.wrapper), 'columns'))
   assert.equal(
     within(panelOf(headed.wrapper), 'data-able-note').textContent,
-    'Click a column name to filter that column.'
+    'A menu on every column header searches that column.'
   )
 })
 
-test('a header cell and its filter are operated from the keyboard', async () => {
+test('a column menu is operated from the keyboard', async () => {
   const { host, main } = editor()
   const { body } = block(main)
   const { wrapper, rows } = table(body, STAFF)
 
   const context = await render(host)
+  turnColumnsOn(context, wrapper)
   const [name] = headCells(wrapper)
 
-  const opened = key(context, name, 'Enter')
+  const opened = key(context, controlOf(name), 'Enter')
   assert.equal(opened.prevented, true)
   assert.equal(opened.stopped, true)
+  const menu = menuOf(wrapper)
+  assert.ok(menu, 'Enter on the control opened no menu')
+
+  const search = itemIn(menu, 'search')
+  const stepped = key(context, search, 'ArrowDown')
+  assert.equal(stepped.prevented, true)
+  assert.equal(stepped.stopped, true)
+  // One item, so the arrow keys wrap back to it rather than leaving the menu.
+  assert.equal(search.focused, true)
+
+  key(context, search, ' ')
   const field = within(name, 'data-able-column-filter')
-  assert.ok(field, 'Enter on the header opened no field')
+  assert.ok(field, 'Space on Search column opened no field')
 
   type(context, field, 'grace')
   key(context, field, 'Enter')
   assert.deepEqual(visible(rows), ['Grace Admiral'])
 
-  const cleared = key(context, within(name, 'data-able-column-term'), ' ')
-  assert.equal(cleared.prevented, true)
-  assert.equal(cleared.stopped, true)
+  // And the committed filter is dropped from the keyboard too.
+  key(context, controlOf(name), 'Enter')
+  key(context, itemIn(menuOf(wrapper), 'clear'), 'Enter')
   assert.equal(within(name, 'data-able-column-term'), null)
   assert.deepEqual(visible(rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
 })
@@ -1222,11 +1469,13 @@ test('two tables in the same block filter their columns independently', async ()
   const second = table(body, STAFF)
 
   const context = await render(host)
-  filterColumn(context, headCells(first.wrapper)[0], 'ada')
+  turnColumnsOn(context, first.wrapper)
+  filterColumn(context, first.wrapper, 0, 'ada')
 
   assert.deepEqual(visible(first.rows), ['Ada Engineer'])
   assert.deepEqual(visible(second.rows), ['Ada Engineer', 'Grace Admiral', 'Alan Engineer'])
-  assert.equal(within(headCells(second.wrapper)[0], 'data-able-column-term'), null)
+  // The switch is the table's own, so the second table has no controls at all.
+  assert.equal(headCells(second.wrapper)[0].getAttribute('data-able-head'), null)
 })
 
 test('a re-render of the block brings every committed filter and its line back', async () => {
@@ -1235,16 +1484,20 @@ test('a re-render of the block brings every committed filter and its line back',
   const first = table(body, STAFF)
 
   const context = await render(host)
-  filterColumn(context, headCells(first.wrapper)[0], 'ada')
+  turnColumnsOn(context, first.wrapper)
+  filterColumn(context, first.wrapper, 0, 'ada')
 
   // Editing the block replaces the whole render.
+  panelOf(first.wrapper)?.remove()
   first.wrapper.remove()
   context.markTables()
   const rendered = table(body, STAFF)
   context.markTables()
 
   assert.equal(rendered.wrapper.getAttribute('data-able-table'), `${uuid}:0`)
-  assert.equal(within(headCells(rendered.wrapper)[0], 'data-able-column-term').textContent, 'ada')
+  const [name] = headCells(rendered.wrapper)
+  assert.ok(controlOf(name), 'the control did not come back')
+  assert.equal(within(name, 'data-able-column-term').textContent, 'ada')
   assert.deepEqual(visible(rendered.rows), ['Ada Engineer'])
 })
 
@@ -1254,11 +1507,11 @@ test('a block being edited commits the field that was open', async () => {
   const first = table(body, STAFF)
 
   const context = await render(host)
-  const [name] = headCells(first.wrapper)
-  press(context, name)
-  type(context, within(name, 'data-able-column-filter'), 'grace')
+  turnColumnsOn(context, first.wrapper)
+  type(context, openColumn(context, first.wrapper, 0), 'grace')
 
   // The render goes while the field is still open.
+  panelOf(first.wrapper)?.remove()
   first.wrapper.remove()
   context.markTables()
   const rendered = table(body, STAFF)
@@ -1276,8 +1529,10 @@ test('a table the pass no longer claims gives its header cells back unmarked', a
   const { wrapper } = table(body, STAFF)
 
   const context = await render(host)
+  turnColumnsOn(context, wrapper)
   const [name] = headCells(wrapper)
-  filterColumn(context, name, 'ada')
+  filterColumn(context, wrapper, 0, 'ada')
+  press(context, controlOf(name))
   assert.ok(within(name, 'data-able-column-term'))
 
   /* The cells stay in the document — what goes is the render this plugin was
@@ -1286,17 +1541,19 @@ test('a table the pass no longer claims gives its header cells back unmarked', a
   wrapper.classList.delete('table-wrapper')
   context.markTables()
 
-  for (const attribute of ['data-able-head', 'data-able-key', 'data-able-column', 'tabindex', 'title']) {
+  for (const attribute of ['data-able-head', 'data-able-key', 'data-able-column']) {
     assert.equal(name.getAttribute(attribute), null, `${attribute} was left on the header cell`)
   }
-  assert.equal(within(name, 'data-able-column-term'), null)
-  assert.equal(host.querySelectorAll('[data-able-column-term]').length, 0)
+  assert.deepEqual(name.children, [])
+  assert.equal(host.querySelectorAll('[data-able-column-menu]').length, 0)
+  assert.equal(host.querySelectorAll('[data-able-column-control]').length, 0)
 })
+
 
 test('unloading removes every node and mark this plugin wrote, and its listeners', async () => {
   const { host, main } = editor()
   const { body } = block(main)
-  const { wrapper, rows } = table(body, ['Ada Lovelace', 'Grace Hopper'])
+  const { wrapper, rows } = table(body, [['Ada', 'Lovelace'], ['Grace', 'Hopper']])
   /* A mark of the theme's, in the same wrapper, to prove teardown reads its
    * own namespace only. */
   const theirs = wrapper.appendChild(node('button', { attributes: { 'data-hc-collapse': '' } }))
@@ -1307,8 +1564,10 @@ test('unloading removes every node and mark this plugin wrote, and its listeners
   assert.ok(panelOf(wrapper), 'the panel is not open')
 
   const [name] = headCells(wrapper)
-  filterColumn(context, name, 'grace')
-  press(context, name)
+  turnColumnsOn(context, wrapper)
+  filterColumn(context, wrapper, 0, 'grace')
+  // With a menu left open over it.
+  press(context, controlOf(name))
 
   const [unload] = context.unloads
   await unload()
@@ -1321,11 +1580,13 @@ test('unloading removes every node and mark this plugin wrote, and its listeners
   assert.equal(host.querySelectorAll('[data-able-anchor]').length, 0)
   assert.equal(host.querySelectorAll('[data-able-head]').length, 0)
   assert.equal(host.querySelectorAll('[data-able-column]').length, 0)
+  assert.equal(host.querySelectorAll('[data-able-column-control]').length, 0)
+  assert.equal(host.querySelectorAll('[data-able-column-menu]').length, 0)
   assert.equal(host.querySelectorAll('[data-able-column-filter]').length, 0)
   assert.equal(host.querySelectorAll('[data-able-column-term]').length, 0)
   // The header cell is Logseq's own node, so every attribute written on it goes.
-  assert.equal(name.getAttribute('tabindex'), null)
-  assert.equal(name.getAttribute('title'), null)
+  assert.deepEqual(name.attributes.size, 0)
+  assert.deepEqual(name.children, [])
   assert.deepEqual(visible(rows), ['Ada Lovelace', 'Grace Hopper'])
 
   for (const handlers of context.documentListeners.values()) assert.deepEqual(handlers, [])
