@@ -27,6 +27,12 @@
  * mark is written: the emoji stays where the reader typed it, in the block's
  * source and in its rendered text.
  *
+ * It reads a block that opens on a markdown list the same way. Logseq renders
+ * only the items below a block's first line as list items, so the first one is
+ * left standing as the literal text it was typed as; the mark lets theme.css
+ * put that line in the column the items below it stand in. Here too nothing is
+ * rewritten — the `*` is still the first character of the block's source.
+ *
  * It also takes over the block bullet's left click. Logseq routes that click to
  * the block's own page; here it folds the block instead, the way the arrow
  * beside the bullet does, and opening a block in the main editor moves to the
@@ -586,6 +592,49 @@ function setBlockIcon(block, icon) {
   else block.removeAttribute(ICON_ATTR)
 }
 
+/* The line a block's own markdown list opens on ----------------------------
+ *
+ * Logseq splits a block's content at its first newline. The first line is
+ * parsed inline into `.block-content-inner`; everything below it is
+ * block-parsed into `.block-body`, which is where a markdown list becomes the
+ * `<ul>`/`<ol>` theme.css lays out. So a list written across a block's own
+ * lines renders as two different things: every item below the first is a real
+ * list item, and the first one stays the literal text the reader typed, `* `
+ * and all. No `<li>` is built for it, so no marker can be drawn in it.
+ *
+ * The character is the reader's, and it stays where they typed it. What is
+ * marked here is only that the block opens on a list, so theme.css can stand
+ * that first line in the same column as the items below it. */
+const LIST_ATTR = 'data-hc-block-list'
+
+/* The line shapes Logseq itself reads as a list item, less the leading `-`
+ * that Logseq takes for the block's own marker rather than a list: one `*`,
+ * `+` or number, one space, and an optional checkbox. */
+const LIST_ITEM = /^[ \t]*([*+]|\d+\.) (?:\[[Xx ]\] )?/
+
+/* The marker the block's own first line opens with, and only where a line
+ * below it opens one too. A lone `* a` is one literal line with nothing under
+ * it to stand in a column with; what this answers is the block that renders a
+ * list, which is the block whose first line is left out of it. */
+function leadingListMarker(text) {
+  const lines = contentLines(text)
+  const opening = LIST_ITEM.exec(lines[0] ?? '')
+  if (!opening) return ''
+  return lines.slice(1).some((line) => LIST_ITEM.test(line)) ? opening[1] : ''
+}
+
+function blockList(block, source) {
+  const marker = leadingListMarker(source)
+  if (!marker || specialSource(source) || renderedSpecial(block)) return ''
+  return marker
+}
+
+/* The marker itself is the value, so the mark says what it was read from. */
+function setBlockList(block, marker) {
+  if (marker) block.setAttribute(LIST_ATTR, marker)
+  else block.removeAttribute(LIST_ATTR)
+}
+
 /* Collapsible rich content -------------------------------------------------
  *
  * A rendered box that runs long — an admonition, a passage, a table, a quote,
@@ -831,6 +880,7 @@ async function refreshFromStoredSource(block) {
     setBulletVisibility(block, specialSource(source) || shouldHideBullet(block))
     setVerseLines(block, versesOpenLines(source))
     setBlockIcon(block, blockIcon(block, source))
+    setBlockList(block, blockList(block, source))
   } catch (error) {
     sourceCache.delete(uuid)
     console.warn('Dark High Contrast could not classify block source', uuid, error)
@@ -1145,6 +1195,7 @@ function teardown() {
   for (const block of doc.querySelectorAll(`[${BULLET_ATTR}]`)) block.removeAttribute(BULLET_ATTR)
   for (const block of doc.querySelectorAll(`[${VERSE_ATTR}]`)) block.removeAttribute(VERSE_ATTR)
   for (const block of doc.querySelectorAll(`[${ICON_ATTR}]`)) block.removeAttribute(ICON_ATTR)
+  for (const block of doc.querySelectorAll(`[${LIST_ATTR}]`)) block.removeAttribute(LIST_ATTR)
   for (const block of doc.querySelectorAll(`[${TYPE_ATTR}]`)) block.removeAttribute(TYPE_ATTR)
 }
 

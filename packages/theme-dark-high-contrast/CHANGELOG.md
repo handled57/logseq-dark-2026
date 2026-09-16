@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## 2.18.0 - 2026-09-13
+## 2.18.0 - 2026-09-16
 
 - Lay a markdown list written inside a block on a gutter of its own. Logseq
   already parses a line opening with `* ` as a bulleted item and one opening
@@ -25,6 +25,18 @@ All notable changes to this project are documented here.
   the first character of the line, and clicking into the block shows it. The
   gutter is `--hc-list-gutter`, `1.5em` by default and retunable from
   `custom.css`.
+- Stand the line a block's list opens on in the same column as the items below
+  it. Logseq splits a block's content at its first newline, parsing the first
+  line inline and only what follows it as blocks, so the first item of a list
+  written inside a block is never a list item: it stays the literal text it was
+  typed as, with no item for a marker to be drawn in. That line now hangs on
+  the list's own gutter, so its `*` stands in the column the `•`s below it
+  stand in and a first item long enough to wrap comes back to its own words
+  rather than running back under its marker, where it used to read as another
+  item. The character is untouched — `index.js` marks the block and theme.css
+  lays out the column. The words after that first `* ` still follow the
+  marker's own width rather than the gutter's, which is a fact of the font and
+  would take re-spacing the reader's line to close.
 
 ## 2.17.0 - 2026-09-13
 

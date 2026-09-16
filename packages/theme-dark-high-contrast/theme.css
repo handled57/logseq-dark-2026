@@ -1594,6 +1594,48 @@ button:disabled,
   text-indent: 0;
 }
 
+/* The line the list opens on ------------------------------------------------
+ *
+ * Logseq splits a block's content at its first newline: the first line is
+ * parsed inline into `.block-content-inner`, and only what follows it is
+ * block-parsed into the `.block-body` the rules above lay out. A list written
+ * across a block's own lines therefore renders as two different things. Every
+ * item below the first is a real `<li>` and takes a `•` of its own; the first
+ * is the literal text the reader typed, `* ` and all, with no `<li>` for a
+ * marker to be drawn in. The `*` is their character and stays where they typed
+ * it, so what is laid out here is the column it stands in.
+ *
+ * `index.js` marks a block whose first line opens a list the lines below it
+ * continue, and that line is then given the same hanging indent as the items:
+ * its text column is one gutter in, and the line itself is pulled back out of
+ * it. The `*` stands in the marker column the `•`s below it stand in, and a
+ * first item long enough to wrap comes back to the column its own words are
+ * in rather than to its marker.
+ *
+ * Only `.block-content-inner` takes the padding, which is where this parts
+ * company with the leading-emoji gutter below. The list in `.block-body`
+ * already carries this same gutter on each of its own items; padding it again
+ * would step the whole list one gutter right of the line above it.
+ *
+ * What is left is the one thing CSS cannot reach: the words after that first
+ * `* ` follow the marker's own advance, which is narrower than the gutter and
+ * a fact of the font rather than of the layout. Re-spacing them would mean
+ * rewriting the reader's line. The markers line up and every wrapped line
+ * lines up; the first item's own text opens against its own marker. */
+.ls-block[data-hc-block-list] > .block-main-container > .block-content-wrapper .block-content > .block-content-inner {
+  padding-left: var(--hc-list-gutter);
+}
+
+.ls-block[data-hc-block-list] > .block-main-container > .block-content-wrapper .block-content > .block-content-inner > :first-child {
+  text-indent: calc(-1 * var(--hc-list-gutter));
+}
+
+/* `text-indent` inherits, so a block container nested inside that first line
+ * would hang a line of its own out of the gutter as well. */
+.ls-block[data-hc-block-list] > .block-main-container > .block-content-wrapper .block-content > .block-content-inner > :first-child * {
+  text-indent: 0;
+}
+
 /* Quotes, code, tables, and queries */
 blockquote {
   color: var(--vscode-hc-white);

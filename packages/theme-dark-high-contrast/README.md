@@ -22,7 +22,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../plugin-passage) plugin's job, and the theme does not require it.
 - Sizes named-admonition and passage icons at 1.5 times the first line's font and aligns them with that line while their semantic divider continues through the full block height.
 - Folds a long rendered box — an admonition, a passage, a table, a quote, a code block, a math block, a piece of media, a block or page embed — on a control of its own, without folding the block that holds it or touching a line of its source.
-- Lays out a markdown list written inside a block — `* ` for bullets, `1. ` for numbers — on one gutter, so both kinds open in the column the block's own text begins in and a wrapped item comes back to its text rather than under its marker. Bullets are drawn as a filled disc, which is nothing the rail draws.
+- Lays out a markdown list written inside a block — `* ` for bullets, `1. ` for numbers — on one gutter, so both kinds open in the column the block's own text begins in and a wrapped item comes back to its text rather than under its marker. The line the list opens on stands in that column too, although Logseq never renders it as an item. Bullets are drawn as a filled disc, which is nothing the rail draws.
 - Sets the emoji a block opens with in a gutter of its own, left of the block's text, so it reads as that block's icon and the lines under it stay in one column. The emoji is left exactly where it is written.
 - Left-clicking a block bullet expands or collapses that block rather than opening it. Shift-click still opens the block in the sidebar, and right-clicking offers **Open**, immediately above **Open in sidebar**, to open the block in the main editor.
 - No build runtime, tracking, remote imports, or network access.
@@ -299,7 +299,25 @@ Logseq itself parses and renders both lists; what the theme changes is where the
 
 The gutter is `--hc-list-gutter`, `1.5em` by default, so a graph that wants a tighter or wider marker column can retune it from `custom.css`.
 
-Typing `1. ` into an otherwise empty block is a separate Logseq feature: it converts the block itself into a numbered list item, recorded as a `logseq.order-list-type` property and drawn in the bullet column. That is unchanged, and the theme keeps its number beside the block's content while the bullet rides the rail.
+### The line the list opens on
+
+Logseq splits a block's content at its first newline. The first line is parsed inline and only what follows it is parsed as blocks, which is where a list becomes list items. So the first line of a list written inside a block is not a list item at all — it stays the literal text it was typed as, `* ` and all, and there is nothing for a marker to be drawn in.
+
+The theme leaves that character alone and lays out the column it stands in. The first line hangs on the same gutter as the items below it, so its `*` stands in the column their `•`s stand in, and a first item long enough to wrap comes back to the column of its own words instead of running back under its marker.
+
+One difference stays visible: the words after that first `* ` follow the marker's own width, which is narrower than the gutter, so the first item's text opens a little left of the items below it. Closing that gap would mean re-spacing the line the reader typed, which the theme does not do.
+
+### Continuing a list with Enter
+
+Pressing Enter inside a block opens a new block rather than a new list item, unless the graph asks Logseq for the other behavior. Logseq has it built in and switched off by default. Turn it on in the graph's `logseq/config.edn`:
+
+```clojure
+:dwim/settings {:list? true}
+```
+
+Enter on a list line then continues the list inside the same block: it adds a soft line break and the next marker, carries the indentation and any checkbox over, numbers an ordered list on from the line above, and clears the marker when it is pressed on an empty item. That is Logseq's own editing behavior, not the theme's — the theme lays out what it produces.
+
+Typing `1. ` into an otherwise empty block is a separate Logseq feature again: it converts the block itself into a numbered list item, recorded as a `logseq.order-list-type` property and drawn in the bullet column. That is unchanged, and the theme keeps its number beside the block's content while the bullet rides the rail.
 
 ## Hiding properties by property value
 

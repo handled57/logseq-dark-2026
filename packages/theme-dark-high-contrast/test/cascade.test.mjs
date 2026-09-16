@@ -554,6 +554,38 @@ test('a table cell keeps a floor of its own longest word', () => {
   assert.ok(tableMetrics[1].includes('width:100%'), 'a table is no longer laid out at the full block width')
 })
 
+test('the line a block’s list opens on hangs on the list’s own gutter', () => {
+  // Logseq parses a block's first line inline and only what follows it into
+  // `.block-body`, so the first item of a list written inside a block is left
+  // as literal text with no `<li>` to carry a marker. The first line is hung
+  // on the same gutter the items are laid out on, which is what stands its `*`
+  // in the column their `•`s stand in.
+  const gutter = 'var(--hc-list-gutter)'
+  const scope = '.ls-block[data-hc-block-list] > .block-main-container > ' +
+    '.block-content-wrapper .block-content > '
+
+  assert.ok(css.includes(`${scope}.block-content-inner {\n  padding-left: ${gutter};`))
+  assert.ok(css.includes(`${scope}.block-content-inner > :first-child {\n  text-indent: calc(-1 * ${gutter});`))
+  assert.ok(css.includes(`${scope}.block-content-inner > :first-child * {\n  text-indent: 0;`))
+
+  // The items carry that same gutter themselves, one per `<li>`. Padding
+  // `.block-body` as well — which is what the leading-emoji gutter does, over
+  // a body holding no list of its own — would step the whole list one gutter
+  // right of the line above it, so the two halves would never line up.
+  assert.ok(
+    !css.includes(`${scope}.block-body {\n  padding-left: ${gutter};`),
+    'the list gutter is applied to .block-body as well as the first line'
+  )
+  assert.ok(css.includes(`.block-body :is(ul, ol) > li {\n  padding-left: ${gutter};`))
+  assert.ok(css.includes(`  text-indent: calc(-1 * ${gutter});`))
+
+  // Both halves are one variable, declared in `em`, so the column holds
+  // wherever the block's text is resized.
+  const declared = css.match(/--hc-list-gutter:\s*([\d.]+)em;/)
+  assert.ok(declared, 'the list gutter is not declared in em')
+  assert.ok(Number(declared[1]) > 0, 'the list gutter is empty')
+})
+
 test('the block-icon gutter and the indent that hangs out of it are one number', () => {
   const gutter = 'var(--hc-block-icon-gutter)'
   const scope = '.ls-block[data-hc-block-icon] > .block-main-container > ' +

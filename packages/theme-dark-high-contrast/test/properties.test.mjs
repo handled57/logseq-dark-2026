@@ -1122,6 +1122,122 @@ test('a repaint gives every mark back the moment the setting is turned off', asy
   assert.equal(block.attributes.has(ICON_ATTR), false)
 })
 
+/* The line a block's own markdown list opens on.
+ *
+ * Logseq renders only the lines below a block's first one into the
+ * `.block-body` where a list becomes `<li>`s, so the first item is left as the
+ * literal text it was typed as. `index.js` marks the block that this happens
+ * to; theme.css stands that line in the items' column. What is asserted here
+ * is which blocks earn the mark and what it holds — nothing moves a character
+ * of the block.
+ */
+const LIST_ATTR = 'data-hc-block-list'
+
+let listUuids = 0
+async function listBlock(content, rendered = {}) {
+  listUuids += 1
+  const uuid = `65f00000-0000-0000-0000-2${String(listUuids).padStart(11, '0')}`
+  const context = load({}, [], { [uuid]: { content } })
+  const block = bulletBlock({ text: content, uuid, ...rendered })
+
+  await context.refreshFromStoredSource(block)
+  return { context, block, marker: block.attributes.get(LIST_ATTR) }
+}
+
+test('a block opening on a bulleted list is marked with its own marker', async () => {
+  const { marker } = await listBlock('* a\n* b\n* c')
+
+  assert.equal(marker, '*')
+})
+
+test('the marker kinds Logseq parses as a list are each read back', async () => {
+  // `+` opens a bulleted item as well; a number opens an ordered one, and the
+  // number the line carries is the one the mark holds.
+  for (const [content, expected] of [
+    ['* a\n* b', '*'],
+    ['+ a\n+ b', '+'],
+    ['1. a\n2. b', '1.'],
+    ['3. a\n4. b', '3.'],
+    // A checkbox is part of the item, not of the marker.
+    ['* [ ] a\n* [x] b', '*']
+  ]) {
+    const { marker } = await listBlock(content)
+    assert.equal(marker, expected, JSON.stringify(content))
+  }
+})
+
+test('a property drawer above the list is stepped over', async () => {
+  const { marker } = await listBlock('id:: 65f0\ntype:: note\n* a\n* b')
+
+  assert.equal(marker, '*')
+})
+
+test('a first line with no list under it is left as the line it is', async () => {
+  // Nothing is rendered below these to stand in a column with: the mark exists
+  // to line the first item up with the items Logseq drew, so where Logseq drew
+  // none there is nothing to line up with.
+  for (const content of [
+    '* a',
+    '* a\nplain prose under it',
+    'An intro line\n* a\n* b',
+    'Plain prose with no list at all',
+    // Logseq reads a leading `-` as the block's own marker, not as a list.
+    '- a\n- b',
+    // A marker needs its space, and a bare `*` is emphasis.
+    '*a*\n*b*',
+    ''
+  ]) {
+    const { block } = await listBlock(content)
+    assert.equal(block.attributes.has(LIST_ATTR), false, JSON.stringify(content))
+  }
+})
+
+test('a list inside a special block leaves that block its own layout', async () => {
+  for (const content of [
+    '> * a\n> * b',
+    '```\n* a\n* b\n```',
+    '#+BEGIN_QUOTE\n* a\n* b\n#+END_QUOTE',
+    '## * a\n* b',
+    '* a\n* b #card'
+  ]) {
+    const { block } = await listBlock(content)
+    assert.equal(block.attributes.has(LIST_ATTR), false, JSON.stringify(content))
+  }
+})
+
+test('a rendered structure keeps its own layout even where the source opens on a list', async () => {
+  for (const renderedSelector of ['.embed', '.custom-query', '.admonitionblock', '.passage', 'pre']) {
+    const { block } = await listBlock('* a\n* b', { renderedSelector })
+    assert.equal(block.attributes.has(LIST_ATTR), false, renderedSelector)
+  }
+})
+
+test('a mark left on a block that is no longer a list is given back', async () => {
+  // Every pass answers for the block it reads rather than only marking: a
+  // block edited down to one line loses the hanging indent with the list.
+  const uuid = '65f00000-0000-0000-0000-2f0000000000'
+  const context = load({}, [], { [uuid]: { content: 'just one line now' } })
+  const block = bulletBlock({ text: 'just one line now', uuid })
+  block.setAttribute(LIST_ATTR, '*')
+
+  await context.refreshFromStoredSource(block)
+  assert.equal(block.attributes.has(LIST_ATTR), false)
+})
+
+test('unloading takes the list mark off the host document', async () => {
+  // The mark lives in a document that outlives the theme, so nothing may be
+  // left behind pushing a line into a gutter no stylesheet draws any more.
+  const host = node('body')
+  const block = node('div', { classes: ['ls-block'], attributes: { [LIST_ATTR]: '*' } })
+  host.appendChild(block)
+
+  const context = load({}, [], {}, host)
+  await Promise.resolve()
+  context.teardown()
+
+  assert.equal(block.attributes.has(LIST_ATTR), false)
+})
+
 test('marking a block writes nothing to the graph and leaves its source alone', async () => {
   const content = '\u{1F4CC} Important note'
   const uuid = '65f00000-0000-0000-0000-1e0000000000'
