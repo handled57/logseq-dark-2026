@@ -2,7 +2,7 @@
 
 All notable changes to this package are documented here.
 
-## 0.2.0 - 2026-09-15
+## 0.2.0 - 2026-09-16
 
 - A rendered table can now be filtered one column at a time. The settings panel
   holds a second switch, **Column menus**; turn it on and every column header
