@@ -253,9 +253,12 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
 
 /* Pinned to the top right of the cell — inside the divider, beside the name
  * rather than under it — so a wrapped name or a committed filter never moves
- * it. It takes the host's accent rather than the header's own colour, so it
- * reads as something to press rather than as part of the column name, and a
- * theme that restates the accent restates this too. */
+ * it. It takes the host's accent at full strength rather than the header's own
+ * colour, so it reads as something to press rather than as part of the column
+ * name, and a theme that restates the accent restates this too. It fills the
+ * strip the header reserves for it — 1.25rem inside 1.5rem, the size the
+ * theme's own controls are drawn at — so making it easier to see costs the
+ * table no width it had not already given up. */
 [data-able-column-control] {
   position: absolute;
   top: 0.25rem;
@@ -264,30 +267,32 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1rem;
-  height: 1rem;
+  width: 1.25rem;
+  height: 1.25rem;
   margin: 0;
   padding: 0;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
   line-height: 1;
   color: var(--ls-active-primary-color, #6fc3df);
   background: var(--ls-secondary-background-color, #0a0a0a);
   border: 1px solid transparent;
   border-radius: 2px;
   cursor: pointer;
-  opacity: 0.8;
 }
 
 [data-able-column-control]::after {
   content: "\\22ee";
 }
 
+/* The control is drawn at full strength already, so hovering it, opening its
+ * menu or giving it focus outlines the box it stands in rather than
+ * brightening the glyph. */
 [data-able-head]:hover > [data-able-column-control],
 [data-able-column-control][aria-expanded="true"],
 [data-able-column-control]:hover,
 [data-able-column-control]:focus-visible {
-  opacity: 1;
   border-color: var(--ls-border-color, #6b6b6b);
 }
 

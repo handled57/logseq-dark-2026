@@ -552,8 +552,14 @@ test('the control steps left of the theme’s collapse control, and stands alone
   assert.match(control, /right: 0\.25rem;/)
   /* Coloured with the host's accent rather than with the header's own text
    * colour, so the control reads as a control; the fallback keeps it coloured
-   * with no theme declaring one. */
+   * with no theme declaring one, and nothing fades it at rest. */
   assert.match(control, /color: var\(--ls-active-primary-color, #6fc3df\);/)
+  assert.doesNotMatch(control, /opacity:/)
+  /* It fills the 1.5rem strip the header reserves rather than standing in the
+   * middle of it, so it is legible without taking any more of the column. */
+  assert.match(control, /width: 1\.25rem;/)
+  assert.match(control, /height: 1\.25rem;/)
+  assert.match(control, /font-size: 1rem;/)
 
   /* The menu is positioned against the box the wrapper sits in, like the
    * panel, because the wrapper itself is a scroller that would clip it. */
