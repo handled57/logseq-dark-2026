@@ -39,12 +39,16 @@ it.
 ## Filtering a column
 
 Turn **Column menus** on in the same panel, and every column header takes a
-filter control of its own — a funnel — inside the cell's right-hand divider,
-drawn in cyan. It is that colour under every theme, so one colour always means
-"filter this column", whatever else the theme you run is accented with; on a
-light Logseq it is taken down to a deeper cyan, where the brighter one would be
-lost against a near-white header. Hovering the header, opening the menu or
-giving the control focus outlines the box it stands in.
+filter control of its own — a funnel — inside the cell's right-hand divider and
+on the line the column name is set on, drawn in cyan. It is that colour under
+every theme, so one colour always means "filter this column", whatever else the
+theme you run is accented with; on a light Logseq it is taken down to a deeper
+cyan, where the brighter one would be lost against a near-white header. A
+header row with column menus on opens its names at the top of the row rather
+than centring them, so a name that wraps — or one carrying a filter underneath
+it — never pulls its neighbours off the line their own funnels are on. Hovering
+the header, opening the menu or giving the control focus outlines the box it
+stands in.
 Press it — with the pointer, or with Enter or Space — and a menu opens under
 it:
 

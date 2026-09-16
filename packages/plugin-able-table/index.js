@@ -250,19 +250,33 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
 #main-content-container [data-able-head] {
   position: relative;
   padding-right: 1.5rem;
+  /* A table cell is laid out vertically centred, so an uneven header row —
+   * one column's name wrapping, or a committed filter under it — drags every
+   * other name down past the line its own control is set on. Opening the
+   * names at the top of the row instead keeps the control and the name it
+   * belongs to on one line in every column. */
+  vertical-align: top;
 }
 
-/* Pinned to the top right of the cell — inside the divider, beside the name
+/* Pinned to the right of the cell — inside the divider, beside the name
  * rather than under it — so a wrapped name or a committed filter never moves
  * it. It is drawn in cyan rather than in the host's accent: one colour means
  * "filter this column" whatever theme is running, it is nothing the header's
  * own text can be, and it does not go amber under a theme whose accent is. It
  * fills the strip the header reserves for it — 1.25rem inside 1.5rem, the size
  * the theme's own controls are drawn at — so making it easier to see costs the
- * table no width it had not already given up. */
+ * table no width it had not already given up.
+ *
+ * Vertically it is set on the name's own first line rather than against the
+ * top of the cell, so the funnel and the column it filters read as one line.
+ * Logseq pads a header cell by \`10px 8px\` and sets it in 14px on the
+ * document's 1.5 line height, which puts the middle of that first line 20.5px
+ * down; the control is 20px tall, so opening it at the cell's own top padding
+ * centres it within half a pixel of the name. A name that wraps, or a
+ * committed filter below it, leaves the control on that first line. */
 [data-able-column-control] {
   position: absolute;
-  top: 0.25rem;
+  top: 0.625rem;
   right: 0.25rem;
   z-index: 2;
   display: inline-flex;

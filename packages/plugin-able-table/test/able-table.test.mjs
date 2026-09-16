@@ -560,14 +560,22 @@ test('the control steps left of the theme’s collapse control, and stands alone
   assert.match(filter, /box-sizing: border-box;/)
 
   /* The control sits inside the cell's right divider, in a strip reserved for
-   * it, so it never stands over the column name. */
-  const head = style.match(/\[data-able-head\] \{[^}]+\}/)[0]
+   * it, so it never stands over the column name. The names open at the top of
+   * the row rather than centred in it, so an uneven header row cannot drag a
+   * name off the line its own control is set on. */
+  const head = style.match(/#main-content-container \[data-able-head\] \{[^}]+\}/)[0]
   assert.match(head, /position: relative;/)
   assert.match(head, /padding-right: 1\.5rem;/)
+  assert.match(head, /vertical-align: top;/)
 
   const control = style.match(/\[data-able-column-control\] \{[^}]+\}/)[0]
   assert.match(control, /position: absolute;/)
   assert.match(control, /right: 0\.25rem;/)
+  /* Set on the column name's own first line, not against the top of the cell:
+   * Logseq pads a header cell by 10px and sets it in 14px on a 1.5 line
+   * height, so the 1.25rem control opened at that padding centres on the
+   * 21px first line within half a pixel. Measured in a browser fixture. */
+  assert.match(control, /top: 0\.625rem;/)
   /* Cyan of its own rather than the header's text colour or the host's accent,
    * so the control reads as a control and means the same thing under a theme
    * whose accent is some other colour. Nothing fades it at rest. */

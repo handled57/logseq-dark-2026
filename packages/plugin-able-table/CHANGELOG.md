@@ -12,7 +12,10 @@ All notable changes to this package are documented here.
   theme rather than the theme's own accent, and is taken down to a deeper cyan
   on a light host, where the brighter one would be lost. It fills the strip the
   header reserves for it, so being legible costs the table no width it had not
-  already given up.
+  already given up. It is set on the line the column name is set on, and stays
+  there when that name wraps or takes a filter underneath it: a header row with
+  column menus on opens its names at the top of the row rather than centring
+  them, so every funnel reads as belonging to the name beside it.
 - That control is a funnel from **Tabler Icons**, the face Logseq already loads
   for its own interface: naming it downloads nothing, ships no font with the
   plugin, and adds no dependency. Because a private-use glyph has no fallback,
