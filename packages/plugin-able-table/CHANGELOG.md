@@ -6,8 +6,9 @@ All notable changes to this package are documented here.
 
 - A rendered table can now be filtered one column at a time. The settings panel
   holds a second switch, **Column menus**; turn it on and every column header
-  takes a small **⋮** control inside the cell's right-hand divider, with a menu
-  of its own behind it.
+  takes a small **⋮** control inside the cell's right-hand divider, drawn in the
+  host theme's accent colour so it reads as something to press rather than as
+  part of the column name, with a menu of its own behind it.
 - **Search column** closes that menu and opens a field over the column name,
   holding whatever the column last searched for, selected, so one keystroke
   refines or replaces it. Typing hides every row whose cell in that column does

@@ -39,8 +39,10 @@ it.
 ## Filtering a column
 
 Turn **Column menus** on in the same panel, and every column header takes a
-small **⋮** control of its own, inside the cell's right-hand divider. Press it
-— with the pointer, or with Enter or Space — and a menu opens under it:
+small **⋮** control of its own, inside the cell's right-hand divider, in the
+accent colour of whatever theme you run — amber under Dark High Contrast, and
+Logseq's own blue or teal with no theme installed. Press it — with the pointer,
+or with Enter or Space — and a menu opens under it:
 
 **Search column** closes the menu and opens a field over the column name,
 holding whatever that column last searched for, selected, so one keystroke

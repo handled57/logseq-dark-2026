@@ -550,6 +550,10 @@ test('the control steps left of the theme’s collapse control, and stands alone
   const control = style.match(/\[data-able-column-control\] \{[^}]+\}/)[0]
   assert.match(control, /position: absolute;/)
   assert.match(control, /right: 0\.25rem;/)
+  /* Coloured with the host's accent rather than with the header's own text
+   * colour, so the control reads as a control; the fallback keeps it coloured
+   * with no theme declaring one. */
+  assert.match(control, /color: var\(--ls-active-primary-color, #6fc3df\);/)
 
   /* The menu is positioned against the box the wrapper sits in, like the
    * panel, because the wrapper itself is a scroller that would clip it. */
