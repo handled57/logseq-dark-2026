@@ -115,7 +115,7 @@ test('the runtime observes the host document and marks tables, and offers no set
   /* Every control sits inside rendered block content, where a click of
    * Logseq's own opens the block for editing; the capture phase is what keeps
    * each one to itself. */
-  for (const type of ['mousedown', 'click', 'keydown', 'keyup', 'input']) {
+  for (const type of ['mousedown', 'click', 'keydown', 'keyup', 'input', 'focusout']) {
     assert.match(code, new RegExp(`'${type}'`), `${type} is not answered`)
   }
   assert.match(code, /addEventListener\(type, handler, true\)/)

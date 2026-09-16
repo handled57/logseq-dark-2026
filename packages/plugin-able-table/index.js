@@ -1,9 +1,10 @@
 /* Able Table: finds and keys every rendered Markdown table, hangs one settings
- * control on it, and — behind that control's one toggle — searches it in place.
+ * control on it, and — behind that control's one toggle — searches it in
+ * place, a column at a time from its own header or across every cell at once.
  *
- * Everything here is display-only. Typing in the field hides the rows that do
+ * Everything here is display-only. Typing in a field hides the rows that do
  * not match by marking them; no row is removed, reordered or rewritten, no
- * block is collapsed, and nothing at all reaches the graph. Closing the field
+ * block is collapsed, and nothing at all reaches the graph. Closing a field
  * or unloading the plugin leaves the table exactly as Logseq rendered it.
  *
  * Keying a table by its block's UUID and its ordinal within that block —
@@ -12,7 +13,8 @@
  * replaces rendered nodes constantly during ordinary editing and navigation,
  * so a search string kept against the element itself would be lost on the next
  * keystroke elsewhere on the page. The table is this plugin's only kind of
- * render, so the kind is constant and the key carries the two parts that vary.
+ * render, so the kind is constant and the key carries the two parts that vary;
+ * a column filter is held under that key by the column's own index.
  *
  * `parent.document` is reachable because package.json declares `effect: true`.
  * That flag keeps the plugin entry on the host's own `file://` origin;
@@ -39,9 +41,22 @@ const SEARCH_ATTR = 'data-able-search'
 const FIELD_ATTR = 'data-able-field'
 const CLEAR_ATTR = 'data-able-clear'
 const STATUS_ATTR = 'data-able-status'
+const NOTE_ATTR = 'data-able-note'
+const OPTION_ATTR = 'data-able-option'
+const HEAD_ATTR = 'data-able-head'
+const COLUMN_ATTR = 'data-able-column'
+const COLUMN_CONTROL_ATTR = 'data-able-column-control'
+const MENU_ATTR = 'data-able-column-menu'
+const ITEM_ATTR = 'data-able-menu-item'
+const ACTION_ATTR = 'data-able-action'
+const COLUMN_FILTER_ATTR = 'data-able-column-filter'
+const COLUMN_TERM_ATTR = 'data-able-column-term'
+const ICON_ATTR = 'data-able-icon'
 const FILTERED_ATTR = 'data-able-filtered'
 const KEY_ATTR = 'data-able-key'
 const PANEL_TOP_PROPERTY = '--able-panel-top'
+const MENU_TOP_PROPERTY = '--able-menu-top'
+const MENU_LEFT_PROPERTY = '--able-menu-left'
 
 /* The main editor only, and Logseq's own render of a Markdown table there:
  * a `<table>` that is the direct child of the `div.table-wrapper` box the
@@ -114,7 +129,11 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
 [data-able-settings]:focus-visible,
 [data-able-toggle]:focus-visible,
 [data-able-clear]:focus-visible,
-[data-able-field]:focus-visible {
+[data-able-field]:focus-visible,
+[data-able-column-control]:focus-visible,
+[data-able-menu-item]:focus-visible,
+[data-able-column-filter]:focus-visible,
+[data-able-column-term]:focus-visible {
   outline: 2px solid var(--ls-active-primary-color, #6fc3df);
   outline-offset: 1px;
 }
@@ -158,6 +177,15 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
 
 [data-able-toggle][aria-checked="true"]::before {
   content: "\\2611";
+}
+
+[data-able-note] {
+  max-width: 14rem;
+  margin: 0.25rem 0 0;
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  opacity: 0.8;
 }
 
 [data-able-search] {
@@ -213,6 +241,193 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
   opacity: 0.8;
 }
 
+/* A header cell carrying a column control. The strip the control stands in is
+ * reserved as padding, so the control never sits over the column name however
+ * narrow the column is, and the name is never clickable: a click on the header
+ * itself still belongs to Logseq. The reserved strip is the one thing this
+ * feature changes about the table's own layout, and it changes it when the
+ * reader turns the feature on rather than as they use it. */
+#main-content-container [data-able-head] {
+  position: relative;
+  padding-right: 1.5rem;
+  /* A table cell is laid out vertically centred, so an uneven header row —
+   * one column's name wrapping, or a committed filter under it — drags every
+   * other name down past the line its own control is set on. Opening the
+   * names at the top of the row instead keeps the control and the name it
+   * belongs to on one line in every column. */
+  vertical-align: top;
+}
+
+/* Pinned to the right of the cell — inside the divider, beside the name
+ * rather than under it — so a wrapped name or a committed filter never moves
+ * it. It is drawn in cyan rather than in the host's accent: one colour means
+ * "filter this column" whatever theme is running, it is nothing the header's
+ * own text can be, and it does not go amber under a theme whose accent is. It
+ * fills the strip the header reserves for it — 1.25rem inside 1.5rem, the size
+ * the theme's own controls are drawn at — so making it easier to see costs the
+ * table no width it had not already given up.
+ *
+ * Vertically it is set on the name's own first line rather than against the
+ * top of the cell, so the funnel and the column it filters read as one line.
+ * Logseq pads a header cell by \`10px 8px\` and sets it in 14px on the
+ * document's 1.5 line height, which puts the middle of that first line 20.5px
+ * down; the control is 20px tall, so opening it at the cell's own top padding
+ * centres it within half a pixel of the name. A name that wraps, or a
+ * committed filter below it, leaves the control on that first line. */
+[data-able-column-control] {
+  position: absolute;
+  top: 0.625rem;
+  right: 0.25rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #6fc3df;
+  background: var(--ls-secondary-background-color, #0a0a0a);
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* The same cyan taken down to where it can still be read: a light host draws
+ * the header behind this control in near-white, and a cyan bright enough for a
+ * dark theme all but disappears on it. Logseq marks the host element itself,
+ * so the rule answers the setting rather than the operating system. */
+html[data-theme=light] [data-able-column-control] {
+  color: #0f6b8a;
+}
+
+[data-able-column-control]::after {
+  content: "\\22ee";
+}
+
+/* A funnel says what the menu behind the control is for, and tells it apart
+ * from the table's own settings control. The face carries one weight, so the
+ * bold the ellipsis is set in is handed back here. */
+[data-able-column-control][data-able-icon="filter"]::after {
+  content: "\\eaa5";
+  font-family: tabler-icons;
+  font-weight: 400;
+}
+
+/* The control is drawn at full strength already, so hovering it, opening its
+ * menu or giving it focus outlines the box it stands in rather than
+ * brightening the glyph. */
+[data-able-head]:hover > [data-able-column-control],
+[data-able-column-control][aria-expanded="true"],
+[data-able-column-control]:hover,
+[data-able-column-control]:focus-visible {
+  border-color: var(--ls-border-color, #6b6b6b);
+}
+
+/* The menu is rendered beside the wrapper rather than in the cell, for the
+ * same reason the settings panel is: the wrapper is an \`overflow: auto\`
+ * scroller, and a menu inside it would be clipped by the table's own
+ * scrolling. Both offsets are measured from the control it belongs to, and
+ * kept inside the block's own box, so a menu on the last column opens inward
+ * rather than off the edge and one on the first column never runs off the
+ * other side. */
+[data-able-column-menu] {
+  position: absolute;
+  top: var(--able-menu-top, 0px);
+  left: var(--able-menu-left, 0px);
+  z-index: 4;
+  min-width: 9rem;
+  padding: 0.25rem;
+  color: var(--ls-primary-text-color, #e7e7e7);
+  background: var(--ls-secondary-background-color, #0a0a0a);
+  border: 1px solid var(--ls-border-color, #6b6b6b);
+  border-radius: 2px;
+}
+
+[data-able-menu-item] {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.25rem 0.375rem;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-align: left;
+  white-space: nowrap;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+[data-able-menu-item]:hover {
+  background: var(--ls-primary-background-color, #000000);
+}
+
+/* The field stands in for the column name only: it stops at the control's
+ * strip, so the menu that opened it is still there to be used. */
+[data-able-column-filter] {
+  position: absolute;
+  /* Stretched between its insets rather than given a width: a width would
+   * over-constrain the box and the right inset — the control's strip — would
+   * be dropped. */
+  inset: 0 1.5rem 0 0;
+  z-index: 1;
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0.25rem;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: normal;
+  color: var(--ls-primary-text-color, #e7e7e7);
+  background: var(--ls-primary-background-color, #000000);
+  border: 1px solid var(--ls-active-primary-color, #6fc3df);
+  border-radius: 2px;
+}
+
+/* The committed filter, in flow under the column name. A zero preferred width
+ * with a percentage floor lays the line out across the cell rather than across
+ * its own text, and \`anywhere\` — the one overflow-wrap value that counts
+ * toward intrinsic sizing — leaves the column's floor where the name's longest
+ * word put it. A long filter can still change how the table shares its width
+ * between columns; what it cannot do is widen the table past the wrapper and
+ * put a horizontal scrollbar on a table that had none. */
+[data-able-column-term] {
+  display: block;
+  width: 0;
+  min-width: 100%;
+  margin: 0.125rem 0 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: normal;
+  line-height: 1.4;
+  text-align: inherit;
+  text-decoration: none;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  opacity: 0.8;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Drawn before the term, so the line reads as the thing that drops it. */
+[data-able-column-term]::before {
+  content: "\\00d7\\00a0";
+}
+
+[data-able-column-term]:hover {
+  opacity: 1;
+}
+
 /* A hidden row is hidden by this one declaration and nothing else, so dropping
  * the mark is all it takes to restore it. It is important because the plugin's
  * style and the host's own table rules are two stylesheets whose order is not
@@ -225,15 +440,33 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
 /* State lives here, keyed by `<block uuid>:<ordinal>` — the ordinal counts
  * tables within the same block, in document order, so a block holding more
  * than one table gives each its own key. Every table opens with its search
- * off; nothing here is read from or written to the graph, and it is discarded
- * on unload and rebuilt from the render on the next load. */
+ * off and no column filtered; nothing here is read from or written to the
+ * graph, and it is discarded on unload and rebuilt from the render on the next
+ * load.
+ *
+ * `search` and `columns` are the panel's two toggles. `filters` holds one
+ * committed term per column index, `editing` the one field that is open on
+ * this table, if any, with what it currently holds, and `menu` the column
+ * whose menu is open. `names` remembers each column's name, read while the
+ * cell was still the one Logseq rendered, so a field covering a name can still
+ * be labelled with it. */
 const tableState = new Map()
 
 function stateFor(key) {
   const existing = tableState.get(key)
   if (existing) return existing
 
-  const created = { open: false, search: false, query: '' }
+  const created = {
+    open: false,
+    search: false,
+    columns: false,
+    query: '',
+    filters: new Map(),
+    names: new Map(),
+    editing: null,
+    menu: null
+  }
+
   tableState.set(key, created)
   return created
 }
@@ -280,11 +513,67 @@ function insertAfter(element, reference) {
   else parent.appendChild(element)
 }
 
+function collapse(text) {
+  return (text ?? '').replace(/\s+/g, ' ').trim()
+}
+
 /* One predictable rule: a case-insensitive substring test over the rendered
  * text, with runs of whitespace collapsed to one space so a value wrapped
  * across lines in the markup still reads as the words it renders as. */
 function normalise(text) {
-  return (text ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
+  return collapse(text).toLowerCase()
+}
+
+function cellsOf(row) {
+  const cells = []
+  for (const cell of row?.children ?? []) cells.push(cell)
+  return cells
+}
+
+/* A row reads as its cells with a space between them, never as the row's own
+ * `textContent`: a browser concatenates cells with nothing in between, so a
+ * row rendering `| Ada | Lovelace |` would read as `AdaLovelace` and a reader
+ * typing what they can see would find nothing. A row with no cells at all —
+ * not a shape Logseq renders — falls back to its text. */
+function rowText(row, cells) {
+  if (cells.length) return cells.map((cell) => cell.textContent ?? '').join(' ')
+  return row.textContent ?? ''
+}
+
+function matchesRow(row, needle, filters) {
+  const cells = cellsOf(row)
+
+  if (needle && !normalise(rowText(row, cells)).includes(needle)) return false
+
+  for (const [index, term] of filters) {
+    /* Cells are matched to columns by index, and a row with no cell at that
+     * index — a ragged or spanned row, which Markdown cannot write but pasted
+     * HTML can — matches nothing rather than everything. */
+    if (!normalise(cells[index]?.textContent).includes(term)) return false
+  }
+
+  return true
+}
+
+/* Every column term narrowing the table right now, normalised once. The column
+ * whose field is open counts as what that field holds rather than as what it
+ * last committed, so the table narrows as the reader types and widens again as
+ * they backspace. */
+function activeFilters(state) {
+  const active = []
+
+  for (const [index, term] of state.filters) {
+    if (state.editing?.index === index) continue
+    const needle = normalise(term)
+    if (needle) active.push([index, needle])
+  }
+
+  if (state.editing) {
+    const needle = normalise(state.editing.draft)
+    if (needle) active.push([state.editing.index, needle])
+  }
+
+  return active
 }
 
 /* The rows a search may hide. A head is never touched; where the markup writes
@@ -301,13 +590,17 @@ function bodyRows(table) {
   return table.querySelector?.('thead') ? rows : rows.slice(1)
 }
 
-function applyFilter(table, query, pass) {
-  const needle = normalise(query)
+/* The search and every column filter are answered in one pass, conjunctively:
+ * a row is shown when it satisfies all of them, in whatever order they were
+ * applied. */
+function applyFilter(table, state, pass) {
+  const needle = normalise(state.search ? state.query : '')
+  const filters = activeFilters(state)
   const rows = bodyRows(table)
   let shown = 0
 
   for (const row of rows) {
-    if (needle && !normalise(row.textContent).includes(needle)) {
+    if (!matchesRow(row, needle, filters)) {
       row.setAttribute(FILTERED_ATTR, '')
       pass.filtered.add(row)
       continue
@@ -317,12 +610,12 @@ function applyFilter(table, query, pass) {
     shown += 1
   }
 
-  return { shown, total: rows.length }
+  return { shown, total: rows.length, narrowed: Boolean(needle) || filters.length > 0 }
 }
 
-function statusText(shown, total, query) {
+function statusText({ shown, total, narrowed }) {
   const rows = total === 1 ? 'row' : 'rows'
-  if (!normalise(query)) return `${total} ${rows}`
+  if (!narrowed) return `${total} ${rows}`
   /* Zero matches is a readable state of its own: the head is still standing,
    * and saying so is the difference between an empty table and a broken one. */
   if (shown === 0) return `No rows match; the header row is all that is left`
@@ -352,19 +645,50 @@ function ensureSettings(wrapper, key, name, state) {
   return control
 }
 
+/* What the panel says about the table under it. A Markdown table renders a
+ * head only where it declares a header separator row, and a table with no head
+ * has no column names to filter by; saying so is the difference between a
+ * feature that is missing and one that is broken. */
+const COLUMN_NOTE = 'A menu on every column header searches that column.'
+const NO_COLUMN_NOTE = 'This table renders no header row, so only full table search is available.'
+
+/* The panel's switches, in the order they are read. `columns` is offered only
+ * to a table that renders a head. */
+const OPTIONS = [
+  { name: 'search', label: 'Full table search' },
+  { name: 'columns', label: 'Column menus' }
+]
+
+function buildToggle(key, option) {
+  const toggle = doc.createElement('button')
+  toggle.setAttribute('type', 'button')
+  toggle.setAttribute(TOGGLE_ATTR, '')
+  toggle.setAttribute(KEY_ATTR, key)
+  toggle.setAttribute(OPTION_ATTR, option.name)
+  toggle.setAttribute('role', 'switch')
+  toggle.textContent = option.label
+  return toggle
+}
+
+function optionIn(panel, name) {
+  for (const child of panel?.children ?? []) {
+    if (child.matches?.(`[${TOGGLE_ATTR}]`) && child.getAttribute?.(OPTION_ATTR) === name) return child
+  }
+
+  return null
+}
+
 function buildPanel(key) {
   const panel = doc.createElement('div')
   panel.setAttribute(PANEL_ATTR, '')
   panel.setAttribute(KEY_ATTR, key)
   panel.setAttribute('role', 'group')
 
-  const toggle = doc.createElement('button')
-  toggle.setAttribute('type', 'button')
-  toggle.setAttribute(TOGGLE_ATTR, '')
-  toggle.setAttribute(KEY_ATTR, key)
-  toggle.setAttribute('role', 'switch')
-  toggle.textContent = 'Full table search'
-  panel.appendChild(toggle)
+  for (const option of OPTIONS) panel.appendChild(buildToggle(key, option))
+
+  const note = doc.createElement('p')
+  note.setAttribute(NOTE_ATTR, '')
+  panel.appendChild(note)
 
   return panel
 }
@@ -377,7 +701,7 @@ function anchorPanel(panel, wrapper) {
   if (typeof top === 'number') panel.style?.setProperty?.(PANEL_TOP_PROPERTY, `${top}px`)
 }
 
-function ensurePanel(wrapper, key, name, state) {
+function ensurePanel(wrapper, key, name, state, head) {
   const existing = siblingWith(wrapper, PANEL_ATTR, key)
 
   if (!state.open) {
@@ -389,7 +713,18 @@ function ensurePanel(wrapper, key, name, state) {
   if (!existing) insertAfter(panel, wrapper)
 
   panel.setAttribute('aria-label', `Search options for ${name}`)
-  childWith(panel, TOGGLE_ATTR)?.setAttribute('aria-checked', state.search ? 'true' : 'false')
+  optionIn(panel, 'search')?.setAttribute('aria-checked', state.search ? 'true' : 'false')
+
+  /* A table with no head is offered no column switch at all: a switch that
+   * could be turned on and do nothing is worse than none. */
+  const columns = optionIn(panel, 'columns')
+  if (head) columns?.setAttribute('aria-checked', state.columns ? 'true' : 'false')
+  else columns?.remove()
+
+  const note = childWith(panel, NOTE_ATTR)
+  const text = head ? COLUMN_NOTE : NO_COLUMN_NOTE
+  if (note && note.textContent !== text) note.textContent = text
+
   anchorPanel(panel, wrapper)
 
   return panel
@@ -461,14 +796,274 @@ function ensureSearch(wrapper, key, name, state) {
   return row
 }
 
-function setStatus(row, { shown, total }, query) {
+function setStatus(row, counts) {
   const status = childWith(row, STATUS_ATTR)
   if (!status) return
 
-  const text = statusText(shown, total, query)
+  const text = statusText(counts)
   /* Writing the same string still replaces the text node, which the observer
    * would read as a change and answer with another pass. */
   if (status.textContent !== text) status.textContent = text
+}
+
+/* Logseq renders a Markdown table's head as `thead > tr > th` and every body
+ * group as `tbody > tr > td`, so the head row's cells are the columns a reader
+ * can filter by. A table declaring no header separator row renders no `thead`
+ * at all, and gives back no columns. */
+function headCells(table) {
+  const head = table.querySelector?.('thead')
+  if (!head) return []
+
+  for (const row of head.children ?? []) {
+    if (row.tagName === 'TR') return cellsOf(row)
+  }
+
+  return []
+}
+
+/* The column's name, read while the cell is still the one Logseq rendered —
+ * before a term line or a field of this plugin's is standing in it — and kept
+ * against the column, so a field covering the name can still be labelled with
+ * it. A render that replaces the cell takes this plugin's nodes with it, so
+ * the next pass reads the new name from a clean cell. */
+function columnName(cell, state, index) {
+  if (!childWith(cell, COLUMN_TERM_ATTR) && !childWith(cell, COLUMN_FILTER_ATTR)) {
+    state.names.set(index, collapse(cell.textContent))
+  }
+
+  return state.names.get(index) || `column ${index + 1}`
+}
+
+/* Logseq 0.10.15 links Tabler Icons from its own page, so the funnel the
+ * control is drawn with is already in the host document: naming that face
+ * costs no request, ships no file, and adds no dependency. What it cannot have
+ * is a fallback — the glyph lives in the private use area, where a face that
+ * is missing renders a replacement box rather than the next font's glyph — so
+ * the runtime asks whether the face is really loaded and marks the control
+ * only then. A host without it keeps the vertical ellipsis.
+ *
+ * `check` answers for a face that has finished loading, so a control built
+ * before the host asked for it would keep the ellipsis; the answer is re-asked
+ * each pass until it is yes, and `main` asks for the face to settle it. */
+const ICON_FONT = '1rem tabler-icons'
+let iconsLoaded = false
+function iconFont() {
+  if (iconsLoaded) return true
+
+  try {
+    iconsLoaded = doc.fonts?.check?.(ICON_FONT) === true
+  } catch {
+    iconsLoaded = false
+  }
+
+  return iconsLoaded
+}
+
+function buildControl(key, index) {
+  const control = doc.createElement('button')
+  control.setAttribute('type', 'button')
+  control.setAttribute(COLUMN_CONTROL_ATTR, '')
+  control.setAttribute(KEY_ATTR, key)
+  control.setAttribute(COLUMN_ATTR, String(index))
+  control.setAttribute('aria-haspopup', 'menu')
+  return control
+}
+
+function buildTerm(key, index) {
+  const term = doc.createElement('button')
+  term.setAttribute('type', 'button')
+  term.setAttribute(COLUMN_TERM_ATTR, '')
+  term.setAttribute(KEY_ATTR, key)
+  term.setAttribute(COLUMN_ATTR, String(index))
+  return term
+}
+
+function buildColumnField(key, index) {
+  const field = doc.createElement('input')
+  field.setAttribute('type', 'text')
+  field.setAttribute(COLUMN_FILTER_ATTR, '')
+  field.setAttribute(KEY_ATTR, key)
+  field.setAttribute(COLUMN_ATTR, String(index))
+  field.setAttribute('autocomplete', 'off')
+  field.setAttribute('spellcheck', 'false')
+  return field
+}
+
+/* One header cell: marked, carrying its own menu control, the committed filter
+ * under its name and — while it is the column being edited — the field that is
+ * laid over it. All three are appended rather than substituted, so the cell's
+ * own rendered markup is never moved, and the name itself is left alone: a
+ * click on it is still Logseq's. */
+function applyColumn(cell, key, index, state, pass) {
+  const name = columnName(cell, state, index)
+
+  cell.setAttribute(HEAD_ATTR, '')
+  cell.setAttribute(KEY_ATTR, key)
+  cell.setAttribute(COLUMN_ATTR, String(index))
+  pass.columns.add(cell)
+
+  const control = childWith(cell, COLUMN_CONTROL_ATTR) ?? cell.appendChild(buildControl(key, index))
+  if (iconFont()) control.setAttribute(ICON_ATTR, 'filter')
+  const label = `Column options for ${name}`
+  control.setAttribute('aria-expanded', state.menu === index ? 'true' : 'false')
+  control.setAttribute('aria-label', label)
+  control.setAttribute('title', label)
+  pass.columnControls.add(control)
+
+  const committed = state.filters.get(index) ?? ''
+  let term = childWith(cell, COLUMN_TERM_ATTR)
+  if (committed && !term) term = cell.appendChild(buildTerm(key, index))
+  else if (!committed && term) {
+    term.remove()
+    term = null
+  }
+
+  if (term) {
+    if (term.textContent !== committed) term.textContent = committed
+    term.setAttribute('aria-label', `Clear the filter on ${name}`)
+    term.setAttribute('title', `Clear the filter on ${name}`)
+    pass.terms.add(term)
+  }
+
+  const editing = state.editing?.index === index
+  let field = childWith(cell, COLUMN_FILTER_ATTR)
+  if (editing && !field) field = cell.appendChild(buildColumnField(key, index))
+  else if (!editing && field) {
+    field.remove()
+    field = null
+  }
+
+  if (field) {
+    field.setAttribute('aria-label', `Search ${name}`)
+    field.setAttribute('placeholder', name)
+    /* Written only when it differs: assigning the same string still moves the
+     * caret to the end of the field the reader is typing in. */
+    if (field.value !== state.editing.draft) field.value = state.editing.draft
+    pass.fields.add(field)
+  }
+}
+
+/* The menu one column's control has open, built beside the wrapper and
+ * measured against the control it belongs to. `Search column` is always there;
+ * `Clear filter` only while there is one to clear. */
+const MENU_ITEMS = [
+  { action: 'search', label: 'Search column' },
+  /* Nothing to clear is not an item to press: it is hung and taken away with
+   * the filter itself. */
+  { action: 'clear', label: 'Clear filter', filtered: true }
+]
+
+function buildMenu(key, index) {
+  const menu = doc.createElement('div')
+  menu.setAttribute(MENU_ATTR, '')
+  menu.setAttribute(KEY_ATTR, key)
+  menu.setAttribute(COLUMN_ATTR, String(index))
+  menu.setAttribute('role', 'menu')
+  return menu
+}
+
+function buildItem(key, index, { action, label }) {
+  const item = doc.createElement('button')
+  item.setAttribute('type', 'button')
+  item.setAttribute(ITEM_ATTR, '')
+  item.setAttribute(ACTION_ATTR, action)
+  item.setAttribute(KEY_ATTR, key)
+  item.setAttribute(COLUMN_ATTR, String(index))
+  item.setAttribute('role', 'menuitem')
+  item.textContent = label
+  return item
+}
+
+function itemIn(menu, action) {
+  for (const child of menu.children ?? []) {
+    if (child.getAttribute?.(ACTION_ATTR) === action) return child
+  }
+
+  return null
+}
+
+/* The menu is positioned against the wrapper's own parent, like the panel, so
+ * where the control sits inside the scrolling table is the one thing the
+ * stylesheet cannot work out for itself. */
+function anchorMenu(menu, control, anchor) {
+  const controlBox = control?.getBoundingClientRect?.()
+  const anchorBox = anchor?.getBoundingClientRect?.()
+  const menuBox = menu.getBoundingClientRect?.()
+  if (!controlBox || !anchorBox || !menuBox) return
+
+  /* Right-aligned to its control, which is where a menu hung on the last
+   * column has to open; where that would put it off the other edge — a menu
+   * wider than the column it belongs to, on the first one — it opens from the
+   * control's left instead, and is held inside the block either way. */
+  const aligned = controlBox.right - anchorBox.left - menuBox.width
+  const left = aligned < 0 ? controlBox.left - anchorBox.left : aligned
+
+  menu.style?.setProperty?.(MENU_TOP_PROPERTY, `${controlBox.bottom - anchorBox.top + 2}px`)
+  menu.style?.setProperty?.(
+    MENU_LEFT_PROPERTY,
+    `${Math.max(0, Math.min(left, Math.max(0, anchorBox.width - menuBox.width)))}px`
+  )
+}
+
+function ensureMenu(wrapper, key, state, cells, pass) {
+  const existing = siblingWith(wrapper, MENU_ATTR, key)
+  const index = state.menu
+
+  if (index === null || !cells[index]) {
+    existing?.remove()
+    return
+  }
+
+  const menu = existing?.getAttribute(COLUMN_ATTR) === String(index) ? existing : buildMenu(key, index)
+  if (menu !== existing) {
+    existing?.remove()
+    insertAfter(menu, wrapper)
+  }
+
+  const name = state.names.get(index) || `column ${index + 1}`
+  menu.setAttribute('aria-label', `Column options for ${name}`)
+
+  for (const option of MENU_ITEMS) {
+    const item = itemIn(menu, option.action)
+    const wanted = !option.filtered || state.filters.has(index)
+
+    if (wanted && !item) menu.appendChild(buildItem(key, index, option))
+    else if (!wanted && item) item.remove()
+  }
+
+  anchorMenu(menu, childWith(cells[index], COLUMN_CONTROL_ATTR), wrapper.parentElement)
+  pass.menus.add(menu)
+}
+
+function applyColumns(table, key, state, pass) {
+  const cells = headCells(table)
+
+  /* No head is no column names, and a switch that is off is no columns either.
+   * A filter the reader can no longer see beside the column it narrows, or
+   * drop from its menu, is not one they can be left holding. */
+  if (!cells.length || !state.columns) {
+    state.filters.clear()
+    state.editing = null
+    state.menu = null
+    return { head: cells.length > 0, cells: [] }
+  }
+
+  for (const [index, cell] of cells.entries()) applyColumn(cell, key, index, state, pass)
+
+  return { head: true, cells }
+}
+
+/* What an open field holds becomes the column's committed filter; an empty one
+ * commits nothing and drops whatever that column held. */
+function commit(state) {
+  if (!state.editing) return
+
+  const { index, draft } = state.editing
+  const term = collapse(draft)
+  state.editing = null
+
+  if (term) state.filters.set(index, term)
+  else state.filters.delete(index)
 }
 
 function applyTable(wrapper, table, key, name, pass) {
@@ -482,17 +1077,23 @@ function applyTable(wrapper, table, key, name, pass) {
 
   pass.controls.add(ensureSettings(wrapper, key, name, state))
 
-  const panel = ensurePanel(wrapper, key, name, state)
+  /* The columns are read before anything is filtered by them, so a table that
+   * has just lost its head, or a switch that has just been turned off, filters
+   * by nothing. */
+  const { head, cells } = applyColumns(table, key, state, pass)
+  ensureMenu(wrapper, key, state, cells, pass)
+
+  const panel = ensurePanel(wrapper, key, name, state, head)
   if (panel) pass.panels.add(panel)
 
   /* Rows are restored before the field that filtered them can go, so turning
    * the search off can never leave a row hidden behind a removed field. */
-  const counts = applyFilter(table, state.search ? state.query : '', pass)
+  const counts = applyFilter(table, state, pass)
 
   const row = ensureSearch(wrapper, key, name, state)
   if (row) {
     pass.searches.add(row)
-    setStatus(row, counts, state.query)
+    setStatus(row, counts)
   }
 }
 
@@ -504,11 +1105,26 @@ function applyTable(wrapper, table, key, name, pass) {
  * block is being edited — gives back its marks, its controls and its field in
  * the same pass; its state is kept, so the render that returns comes back
  * searched. */
+function emptyPass() {
+  return {
+    anchors: new Set(),
+    controls: new Set(),
+    panels: new Set(),
+    searches: new Set(),
+    filtered: new Set(),
+    columns: new Set(),
+    columnControls: new Set(),
+    menus: new Set(),
+    terms: new Set(),
+    fields: new Set()
+  }
+}
+
 function markTables() {
   const marked = new Set()
   const live = new Set()
   const counts = new Map()
-  const pass = { anchors: new Set(), controls: new Set(), panels: new Set(), searches: new Set(), filtered: new Set() }
+  const pass = emptyPass()
   let position = 0
 
   for (const root of doc.querySelectorAll(MAIN_EDITOR_SELECTOR)) {
@@ -528,6 +1144,14 @@ function markTables() {
 
       applyTable(wrapper, table, key, `table ${position}`, pass)
     }
+  }
+
+  /* A table the pass did not reach is not rendered right now: its block is
+   * being edited, or the page has moved on. The field that was open goes with
+   * that render, so what it held is committed rather than dropped, and the
+   * table comes back filtered by what the reader last typed. */
+  for (const [key, state] of tableState) {
+    if (state.editing && !live.has(key)) commit(state)
   }
 
   for (const wrapper of doc.querySelectorAll(`[${TABLE_ATTR}]`)) {
@@ -560,6 +1184,29 @@ function release(pass) {
     if (!pass.searches.has(row)) row.remove()
   }
 
+  for (const control of doc.querySelectorAll(`[${COLUMN_CONTROL_ATTR}]`)) {
+    if (!pass.columnControls.has(control)) control.remove()
+  }
+
+  for (const menu of doc.querySelectorAll(`[${MENU_ATTR}]`)) {
+    if (!pass.menus.has(menu)) menu.remove()
+  }
+
+  for (const field of doc.querySelectorAll(`[${COLUMN_FILTER_ATTR}]`)) {
+    if (!pass.fields.has(field)) field.remove()
+  }
+
+  for (const term of doc.querySelectorAll(`[${COLUMN_TERM_ATTR}]`)) {
+    if (!pass.terms.has(term)) term.remove()
+  }
+
+  /* A header cell is Logseq's own node, so what is given back is every
+   * attribute this plugin wrote on it rather than the cell itself. */
+  for (const cell of doc.querySelectorAll(`[${HEAD_ATTR}]`)) {
+    if (pass.columns.has(cell)) continue
+    for (const attribute of [HEAD_ATTR, KEY_ATTR, COLUMN_ATTR]) cell.removeAttribute(attribute)
+  }
+
   for (const row of doc.querySelectorAll(`[${FILTERED_ATTR}]`)) {
     if (!pass.filtered.has(row)) row.removeAttribute(FILTERED_ATTR)
   }
@@ -582,9 +1229,27 @@ function repaint() {
   })
 }
 
-function focusIn(attribute, key) {
+/* This plugin's own nodes are found by the key they carry rather than by where
+ * they sit, because the render they sit in is replaced under them. A column's
+ * chrome carries its index as well. */
+function nodeFor(attribute, key, index) {
   for (const element of doc.querySelectorAll(`[${attribute}]`)) {
-    if (element.getAttribute(KEY_ATTR) === key) return element.focus?.()
+    if (element.getAttribute(KEY_ATTR) !== key) continue
+    if (index !== undefined && element.getAttribute(COLUMN_ATTR) !== String(index)) continue
+    return element
+  }
+
+  return null
+}
+
+function focusIn(attribute, key, index) {
+  nodeFor(attribute, key, index)?.focus?.()
+}
+
+function focusOption(key, name) {
+  for (const toggle of doc.querySelectorAll(`[${TOGGLE_ATTR}]`)) {
+    if (toggle.getAttribute(KEY_ATTR) !== key || toggle.getAttribute(OPTION_ATTR) !== name) continue
+    return toggle.focus?.()
   }
 }
 
@@ -601,14 +1266,63 @@ function closePanels() {
   return closed
 }
 
+/* The reader scrolled: a menu measured against a control that has moved is
+ * pointing at nothing, so it goes. */
+function onScroll() {
+  closeMenus()
+}
+
+/* A click on the page is the reader moving on: an open panel is dismissed, and
+ * an open field commits what it holds, exactly as losing focus would — which,
+ * where the click landed on something focusable, it also has. */
+function dismiss() {
+  let changed = false
+
+  for (const state of tableState.values()) {
+    if (state.editing) {
+      commit(state)
+      changed = true
+    }
+
+    if (state.open || state.menu !== null) {
+      state.open = false
+      state.menu = null
+      changed = true
+    }
+  }
+
+  if (changed) markTables()
+  return changed
+}
+
+/* One popup at a time, whichever kind it is: a column menu dismisses the
+ * settings panel and any other column's menu, and the panel dismisses every
+ * menu. */
+function closeMenus() {
+  let closed = false
+
+  for (const state of tableState.values()) {
+    if (state.menu === null) continue
+    state.menu = null
+    closed = true
+  }
+
+  if (closed) markTables()
+  return closed
+}
+
 function togglePanel(control) {
   const key = control.getAttribute(KEY_ATTR)
   const state = tableState.get(key)
   if (!state) return
 
   const open = !state.open
-  /* One panel at a time: opening this one dismisses any other. */
-  for (const [other, value] of tableState) value.open = other === key && open
+  /* One popup at a time: opening this panel dismisses every other panel and
+   * every column menu. */
+  for (const [other, value] of tableState) {
+    value.open = other === key && open
+    value.menu = null
+  }
 
   markTables()
   /* The press was taken before the host could move focus, so the control is
@@ -624,12 +1338,31 @@ function toggleSearch(toggle) {
 
   state.search = !state.search
   /* Turning it off clears what the field held, so it never comes back holding
-   * a search the reader has closed. */
+   * a search the reader has closed. The column filters are not its to clear. */
   if (!state.search) state.query = ''
 
   markTables()
   if (state.search) focusIn(FIELD_ATTR, key)
-  else focusIn(TOGGLE_ATTR, key)
+  else focusOption(key, 'search')
+}
+
+/* The switch the whole column feature hangs off. Turning it off takes away
+ * every control, menu, field and committed filter on that table, and gives
+ * back every row they were hiding: an affordance the reader cannot see is not
+ * one that should still be narrowing what they read. */
+function toggleOption(toggle) {
+  if (toggle.getAttribute(OPTION_ATTR) === 'columns') return toggleColumns(toggle)
+  return toggleSearch(toggle)
+}
+
+function toggleColumns(toggle) {
+  const key = toggle.getAttribute(KEY_ATTR)
+  const state = tableState.get(key)
+  if (!state) return
+
+  state.columns = !state.columns
+  markTables()
+  focusOption(key, 'columns')
 }
 
 function clearSearch(clear) {
@@ -642,13 +1375,137 @@ function clearSearch(clear) {
   focusIn(FIELD_ATTR, key)
 }
 
+function columnOf(node) {
+  const key = node.getAttribute(KEY_ATTR)
+  const raw = node.getAttribute(COLUMN_ATTR)
+  const state = tableState.get(key)
+  if (!state || raw === null) return null
+
+  return { key, index: Number(raw), state }
+}
+
+/* Opening and closing a column's menu. The control keeps focus while its menu
+ * is open, so the menu is reached with Tab or with the arrow keys and Escape
+ * always comes back to it. */
+function toggleMenu(control) {
+  const column = columnOf(control)
+  if (!column) return
+
+  const open = column.state.menu !== column.index
+
+  for (const [other, value] of tableState) {
+    value.menu = other === column.key && open ? column.index : null
+    if (other !== column.key || !open) continue
+    /* A menu and the settings panel are two answers to the same question. */
+    value.open = false
+  }
+
+  markTables()
+  if (open) focusIn(ITEM_ATTR, column.key, column.index)
+  else focusIn(COLUMN_CONTROL_ATTR, column.key, column.index)
+}
+
+/* The menu's items. `Search column` closes the menu and opens the field over
+ * the column name, holding what that column last searched for; `Clear filter`
+ * drops it. */
+function activateItem(item) {
+  const column = columnOf(item)
+  if (!column) return
+
+  const action = item.getAttribute(ACTION_ATTR)
+  column.state.menu = null
+
+  if (action === 'clear') return clearColumn(item)
+  if (action === 'search') return openColumn(item)
+
+  markTables()
+}
+
+/* Moving through an open menu from the keyboard. */
+function stepMenu(item, step) {
+  const menu = item.closest?.(`[${MENU_ATTR}]`)
+  const items = []
+  for (const child of menu?.children ?? []) {
+    if (child.matches?.(`[${ITEM_ATTR}]`)) items.push(child)
+  }
+
+  const at = items.indexOf(item)
+  if (at === -1 || !items.length) return
+
+  items[(at + step + items.length) % items.length].focus?.()
+}
+
+/* Opening a column's field. Whatever was open elsewhere commits rather than
+ * being dropped, wherever the reader went next. */
+function openColumn(node) {
+  const column = columnOf(node)
+  if (!column) return
+
+  for (const other of tableState.values()) {
+    if (other !== column.state || other.editing?.index !== column.index) commit(other)
+  }
+
+  if (!column.state.editing) {
+    column.state.editing = { index: column.index, draft: column.state.filters.get(column.index) ?? '' }
+  }
+
+  markTables()
+
+  const field = nodeFor(COLUMN_FILTER_ATTR, column.key, column.index)
+  field?.focus?.()
+  /* Reopened holding what was committed, and selected, so the next keystroke
+   * refines or discards it. */
+  field?.setSelectionRange?.(0, (field.value ?? '').length)
+}
+
+/* Closing it, either way round: what the field holds becomes the column's
+ * filter, or is dropped for the one last committed. The node is passed rather
+ * than the key alone so a stray event from a field this plugin has already
+ * taken away can never close the one that replaced it. */
+function closeColumn(node, keep) {
+  const column = columnOf(node)
+  if (!column?.state.editing || column.state.editing.index !== column.index) return false
+
+  if (keep) commit(column.state)
+  else column.state.editing = null
+
+  markTables()
+  return true
+}
+
+function clearColumn(term) {
+  const column = columnOf(term)
+  if (!column) return
+
+  /* Dropping one column's filter is all this does: it never opens that
+   * column's field, and never leaves another's open field hanging. */
+  for (const state of tableState.values()) commit(state)
+  column.state.filters.delete(column.index)
+
+  markTables()
+  focusIn(COLUMN_CONTROL_ATTR, column.key, column.index)
+}
+
 /* Every node this plugin hangs in the host document sits inside rendered block
  * content, where a click of Logseq's own opens the block for editing and Enter
  * or Space reaches its shortcut handling. Taking these events in the capture
  * phase, before React's root container sees them, is what keeps each control
  * to itself. */
+/* The header cell itself is not on this list: the column name is Logseq's, and
+ * a click on it opens the block for editing exactly as it always did. What
+ * this plugin answers for is the control it hangs in the cell, the menu that
+ * control opens, and the field and committed filter that come of it. */
 function chromeOf(target) {
-  return target?.closest?.(`[${SETTINGS_ATTR}], [${PANEL_ATTR}], [${SEARCH_ATTR}]`) ?? null
+  return (
+    target?.closest?.(
+      `[${SETTINGS_ATTR}], [${PANEL_ATTR}], [${SEARCH_ATTR}], [${COLUMN_CONTROL_ATTR}], ` +
+        `[${MENU_ATTR}], [${COLUMN_FILTER_ATTR}], [${COLUMN_TERM_ATTR}]`
+    ) ?? null
+  )
+}
+
+function fieldOf(target) {
+  return target?.closest?.(`[${FIELD_ATTR}], [${COLUMN_FILTER_ATTR}]`) ?? null
 }
 
 function onPointer(event) {
@@ -656,28 +1513,39 @@ function onPointer(event) {
   const chrome = chromeOf(target)
 
   if (!chrome) {
-    /* A click anywhere else dismisses an open panel, and is otherwise left
-     * entirely to Logseq. */
-    if (event.type === 'click') closePanels()
+    /* A click anywhere else dismisses an open panel and commits an open field,
+     * and is otherwise left entirely to Logseq. */
+    if (event.type === 'click') dismiss()
     return
   }
 
   event.stopPropagation()
 
-  /* The field is the one place a press must still reach its own element: a
+  /* A field is the one place a press must still reach its own element: a
    * prevented `mousedown` puts no caret in an input. Stopping the event is all
    * that is needed to keep the block out of edit mode. */
-  if (!target.closest?.(`[${FIELD_ATTR}]`)) event.preventDefault()
+  if (!fieldOf(target)) event.preventDefault()
   if (event.type !== 'click') return
 
   const settings = target.closest?.(`[${SETTINGS_ATTR}]`)
   if (settings) return togglePanel(settings)
 
   const toggle = target.closest?.(`[${TOGGLE_ATTR}]`)
-  if (toggle) return toggleSearch(toggle)
+  if (toggle) return toggleOption(toggle)
 
   const clear = target.closest?.(`[${CLEAR_ATTR}]`)
   if (clear) return clearSearch(clear)
+
+  const control = target.closest?.(`[${COLUMN_CONTROL_ATTR}]`)
+  if (control) return toggleMenu(control)
+
+  const item = target.closest?.(`[${ITEM_ATTR}]`)
+  if (item) return activateItem(item)
+
+  /* The committed filter, and nothing else on the header, is what a click
+   * drops a column's filter with. */
+  const term = target.closest?.(`[${COLUMN_TERM_ATTR}]`)
+  if (term) return clearColumn(term)
 }
 
 function onKeyDown(event) {
@@ -686,8 +1554,39 @@ function onKeyDown(event) {
 
   event.stopPropagation()
 
+  /* An open column field answers Escape and Enter itself: Escape restores the
+   * filter the column last committed, Enter commits what the field holds. Both
+   * leave focus on the header, so the interaction carries on from there. */
+  const editor = event.target.closest?.(`[${COLUMN_FILTER_ATTR}]`)
+  if (editor) {
+    if (event.key !== 'Escape' && event.key !== 'Enter') return
+
+    event.preventDefault()
+    const key = editor.getAttribute(KEY_ATTR)
+    const index = editor.getAttribute(COLUMN_ATTR)
+    closeColumn(editor, event.key === 'Enter')
+    focusIn(COLUMN_CONTROL_ATTR, key, index)
+    return
+  }
+
+  /* An open menu is walked with the arrow keys, the way a menu is. */
+  const item = event.target.closest?.(`[${ITEM_ATTR}]`)
+  if (item && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+    event.preventDefault()
+    return stepMenu(item, event.key === 'ArrowDown' ? 1 : -1)
+  }
+
   if (event.key === 'Escape') {
     event.preventDefault()
+
+    /* Escape answers the nearest thing that is open: a menu first, and its
+     * control takes focus back. */
+    const column = item ?? event.target.closest?.(`[${COLUMN_CONTROL_ATTR}]`)
+    if (column && closeMenus()) {
+      focusIn(COLUMN_CONTROL_ATTR, column.getAttribute(KEY_ATTR), column.getAttribute(COLUMN_ATTR))
+      return
+    }
+
     if (closePanels()) focusIn(SETTINGS_ATTR, chrome.getAttribute(KEY_ATTR))
     return
   }
@@ -696,12 +1595,18 @@ function onKeyDown(event) {
   if (event.target.closest?.(`[${FIELD_ATTR}]`)) return
   if (event.key !== 'Enter' && event.key !== ' ') return
 
-  const control = event.target.closest?.(`[${SETTINGS_ATTR}], [${TOGGLE_ATTR}], [${CLEAR_ATTR}]`)
+  const control = event.target.closest?.(
+    `[${SETTINGS_ATTR}], [${TOGGLE_ATTR}], [${CLEAR_ATTR}], [${COLUMN_CONTROL_ATTR}], [${ITEM_ATTR}], ` +
+      `[${COLUMN_TERM_ATTR}]`
+  )
   if (!control) return
 
   event.preventDefault()
   if (control.matches(`[${SETTINGS_ATTR}]`)) togglePanel(control)
-  else if (control.matches(`[${TOGGLE_ATTR}]`)) toggleSearch(control)
+  else if (control.matches(`[${TOGGLE_ATTR}]`)) toggleOption(control)
+  else if (control.matches(`[${COLUMN_CONTROL_ATTR}]`)) toggleMenu(control)
+  else if (control.matches(`[${ITEM_ATTR}]`)) activateItem(control)
+  else if (control.matches(`[${COLUMN_TERM_ATTR}]`)) clearColumn(control)
   else clearSearch(control)
 }
 
@@ -712,7 +1617,7 @@ function onKeyUp(event) {
 }
 
 function onInput(event) {
-  const field = event.target?.closest?.(`[${FIELD_ATTR}]`)
+  const field = fieldOf(event.target)
   if (!field) return
 
   event.stopPropagation()
@@ -720,8 +1625,17 @@ function onInput(event) {
   const state = tableState.get(field.getAttribute(KEY_ATTR))
   if (!state) return
 
-  state.query = field.value ?? ''
+  if (!field.matches(`[${COLUMN_FILTER_ATTR}]`)) state.query = field.value ?? ''
+  else if (state.editing) state.editing = { ...state.editing, draft: field.value ?? '' }
+
   markTables()
+}
+
+/* A field that loses focus closes, committing what it holds: the reader has
+ * moved on, and the column keeps what they typed. */
+function onFocusOut(event) {
+  const editor = event.target?.closest?.(`[${COLUMN_FILTER_ATTR}]`)
+  if (editor) closeColumn(editor, true)
 }
 
 const LISTENERS = [
@@ -729,7 +1643,9 @@ const LISTENERS = [
   ['click', onPointer],
   ['keydown', onKeyDown],
   ['keyup', onKeyUp],
-  ['input', onInput]
+  ['input', onInput],
+  ['focusout', onFocusOut],
+  ['scroll', onScroll]
 ]
 
 /* Everything this script writes lives in the host document, which outlives the
@@ -742,7 +1658,7 @@ function teardown() {
 
   for (const [type, handler] of LISTENERS) doc.removeEventListener?.(type, handler, true)
 
-  release({ anchors: new Set(), controls: new Set(), panels: new Set(), searches: new Set(), filtered: new Set() })
+  release(emptyPass())
   for (const wrapper of doc.querySelectorAll(`[${TABLE_ATTR}]`)) wrapper.removeAttribute(TABLE_ATTR)
 }
 
@@ -751,6 +1667,15 @@ function main() {
   logseq.beforeunload?.(async () => teardown())
 
   for (const [type, handler] of LISTENERS) doc.addEventListener(type, handler, true)
+
+  /* Logseq draws its own chrome in this face, so it is loaded long before a
+   * table renders; asking costs nothing and repaints the controls that were
+   * built while it was still on its way. */
+  try {
+    doc.fonts?.load?.(ICON_FONT)?.then?.(repaint, () => {})
+  } catch {
+    /* A host with no font set draws the ellipsis, which is the fallback. */
+  }
 
   /* childList/subtree only: this observer must not see its own attribute
    * writes, or every pass would schedule another one. */

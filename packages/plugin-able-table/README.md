@@ -1,24 +1,27 @@
 # Able Table for Logseq
 
-Able Table makes a rendered Markdown table searchable in place, without
-editing the block, restructuring the Markdown, or converting the table to a
-query. Everything it does is display-only: no filter, no search string, and no
-toggle state is ever written to the graph.
+Able Table makes a rendered Markdown table searchable and filterable in place,
+without editing the block, restructuring the Markdown, or converting the table
+to a query. Everything it does is display-only: no filter, no search string,
+and no toggle state is ever written to the graph.
 
 ## Searching a table
 
 Every Markdown table in the main editor carries a small **⋯** control in its
-top-right corner. Press it — with the pointer, or with Enter or Space from the
-keyboard — and a panel opens beneath it holding one toggle:
+top-right corner, beside the collapse control. Press it — with the pointer, or
+with Enter or Space from the keyboard — and a panel opens beneath it holding
+the table's two switches, **Full table search** and **Column menus**. Each is
+that table's own, and neither is remembered anywhere outside the session.
 
 **Full table search** puts a find-as-you-type field across the top of the
 table and focuses it. Type, and every row that does not match disappears as
 you go; backspace, and the rows come back.
 
-- Matching is a **case-insensitive substring test** over the row's rendered
-  text, with runs of whitespace collapsed to one space. `ada` finds
-  `Ada Lovelace`. There is no tokenising, no fuzzy matching and no regular
-  expression support — one predictable rule is the point.
+- Matching is a **case-insensitive substring test** over the row's cells, read
+  with a space between them and runs of whitespace collapsed to one. `ada`
+  finds `Ada Lovelace`, and so does `ada lovelace` in a row whose first two
+  cells are `Ada` and `Lovelace`. There is no tokenising, no fuzzy matching
+  and no regular expression support — one predictable rule is the point.
 - The **header row is never hidden**, so a table with nothing matching still
   reads as a table rather than as an error.
 - The field says how many rows match out of how many the table holds, and
@@ -28,23 +31,102 @@ you go; backspace, and the rows come back.
 - Turning **Full table search** off takes the field away, clears it, and
   restores every row.
 
-Dismiss the panel with Escape, with a click anywhere outside it, or by
-pressing the control again. Escape and a second press hand focus back to the
-control; a click outside leaves focus wherever you clicked it.
+Dismiss the panel with Escape, with a click anywhere outside it, by opening a
+column's menu, or by pressing the control again. Escape and a second press hand
+focus back to the control; a click outside leaves focus wherever you clicked
+it.
+
+## Filtering a column
+
+Turn **Column menus** on in the same panel, and every column header takes a
+filter control of its own — a funnel — inside the cell's right-hand divider and
+on the line the column name is set on, drawn in cyan. It is that colour under
+every theme, so one colour always means "filter this column", whatever else the
+theme you run is accented with; on a light Logseq it is taken down to a deeper
+cyan, where the brighter one would be lost against a near-white header. A
+header row with column menus on opens its names at the top of the row rather
+than centring them, so a name that wraps — or one carrying a filter underneath
+it — never pulls its neighbours off the line their own funnels are on. Hovering
+the header, opening the menu or giving the control focus outlines the box it
+stands in.
+Press it — with the pointer, or with Enter or Space — and a menu opens under
+it:
+
+**Search column** closes the menu and opens a field over the column name,
+holding whatever that column last searched for, selected, so one keystroke
+refines or replaces it. Type, and every row whose cell **in that column** does
+not match disappears. Matching is the same case-insensitive substring test the
+full table search uses, read off that one cell rather than off the whole row.
+
+**Clear filter** is there only while that column has one, and drops it.
+
+The field is laid over the header cell rather than put in its place, and stops
+short of the filter control, so the column keeps its width, the menu stays
+reachable, and whatever Logseq rendered in that header — a link, code,
+emphasis — is still exactly where it was when the field goes.
+
+- **Losing focus commits** what the field holds. The filter is shown in small
+  text under the column name, so you can see at a glance which columns are
+  narrowing the table and by what. A field that closes empty commits nothing.
+- **Click the committed filter** to drop it and bring back the rows it hid —
+  the same thing **Clear filter** does, without opening the menu. It never
+  reopens the field.
+- **Escape** closes the field and restores the last committed filter. **Enter**
+  commits what the field holds and closes it. Both leave focus on the filter
+  control, so the next thing is a keystroke away.
+- **Several columns filter together.** A row is shown only when it satisfies
+  every committed column filter *and* the full table search. The order they
+  were applied in does not matter, and dropping the last one restores every
+  row.
+- **The column name itself is still Logseq's.** Clicking it opens the block for
+  editing exactly as it always did; only the filter control belongs to Able
+  Table.
+- Turning **Full table search** off clears the search field alone. Turning
+  **Column menus** off takes away every control, menu, field and committed
+  filter on that table and restores every row it was hiding — nothing is left
+  narrowing what you read once the affordance that would drop it is gone.
+
+A long filter wraps under the column name over a line or two, and can change
+how the table shares its width between columns. It never widens the table or
+puts a horizontal scrollbar on a table that had none. Turning **Column menus**
+on reserves the strip the filter control stands in, which can also change that
+share; nothing moves as you use the menus.
+
+The funnel is drawn with the **Tabler Icons** face Logseq already loads for its
+own interface, so nothing is downloaded and no font ships in the plugin. The
+runtime asks the host whether that face is really loaded and uses it only then;
+a host without it draws a vertical ellipsis (**⋮**) instead, rather than the
+empty box a missing icon font would otherwise leave.
+
+### What a column filter needs
+
+- **A header row.** Logseq renders one only for a Markdown table that declares
+  a header separator row — the `| --- | --- |` line. A table that renders no
+  header row has no column names to filter by, so it is offered no **Column
+  menus** switch at all, and the settings panel says why.
+- **A cell at that index.** Cells are matched to columns by position, so a row
+  with no cell at the filtered column's index — a ragged or spanned row, which
+  Markdown cannot write but pasted HTML can — counts as not matching and is
+  hidden. Spanned and ragged tables are not a supported shape.
 
 ## What it never does
 
 - **Nothing reaches the graph.** No block content, property or Markdown change
-  comes from opening the panel, toggling, typing, clearing, or unloading.
+  comes from opening the panel, toggling, typing, filtering a column,
+  clearing, or unloading.
 - **No row is removed, reordered or rewritten.** A hidden row is marked
   `data-able-filtered` and hidden by the plugin's own registered style;
   dropping the mark is all it takes to restore it.
 - **No block is collapsed and no bullet is folded.** Every control answers
   pointer and key events in the capture phase, before Logseq's own handlers
-  see them, so nothing you do to a table opens its block for editing or fires
-  a shortcut.
+  see them, so nothing you do to one of Able Table's controls opens its block
+  for editing or fires a shortcut. What is not one of its controls — the column
+  name, the cells, the rest of the block — is left entirely to Logseq.
+- **No header is rewritten.** The filter control, the field and the committed
+  filter are added to the header cell; none of them replaces what Logseq
+  rendered there.
 - Editing a block replaces its render, which takes the controls with it; the
-  table comes back searched when the render comes back.
+  table comes back searched and filtered when the render comes back.
 
 ## Where it works
 
@@ -95,8 +177,8 @@ npm run check --workspace packages/plugin-able-table       # test, build and ver
 
 `test/package.test.mjs` covers the package's structure, its metadata, and the
 one-directional theme hook; `test/able-table.test.mjs` drives the entry script
-against a stub host document, from initial paint through the panel, the
-search field, re-render and teardown.
+against a stub host document, from initial paint through the panel, the search
+field, column filters, re-render and teardown.
 
 ## Attribution
 
