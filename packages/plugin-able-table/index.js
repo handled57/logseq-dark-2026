@@ -51,6 +51,7 @@ const ITEM_ATTR = 'data-able-menu-item'
 const ACTION_ATTR = 'data-able-action'
 const COLUMN_FILTER_ATTR = 'data-able-column-filter'
 const COLUMN_TERM_ATTR = 'data-able-column-term'
+const ICON_ATTR = 'data-able-icon'
 const FILTERED_ATTR = 'data-able-filtered'
 const KEY_ATTR = 'data-able-key'
 const PANEL_TOP_PROPERTY = '--able-panel-top'
@@ -284,6 +285,15 @@ div.table-wrapper:has(> [data-hc-collapse]) > [data-able-settings] {
 
 [data-able-column-control]::after {
   content: "\\22ee";
+}
+
+/* A funnel says what the menu behind the control is for, and tells it apart
+ * from the table's own settings control. The face carries one weight, so the
+ * bold the ellipsis is set in is handed back here. */
+[data-able-column-control][data-able-icon="filter"]::after {
+  content: "\\eaa5";
+  font-family: tabler-icons;
+  font-weight: 400;
 }
 
 /* The control is drawn at full strength already, so hovering it, opening its
@@ -802,6 +812,31 @@ function columnName(cell, state, index) {
   return state.names.get(index) || `column ${index + 1}`
 }
 
+/* Logseq 0.10.15 links Tabler Icons from its own page, so the funnel the
+ * control is drawn with is already in the host document: naming that face
+ * costs no request, ships no file, and adds no dependency. What it cannot have
+ * is a fallback — the glyph lives in the private use area, where a face that
+ * is missing renders a replacement box rather than the next font's glyph — so
+ * the runtime asks whether the face is really loaded and marks the control
+ * only then. A host without it keeps the vertical ellipsis.
+ *
+ * `check` answers for a face that has finished loading, so a control built
+ * before the host asked for it would keep the ellipsis; the answer is re-asked
+ * each pass until it is yes, and `main` asks for the face to settle it. */
+const ICON_FONT = '1rem tabler-icons'
+let iconsLoaded = false
+function iconFont() {
+  if (iconsLoaded) return true
+
+  try {
+    iconsLoaded = doc.fonts?.check?.(ICON_FONT) === true
+  } catch {
+    iconsLoaded = false
+  }
+
+  return iconsLoaded
+}
+
 function buildControl(key, index) {
   const control = doc.createElement('button')
   control.setAttribute('type', 'button')
@@ -846,6 +881,7 @@ function applyColumn(cell, key, index, state, pass) {
   pass.columns.add(cell)
 
   const control = childWith(cell, COLUMN_CONTROL_ATTR) ?? cell.appendChild(buildControl(key, index))
+  if (iconFont()) control.setAttribute(ICON_ATTR, 'filter')
   const label = `Column options for ${name}`
   control.setAttribute('aria-expanded', state.menu === index ? 'true' : 'false')
   control.setAttribute('aria-label', label)
@@ -1609,6 +1645,15 @@ function main() {
   logseq.beforeunload?.(async () => teardown())
 
   for (const [type, handler] of LISTENERS) doc.addEventListener(type, handler, true)
+
+  /* Logseq draws its own chrome in this face, so it is loaded long before a
+   * table renders; asking costs nothing and repaints the controls that were
+   * built while it was still on its way. */
+  try {
+    doc.fonts?.load?.(ICON_FONT)?.then?.(repaint, () => {})
+  } catch {
+    /* A host with no font set draws the ellipsis, which is the fallback. */
+  }
 
   /* childList/subtree only: this observer must not see its own attribute
    * writes, or every pass would schedule another one. */

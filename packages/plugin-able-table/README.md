@@ -39,11 +39,12 @@ it.
 ## Filtering a column
 
 Turn **Column menus** on in the same panel, and every column header takes a
-**⋮** control of its own, inside the cell's right-hand divider, in the accent
-colour of whatever theme you run — amber under Dark High Contrast, and Logseq's
-own blue or teal with no theme installed. Hovering the header, opening the menu
-or giving the control focus outlines the box it stands in. Press it — with the
-pointer, or with Enter or Space — and a menu opens under it:
+filter control of its own — a funnel — inside the cell's right-hand divider, in
+the accent colour of whatever theme you run: amber under Dark High Contrast,
+and Logseq's own blue or teal with no theme installed. Hovering the header,
+opening the menu or giving the control focus outlines the box it stands in.
+Press it — with the pointer, or with Enter or Space — and a menu opens under
+it:
 
 **Search column** closes the menu and opens a field over the column name,
 holding whatever that column last searched for, selected, so one keystroke
@@ -54,7 +55,7 @@ full table search uses, read off that one cell rather than off the whole row.
 **Clear filter** is there only while that column has one, and drops it.
 
 The field is laid over the header cell rather than put in its place, and stops
-short of the ⋮ control, so the column keeps its width, the menu stays
+short of the filter control, so the column keeps its width, the menu stays
 reachable, and whatever Logseq rendered in that header — a link, code,
 emphasis — is still exactly where it was when the field goes.
 
@@ -65,14 +66,15 @@ emphasis — is still exactly where it was when the field goes.
   the same thing **Clear filter** does, without opening the menu. It never
   reopens the field.
 - **Escape** closes the field and restores the last committed filter. **Enter**
-  commits what the field holds and closes it. Both leave focus on the ⋮
+  commits what the field holds and closes it. Both leave focus on the filter
   control, so the next thing is a keystroke away.
 - **Several columns filter together.** A row is shown only when it satisfies
   every committed column filter *and* the full table search. The order they
   were applied in does not matter, and dropping the last one restores every
   row.
 - **The column name itself is still Logseq's.** Clicking it opens the block for
-  editing exactly as it always did; only the ⋮ control belongs to Able Table.
+  editing exactly as it always did; only the filter control belongs to Able
+  Table.
 - Turning **Full table search** off clears the search field alone. Turning
   **Column menus** off takes away every control, menu, field and committed
   filter on that table and restores every row it was hiding — nothing is left
@@ -81,8 +83,14 @@ emphasis — is still exactly where it was when the field goes.
 A long filter wraps under the column name over a line or two, and can change
 how the table shares its width between columns. It never widens the table or
 puts a horizontal scrollbar on a table that had none. Turning **Column menus**
-on reserves the strip the ⋮ control stands in, which can also change that
+on reserves the strip the filter control stands in, which can also change that
 share; nothing moves as you use the menus.
+
+The funnel is drawn with the **Tabler Icons** face Logseq already loads for its
+own interface, so nothing is downloaded and no font ships in the plugin. The
+runtime asks the host whether that face is really loaded and uses it only then;
+a host without it draws a vertical ellipsis (**⋮**) instead, rather than the
+empty box a missing icon font would otherwise leave.
 
 ### What a column filter needs
 
@@ -108,7 +116,7 @@ share; nothing moves as you use the menus.
   see them, so nothing you do to one of Able Table's controls opens its block
   for editing or fires a shortcut. What is not one of its controls — the column
   name, the cells, the rest of the block — is left entirely to Logseq.
-- **No header is rewritten.** The ⋮ control, the filter field and the committed
+- **No header is rewritten.** The filter control, the field and the committed
   filter are added to the header cell; none of them replaces what Logseq
   rendered there.
 - Editing a block replaces its render, which takes the controls with it; the

@@ -120,7 +120,7 @@ class FakeObserver {
 }
 FakeObserver.instances = []
 
-function load(host) {
+function load(host, fonts) {
   FakeObserver.instances = []
   const unloads = []
   const provided = []
@@ -138,6 +138,7 @@ function load(host) {
       },
       document: {
         body: host,
+        fonts,
         createElement: (tag) => node(tag),
         addEventListener(type, handler) {
           documentListeners.set(type, [...(documentListeners.get(type) ?? []), handler])
@@ -335,10 +336,27 @@ function openSearch(context, wrapper) {
   return within(searchOf(wrapper), 'data-able-field')
 }
 
-async function render(host) {
-  const context = load(host)
+async function render(host, fonts) {
+  const context = load(host, fonts)
   await Promise.resolve()
   return context
+}
+
+/* Logseq's own font set, as much of it as the runtime asks: whether the Tabler
+ * face is loaded, and a request for it. `here` is flipped by a test to stand
+ * for a face that finishes loading after the first pass. */
+function fontSet({ loaded = true } = {}) {
+  const set = {
+    here: loaded,
+    requested: null,
+    check: (font) => font === '1rem tabler-icons' && set.here,
+    load(font) {
+      set.requested = font
+      return Promise.resolve([])
+    }
+  }
+
+  return set
 }
 
 test('a rendered table is marked with its block uuid and an ordinal of zero', async () => {
@@ -576,6 +594,76 @@ test('the control steps left of the theme’s collapse control, and stands alone
   assert.match(term, /width: 0;/)
   assert.match(term, /min-width: 100%;/)
   assert.match(term, /overflow-wrap: anywhere;/)
+})
+
+test('the control is drawn with the host icon font only where that face is loaded', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  const context = await render(host, fontSet())
+  turnColumnsOn(context, wrapper)
+  const [name] = headCells(wrapper)
+
+  /* Logseq links Tabler Icons from its own page, so the face is there to be
+   * named; the mark is what the stylesheet switches the glyph on. */
+  assert.equal(within(name, 'data-able-column-control').getAttribute('data-able-icon'), 'filter')
+
+  const [{ style }] = context.provided
+  assert.match(
+    style,
+    /\[data-able-column-control\]::after \{\s*content: "\\22ee";/,
+    'the ellipsis is not what an unmarked control paints'
+  )
+  const icon = style.match(/\[data-able-column-control\]\[data-able-icon="filter"\]::after \{[^}]+\}/)[0]
+  assert.match(icon, /content: "\\eaa5";/)
+  assert.match(icon, /font-family: tabler-icons;/)
+  // The face has one weight; asking for bold would have the engine fake it.
+  assert.match(icon, /font-weight: 400;/)
+})
+
+test('a host whose icon face is missing keeps the ellipsis rather than a replacement box', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  /* A private-use codepoint has no fallback glyph, so naming the face where it
+   * is not loaded would draw a box. Both shapes of host are checked: one that
+   * answers no, and one with no font set at all. */
+  const missing = await render(host, fontSet({ loaded: false }))
+  turnColumnsOn(missing, wrapper)
+  assert.equal(within(headCells(wrapper)[0], 'data-able-column-control').getAttribute('data-able-icon'), null)
+
+  const bare = editor()
+  const { wrapper: other } = table(block(bare.main).body, STAFF)
+  const context = await render(bare.host)
+  turnColumnsOn(context, other)
+  assert.equal(within(headCells(other)[0], 'data-able-column-control').getAttribute('data-able-icon'), null)
+})
+
+test('a face that finishes loading late reaches the controls already drawn', async () => {
+  const { host, main } = editor()
+  const { body } = block(main)
+  const { wrapper } = table(body, STAFF)
+
+  /* `check` answers for a face that has finished loading, so a first pass can
+   * miss one the host is still fetching. The runtime asks the host for it —
+   * which is what resolves into a repaint — and re-asks each pass, so a
+   * control drawn without it is not left with the ellipsis for good. */
+  const fonts = fontSet({ loaded: false })
+  const context = await render(host, fonts)
+  assert.equal(fonts.requested, '1rem tabler-icons')
+
+  turnColumnsOn(context, wrapper)
+  const [name] = headCells(wrapper)
+  const control = within(name, 'data-able-column-control')
+  assert.equal(control.getAttribute('data-able-icon'), null)
+
+  fonts.here = true
+  context.markTables()
+  assert.equal(control.getAttribute('data-able-icon'), 'filter')
+  // The same control, not a rebuilt one: the header was never rewritten.
+  assert.deepEqual(name.children.map((child) => child.getAttribute('data-able-column-control')), [''])
 })
 
 test('pressing the control opens a panel beside the wrapper rather than inside it', async () => {

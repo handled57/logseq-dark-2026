@@ -6,11 +6,17 @@ All notable changes to this package are documented here.
 
 - A rendered table can now be filtered one column at a time. The settings panel
   holds a second switch, **Column menus**; turn it on and every column header
-  takes a **⋮** control inside the cell's right-hand divider, drawn at full
+  takes a filter control inside the cell's right-hand divider, drawn at full
   strength in the host theme's accent colour so it reads as something to press
   rather than as part of the column name, with a menu of its own behind it. It
   fills the strip the header reserves for it, so being legible costs the table
   no width it had not already given up.
+- That control is a funnel from **Tabler Icons**, the face Logseq already loads
+  for its own interface: naming it downloads nothing, ships no font with the
+  plugin, and adds no dependency. Because a private-use glyph has no fallback,
+  the runtime asks the host whether the face is really loaded and uses it only
+  then — and asks again on each pass, so a face that arrives late still reaches
+  the controls already drawn. A host without it keeps a vertical ellipsis.
 - **Search column** closes that menu and opens a field over the column name,
   holding whatever the column last searched for, selected, so one keystroke
   refines or replaces it. Typing hides every row whose cell in that column does
