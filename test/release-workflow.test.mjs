@@ -6,9 +6,9 @@ import { repositoryRoot } from '../scripts/release-support.mjs'
 import { selectRelease } from '../scripts/select-release.mjs'
 
 test('package tags select one version-matched release archive', async () => {
-  assert.deepEqual(await selectRelease('theme-v2.18.0'), {
-    archive: 'dist/logseq-dark-high-contrast-theme-2.18.0.zip',
-    release_name: 'Dark High Contrast 2.18.0',
+  assert.deepEqual(await selectRelease('theme-v2.19.0'), {
+    archive: 'dist/logseq-dark-high-contrast-theme-2.19.0.zip',
+    release_name: 'Dark High Contrast 2.19.0',
     workspace: 'packages/theme-dark-high-contrast'
   })
   assert.deepEqual(await selectRelease('passage-v0.8.0'), {
@@ -21,6 +21,11 @@ test('package tags select one version-matched release archive', async () => {
     release_name: 'Anno 0.2.0',
     workspace: 'packages/plugin-anno'
   })
+  assert.deepEqual(await selectRelease('able-table-v0.4.0'), {
+    archive: 'dist/logseq-able-table-0.4.0.zip',
+    release_name: 'Able Table 0.4.0',
+    workspace: 'packages/plugin-able-table'
+  })
 })
 
 test('release selection rejects legacy, unknown, and mismatched tags', async () => {
@@ -29,6 +34,7 @@ test('release selection rejects legacy, unknown, and mismatched tags', async () 
   await assert.rejects(selectRelease('theme-v2.0.1'), /does not match .*package.json version/)
   await assert.rejects(selectRelease('passage-v1.0.0'), /does not match .*package.json version/)
   await assert.rejects(selectRelease('anno-v9.9.9'), /does not match .*package.json version/)
+  await assert.rejects(selectRelease('able-table-v9.9.9'), /does not match .*package.json version/)
 })
 
 test('workflows validate all changes and publish only the selected archive', async () => {
@@ -41,6 +47,7 @@ test('workflows validate all changes and publish only the selected archive', asy
   assert.match(publishWorkflow, /- "theme-v\*"/)
   assert.match(publishWorkflow, /- "passage-v\*"/)
   assert.match(publishWorkflow, /- "anno-v\*"/)
+  assert.match(publishWorkflow, /- "able-table-v\*"/)
   assert.doesNotMatch(publishWorkflow, /- "v\*"/)
   assert.match(publishWorkflow, /scripts\/select-release\.mjs/)
   assert.match(publishWorkflow, /npm run check --workspace "\$\{\{ steps\.package\.outputs\.workspace \}\}"/)

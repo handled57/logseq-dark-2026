@@ -1,0 +1,13 @@
+{
+  "title": "Able Table",
+  "description": "Search and filter a rendered Markdown table in place, without editing the block, restructuring the Markdown, or writing anything to the graph.",
+  "author": "Peter Cole",
+  "repo": "handled57/logseq-dark-2026",
+  "icon": "icon.svg",
+  "theme": false,
+  "effect": true,
+  "web": false,
+  "supportsDB": false,
+  "supportsDBOnly": false,
+  "id": "logseq-able-table"
+}

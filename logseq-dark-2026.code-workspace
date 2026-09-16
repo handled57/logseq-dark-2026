@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../Library/Mobile Documents/iCloud~com~logseq~logseq/Documents/Logseq"
+		}
+	],
+	"settings": {
+		"git.repositoryScanIgnoredFolders": [],
+		"git.ignoredRepositories": [
+			"Logseq"
+		]
+	}
+}

@@ -228,8 +228,18 @@ test('every repaired surface still carries a rule', () => {
  * is a bare `div.passage` with no such structure, so the theme rebuilds that
  * geometry out of padding and two pseudo-elements. These are the upstream
  * utility declarations that geometry is derived from; if any of them changes,
- * the passage stops lining up with the admonitions beside it. */
-const admonitionMetrics = ['.h-8{height:2rem}', '.w-8{width:2rem}', '.pr-4{padding-right:1rem}', '.ml-4{margin-left:1rem}']
+ * the passage stops lining up with the admonitions beside it.
+ *
+ * `.text-lg` is both halves of the content box: the type size the theme
+ * replaces with the block's own, and the line box it leaves alone and measures
+ * the icon and the rail bullet against. */
+const admonitionMetrics = [
+  '.h-8{height:2rem}',
+  '.w-8{width:2rem}',
+  '.pr-4{padding-right:1rem}',
+  '.ml-4{margin-left:1rem}',
+  '.text-lg{font-size:1.125rem;line-height:1.75rem}'
+]
 
 /* The vertical half of the same geometry. A property table moved under a box
  * inherits the box's 2rem tail, and keeps the 4px of its own the table has
@@ -311,7 +321,7 @@ test('the passage indent reproduces the admonition icon column', () => {
   assert.equal(indent, column + divider + 1)
 
   // A real admonition's column is pinned to the same two figures rather than
-  // left to the glyph, which the theme shrinks to 1.5em of the box's 1.125rem
+  // left to the glyph, which the theme shrinks to 1.5em of the box's own
   // text: without this the column measured that glyph plus its `pr-4`, and the
   // divider followed it away from where the passage draws the same line.
   const iconSelector =
@@ -322,6 +332,43 @@ test('the passage indent reproduces the admonition icon column', () => {
   assert.deepEqual(hung(icon, 'the admonition column'), reserved)
   // A flex row would otherwise shrink the column below the width set here.
   assert.match(icon, /flex:\s*none/)
+})
+
+test('the box takes the block\'s type size and upstream\'s line box', () => {
+  const [size, leading] = admonitionMetrics
+    .find((declaration) => declaration.startsWith('.text-lg'))
+    .match(/font-size:([^;]+);line-height:([^}]+)/)
+    .slice(1)
+
+  // Upstream sets an admonition's content a size larger than the prose around
+  // it. The theme answers that from the same element Tailwind styles, so `1em`
+  // resolves against the block the box sits in rather than against the box.
+  const scoped = '.admonitionblock:is(.tip, .note, .important, .caution, .pinned, .warning)'
+  const start = css.indexOf(`\n${scoped} {`)
+  assert.ok(start >= 0, `${scoped} is missing`)
+  const box = css.slice(start, css.indexOf('}', start))
+  assert.match(box, /--hc-admonition-font-size:\s*1em;/)
+  assert.ok(!box.includes(size.trim()), `the theme still restates upstream's ${size.trim()} type size`)
+  assert.match(
+    css,
+    new RegExp(`\\n${scoped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} > :is\\(\\.admonition-icon, \\.text-lg\\) \\{[^}]*font-size:\\s*var\\(--hc-admonition-font-size\\)`),
+    'the type size is not written onto the element Tailwind sizes'
+  )
+
+  // The line box is upstream's and is not touched, so the glyph centred on it
+  // and the rail bullet measured beside it hold their positions whatever the
+  // type is set at. No rule may set a line-height on that content.
+  for (const declarations of [box, css.slice(css.indexOf('\n.block-body > .passage {'))]) {
+    assert.ok(
+      declarations.includes(`--hc-admonition-first-line-height: ${leading.trim()}`),
+      `the first line box is not pinned to upstream's ${leading.trim()}`
+    )
+  }
+  assert.doesNotMatch(
+    css,
+    /\.(?:admonitionblock|text-lg)[^{]*\{[^}]*\n\s*line-height:/,
+    'the theme sets a line-height upstream owns'
+  )
 })
 
 test('the moved property table lines up with the box text and takes the box tail', () => {
