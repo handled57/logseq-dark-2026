@@ -84,8 +84,9 @@ bridge.
   or runs a command. Choose **Allow**, **Allow for this session** or **Deny**.
   You can give a reason when you deny. "For this session" is never saved to a
   settings file.
-- **Composer.** **Enter** sends and **Shift+Enter** starts a new line. **⌘Esc**
-  moves focus between the composer and the block you were editing.
+- **Composer.** **Enter** sends and **Shift+Enter** starts a new line. While
+  **Focus mode** is on, **⌘Esc** moves focus between the composer and the
+  block you were editing.
 - **Toolbar**, from left to right:
   - **+** mentions the page you have open, by its file path;
   - **/** lists Claude Code's slash commands;
@@ -112,6 +113,7 @@ Sessions Claudseq starts are ordinary Claude Code sessions. They appear in
 | Model for new sessions | default | `default` follows your Claude Code configuration; otherwise `fable`, `opus`, `sonnet` or `haiku`. |
 | Effort for new sessions | default | `low` to `max`. A change applies from the next session. |
 | Permission mode for new sessions | default | `default` is Manual. The pane's mode button changes it too. |
+| Focus mode | on | ⌘Esc moves focus between the composer and the block you were editing. The command palette lists it as **Claudseq: Focus or unfocus Claude**. Off removes both at once and leaves ⌘Esc to Logseq and other plugins. |
 | Node path | empty | The Node.js, version 20 or later, that starts the bridge. Empty means the first one found in the places listed under Requirements. Logseq runs it through a shell, so it cannot contain spaces; a symlink to Node works. |
 
 Whether the pane is folded, its height and which session was open are kept

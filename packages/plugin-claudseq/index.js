@@ -51,7 +51,8 @@ const COMMAND_KEY = 'claudseq-focus'
 const LOG_PREFIX = '[claudseq]'
 
 const NAV_SELECTOR = '.nav-contents-container'
-const PLACEHOLDER = '⌘ Esc to focus or unfocus Claude'
+const PLACEHOLDER = 'Message Claude'
+const FOCUS_PLACEHOLDER = '⌘ Esc to focus or unfocus Claude'
 
 const MIN_HEIGHT = 240
 const MAX_HEIGHT = 1600
@@ -95,6 +96,7 @@ const DEFAULTS = {
   model: 'default',
   effort: 'default',
   permissionMode: 'default',
+  focusMode: true,
   workingDirectory: '',
   nodePath: ''
 }
@@ -115,6 +117,7 @@ function readSettings(raw) {
     model: MODELS.includes(source.model) ? source.model : DEFAULTS.model,
     effort: EFFORTS.includes(source.effort) ? source.effort : DEFAULTS.effort,
     permissionMode: MODES.includes(source.permissionMode) ? source.permissionMode : DEFAULTS.permissionMode,
+    focusMode: source.focusMode !== false,
     workingDirectory: directory.startsWith('/') ? directory : '',
     nodePath: node.startsWith('/') ? node : ''
   }
@@ -155,6 +158,13 @@ function settingsSchema() {
       enumChoices: MODES,
       enumPicker: 'select',
       default: DEFAULTS.permissionMode
+    },
+    {
+      key: 'focusMode',
+      type: 'boolean',
+      title: 'Focus mode',
+      description: '⌘Esc moves focus between Claudseq\'s composer and the block you were editing. Turn it off to leave ⌘Esc to Logseq and other plugins.',
+      default: DEFAULTS.focusMode
     },
     {
       key: 'nodePath',
@@ -620,7 +630,7 @@ function buildPane() {
     class: 'claudseq-input',
     [PART_ATTR]: 'input',
     rows: '1',
-    placeholder: PLACEHOLDER,
+    placeholder: settings.focusMode ? FOCUS_PLACEHOLDER : PLACEHOLDER,
     'aria-label': 'Message Claude',
     spellcheck: 'false'
   })
@@ -1557,7 +1567,7 @@ function onClick(event) {
 function onKeyDown(event) {
   const part = event.target?.getAttribute?.(PART_ATTR)
   if (part === 'input') {
-    if (event.key === 'Escape' && (event.metaKey || event.ctrlKey)) {
+    if (settings.focusMode && event.key === 'Escape' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault()
       event.stopPropagation?.()
       unfocus()
@@ -1665,6 +1675,37 @@ function unfocus() {
 function toggleFocus() {
   if (doc.activeElement && doc.activeElement === parts.input) unfocus()
   else focusComposer()
+}
+
+/* Focus mode is ⌘Esc: a Logseq command, which puts it in the command palette
+ * and Logseq's keymap, and the composer's own handling of the same keys. Off,
+ * the command goes and the keys are left to Logseq and other plugins. Logseq
+ * takes a plugin's commands away only all at once, and this is Claudseq's
+ * one command. */
+let focusRegistered = false
+
+function applyFocusMode() {
+  parts.input.setAttribute('placeholder', settings.focusMode ? FOCUS_PLACEHOLDER : PLACEHOLDER)
+  if (settings.focusMode === focusRegistered) return
+  focusRegistered = settings.focusMode
+  if (focusRegistered) {
+    logseq.App.registerCommandPalette({
+      key: COMMAND_KEY,
+      label: 'Claudseq: Focus or unfocus Claude',
+      keybinding: { binding: 'mod+esc', mode: 'global' }
+    }, () => toggleFocus())
+    return
+  }
+  savedEditingBlock = null
+  removeCommands().catch((error) => console.warn(LOG_PREFIX, 'could not remove the focus command', error))
+}
+
+async function removeCommands() {
+  const id = logseq.baseInfo?.id
+  /* Logseq matches the id as part of each command's, so an empty one would
+   * take every plugin's commands. */
+  if (typeof id !== 'string' || !id) return
+  await logseq.App.unregister_plugin_simple_command(id)
 }
 
 /* ------------------------------------------------------------- connection */
@@ -1783,12 +1824,7 @@ function main() {
   doc.addEventListener('mousedown', onDocumentMouseDown, true)
   observer = new MutationObserver(() => mount())
   observer.observe(doc.body, { childList: true, subtree: true })
-
-  logseq.App.registerCommandPalette({
-    key: COMMAND_KEY,
-    label: 'Claudseq: Focus or unfocus Claude',
-    keybinding: { binding: 'mod+esc', mode: 'global' }
-  }, () => toggleFocus())
+  applyFocusMode()
 
   logseq.App.onCurrentGraphChanged?.(() => {
     switchDirectory().catch((error) => console.warn(LOG_PREFIX, error))
@@ -1796,6 +1832,7 @@ function main() {
   logseq.onSettingsChanged?.((next) => {
     const before = settings
     settings = readSettings(next)
+    if (settings.focusMode !== before.focusMode) applyFocusMode()
     if (settings.workingDirectory !== before.workingDirectory) switchDirectory().catch((error) => console.warn(LOG_PREFIX, error))
     else if (settings.nodePath !== before.nodePath && bridge.state !== 'ready') connect().catch(() => {})
     else scheduleRender()

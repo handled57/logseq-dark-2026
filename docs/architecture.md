@@ -398,6 +398,14 @@ required, and the theme reads nothing back. The hook is versioned in
 [Table controls v1](contracts/table-controls-v1.md), and pinned by a test on
 each side so it cannot drift silently.
 
+Claudseq also registers one Logseq command, `claudseq-focus` on ⌘Esc, and
+only while its **Focus mode** setting is on. Turning the setting off calls
+the host's `unregister_plugin_simple_command` with Claudseq's own plugin id.
+Logseq makes the same call when a plugin unloads. It removes all of that
+plugin's commands, palette entries and shortcuts, and this is Claudseq's only
+command. Logseq matches the id as a substring of each command's, so the pane
+never makes the call without an id: an empty one would match every plugin.
+
 Chrome that overhangs the block it belongs to is the one place a runtime styles
 a host element rather than its own. Logseq lays each block out in a
 `position: relative` box, and a theme may make that box a stacking context —
