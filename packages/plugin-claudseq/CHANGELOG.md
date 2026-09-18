@@ -22,8 +22,8 @@ All notable changes to this package are documented here.
   and Deny, plus an optional reason. What you allow for the session is never
   saved to a settings file, and bypassing permissions is never offered.
 - **The composer.** Enter sends, Shift+Enter starts a new line, and ⌘Esc moves
-  focus between the composer and the block you were editing. The **Focus
-  mode** setting, on by default, turns ⌘Esc off. The toolbar holds:
+  focus between the composer and the block you were editing. The toolbar
+  holds:
   - an @-mention of the open page;
   - Claude Code's slash commands;
   - a count of running agents;

@@ -139,12 +139,6 @@ test('the pane runs one command, the bridge, and changes one Logseq setting, its
   assert.equal(source.match(/'userAppCfgs', 'commands-allowlist'/g)?.length, settingCalls, 'the pane touches a Logseq setting other than the allowlist')
 })
 
-test('the pane takes away only its own command, and never without its id', () => {
-  const source = code['index.js']
-  assert.equal(source.match(/unregister_plugin_simple_command/g)?.length, 1)
-  assert.match(source, /const id = logseq\.baseInfo\?\.id\s+if \(typeof id !== 'string' \|\| !id\) return\s+await logseq\.App\.unregister_plugin_simple_command\(id\)/)
-})
-
 test('the bridge listens on loopback only, never uses a shell, and needs nothing installed', () => {
   assert.match(bridgeCode, /server\.listen\(\w+, '127\.0\.0\.1'/)
   assert.doesNotMatch(bridgeCode, /listen\([^)]*'0\.0\.0\.0'|listen\([^)]*'::'/)

@@ -197,8 +197,6 @@ async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH, url =
     updates: [],
     opened: [],
     messages: [],
-    unregistered: [],
-    baseInfo: { id: 'logseq-claudseq' },
     currentGraph: { path: graph, name: 'notes' },
     updateSettings(patch) {
       this.updates.push(patch)
@@ -219,10 +217,6 @@ async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH, url =
       getCurrentGraph: async () => plugin.currentGraph,
       onCurrentGraphChanged(handler) { plugin.graphChanged = handler },
       registerCommandPalette(options, handler) { plugin.command = { options, handler } },
-      async unregister_plugin_simple_command(id) {
-        plugin.unregistered.push(id)
-        plugin.command = null
-      },
       openExternalLink(url) { plugin.opened.push(url) }
     },
     Editor: {
@@ -518,7 +512,6 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: 'default',
     effort: 'default',
     permissionMode: 'default',
-    focusMode: true,
     workingDirectory: '',
     nodePath: ''
   }
@@ -532,7 +525,6 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: '--dangerously-skip-permissions',
     effort: 'ultra',
     permissionMode: 'bypassPermissions',
-    focusMode: 'off',
     workingDirectory: 'relative/path',
     nodePath: 'node'
   }) }, defaults)
@@ -543,7 +535,6 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: 'opus',
     effort: 'xhigh',
     permissionMode: 'plan',
-    focusMode: false,
     workingDirectory: ' /Users/example/code ',
     nodePath: ' /Users/example/.volta/bin/node '
   }) }, {
@@ -553,7 +544,6 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: 'opus',
     effort: 'xhigh',
     permissionMode: 'plan',
-    focusMode: false,
     workingDirectory: '/Users/example/code',
     nodePath: '/Users/example/.volta/bin/node'
   })
@@ -919,44 +909,6 @@ test('⌘Esc is a command that moves focus to the composer and back', async () =
   pane.doc.activeElement = pane.part('input')
   pane.pane.dispatch('keydown', { target: pane.part('input'), key: 'Escape', metaKey: true })
   assert.equal(pane.part('input').focused, false)
-})
-
-test('with Focus mode off, ⌘Esc is not Claudseq\'s, and turning it back on returns it', async () => {
-  const pane = await load({ settings: { focusMode: false } })
-  await ready(pane)
-  const input = pane.part('input')
-  assert.equal(pane.plugin.command, undefined, 'the focus command was registered')
-  assert.equal(input.getAttribute('placeholder'), 'Message Claude')
-  input.focus()
-  let prevented = false
-  pane.pane.dispatch('keydown', { target: input, key: 'Escape', metaKey: true, preventDefault() { prevented = true } })
-  assert.equal(input.focused, true)
-  assert.equal(prevented, false, 'the composer kept ⌘Esc from Logseq')
-
-  pane.plugin.settingsChanged({ focusMode: true })
-  assert.equal(pane.plugin.command.options.key, 'claudseq-focus')
-  assert.deepEqual(plain(pane.plugin.command.options.keybinding), { binding: 'mod+esc', mode: 'global' })
-  assert.equal(input.getAttribute('placeholder'), '⌘ Esc to focus or unfocus Claude')
-  /* A change to another setting leaves the command as it is. */
-  pane.plugin.settingsChanged({ focusMode: true, model: 'opus' })
-  assert.deepEqual(plain(pane.plugin.unregistered), [])
-
-  pane.plugin.settingsChanged({ focusMode: false })
-  await until(() => pane.plugin.unregistered.length === 1)
-  assert.deepEqual(plain(pane.plugin.unregistered), ['logseq-claudseq'])
-  assert.equal(pane.plugin.command, null)
-  assert.equal(input.getAttribute('placeholder'), 'Message Claude')
-  pane.pane.dispatch('keydown', { target: input, key: 'Escape', metaKey: true })
-  assert.equal(input.focused, true)
-})
-
-test('without its own id, the pane takes no plugin\'s commands away', async () => {
-  const pane = await load()
-  await ready(pane)
-  pane.plugin.baseInfo = { id: '' }
-  pane.plugin.settingsChanged({ focusMode: false })
-  await pane.idle()
-  assert.deepEqual(plain(pane.plugin.unregistered), [])
 })
 
 test('the header folds the pane, and the fold is remembered', async () => {
