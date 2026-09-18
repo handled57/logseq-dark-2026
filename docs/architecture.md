@@ -2,10 +2,11 @@
 
 ## Package boundaries
 
-This repository contains four runtimes, not one application split across
-folders. Dark High Contrast, Passage, Anno and Able Table have separate Logseq
-identities, settings, entry scripts, metadata, versions, archives, and
-lifecycles. None imports another or relies on sibling-package files.
+This repository contains five runtimes, not one application split across
+folders. Dark High Contrast, Passage, Anno, Able Table and Claudseq have
+separate Logseq identities, settings, entry scripts, metadata, versions,
+archives, and lifecycles. None imports another or relies on sibling-package
+files.
 
 The theme and Passage have one product-level agreement, the versioned
 [Passage v1 content contract](contracts/passage-v1.md). Passage writes ordinary
@@ -22,11 +23,13 @@ block hangs its bullet below the top of its row, which Able Table reads the same
 way so the field it opens a table block with begins on the line that bullet
 marks. Every such read carries a fallback of Able Table's own, and the set of
 names read is pinned, so a third cannot be reached for without amending the
-contract. Both sides pin the hook in their own suite.
+contract. Both sides pin the hook in their own suite. Claudseq is party to no contract
+either: it reads and writes nothing of another package's, and its one
+dependency outside Logseq is the `claude` CLI, reached through its own bridge.
 
 ## Host origin and `effect: true`
 
-All four packages inspect or augment Logseq's host document. Logseq 0.10.15
+All five packages inspect or augment Logseq's host document. Logseq 0.10.15
 moves a side-effect-free plugin entry to the `lsp://logseq.io/` origin, where
 browser same-origin rules prevent access to `parent.document` and to the host's
 own `parent.apis` bridge. Consequently every package's and manifest's metadata
@@ -40,7 +43,12 @@ tables. Anno needs it twice over: it draws its prompt in the host document, and
 the only route a plugin has to the graph folder is `parent.apis.doAction`, the
 host's IPC bridge, because no plugin API writes an asset. Able Table needs host
 access because the plugin API renders no table of its own: every table it finds
-and marks is a `<table>` Logseq already put in `parent.document`. A future
+and marks is a `<table>` Logseq already put in `parent.document`. Claudseq
+needs it for its place and its key: it mounts its pane in the host's left
+sidebar, and it reads its bridge's token through `parent.apis.doAction`. The
+entry's origin matters to it a third way: `effect: true` keeps the entry on
+the `file://` origin Logseq's window has, which is the one origin its bridge
+admits. A future
 package that does not need host access should decide `effect` from its own
 requirements rather than copying this setting automatically.
 
@@ -235,6 +243,82 @@ owner of its quoted text, UUID, colour and PDF-page properties. Transactions
 that edit an existing annotation do not qualify, so changing the setting is not
 retroactive.
 
+## The Claudseq bridge
+
+Claudseq is the one package that runs something outside Logseq, and it is the
+one exception to the repository's rule against runtime network access. The
+exception is narrow and was approved by the owner. Claudseq's pane talks to its own bridge over the
+loopback interface, and to nothing else. Every other package keeps the rule
+as stated.
+
+**Why a bridge.** A Logseq plugin cannot start a process or read one's
+output. The host's `runCli` action runs only commands on a user-configured
+allowlist, and runs them through a shell. It resolves with the exit code
+alone, and the output goes to toast notifications, never to the caller.
+`logseq.Request` cannot stream. So `bridge/claudseq-bridge.mjs` runs `claude`
+for the pane. It is a Node script that uses built-in modules only, and the
+user installs it once. `install` resolves the absolute paths of `claude` and
+`node` and the login shell's `PATH`, because a login agent inherits none of
+them. It copies the script to `~/.claudseq/` and writes
+`~/.claudseq/bridge.json`. Then it registers the LaunchAgent
+`io.github.handled57.logseq-claudseq`, which runs `serve`.
+
+**Threat model.** The bridge starts Claude Code with the user's credentials,
+in whichever folder a request names. So it answers only a caller who can read
+a file in the user's home:
+
+- It listens on `127.0.0.1` only.
+- Every request carries `Authorization: Bearer <token>`. The token is 32
+  random bytes. It is stored in `bridge.json`, which is mode 0600 in a 0700
+  folder, and compared in constant time over SHA-256 digests. Reinstalling
+  issues a new one, and on a 401 the pane reads the file again once.
+- The `Host` header must be exactly `127.0.0.1:<port>`. This defeats DNS
+  rebinding: a page that points its own name at 127.0.0.1 still sends that
+  name as the host.
+- CORS admits one origin, `file://`. The plugin's `effect: true` entry shares
+  it with Logseq's window. Any refused origin or host is logged to
+  `~/.claudseq/bridge.log`.
+
+A web page can reach the port, but it has no token and cannot read the file
+that holds it. The pane reads that file through
+`parent.apis.doAction(['readFile', …])`, and finds home as the parent of
+`getLogseqDotDirRoot`.
+
+**Processes.** Each open session is one `claude` child. The bridge starts it
+with an argv array, never a shell, in the folder the pane names. The argv
+turns on stream-json in both directions, partial messages, permission
+requests over stdio (`--permission-prompt-tool stdio`) and the chosen
+`--permission-mode`. A prompt reaches Claude only as a stream-json `user`
+message on stdin.
+
+The bridge never passes `bypassPermissions` or
+`--dangerously-skip-permissions`. It rewrites the destination of every
+permission suggestion to `session` and drops any suggestion that would switch
+to bypass mode, so "Allow for this session" never writes a settings file into
+the graph.
+
+It sets `CLAUDE_CODE_ENTRYPOINT=logseq-claudseq` on the sessions it starts.
+Without that, `-p` records the entrypoint `sdk-cli`, and the VS Code
+extension's history and `claude --resume` both hide such sessions.
+
+A child is sent SIGTERM, then SIGKILL three seconds later. That happens when
+its session closes, after 30 minutes with no pane attached, and when the
+bridge stops. At most eight run at once.
+
+**Events.** The pane follows a session over one streaming `fetch` of NDJSON.
+The bridge numbers every event and keeps the last 5,000 for each session. At
+the end of each turn it drops that turn's partial chunks, because the complete
+messages repeat them. A pane that reconnects mid-turn therefore replays that
+turn from its first event, rather than reading half of it back from a
+transcript.
+
+**History.** History is Claude Code's own transcripts under
+`~/.claude/projects/`, which the bridge reads and never writes. A transcript
+belongs to a folder only when its records name that `cwd`; the encoded
+directory name only says where to look. The pane keeps its own state (fold,
+height, open session and defaults) in its plugin settings through
+`logseq.updateSettings`, never in the graph.
+
 ## Host-DOM annotation and cleanup
 
 Each runtime owns a namespace. Passage writes `data-passage-*`, element ids
@@ -242,7 +326,10 @@ beginning `passage-`, and the `passage-dialog` style key. Anno writes
 `data-anno-*`, element ids beginning `anno-`, and the `anno-dialog` style key.
 Dark High Contrast writes `data-hc-*` and the `hc-hidden-properties` style key.
 Able Table writes `data-able-*`, element ids beginning `able-table-`, and the
-`able-table` style key. None reads, clears, or reuses another's annotations,
+`able-table` style key. Claudseq writes `data-claudseq-*`, element ids
+beginning `claudseq-`, and the `claudseq` style key; its pane is one `section`
+it inserts after the left sidebar's `.nav-contents-container` and puts back
+when Logseq redraws the sidebar. None reads, clears, or reuses another's annotations,
 with one deliberate, one-directional exception: Able Table's registered style
 detects the theme's own `data-hc-collapse` — in CSS alone, never from script —
 so its settings control steps left of the theme's collapse control instead of

@@ -45,10 +45,10 @@ test('shared host fixture models host descendants and event delivery', () => {
 
 test('repository documentation covers package ownership and independent migration', async () => {
   const required = [
-    ['README.md', ['Dark High Contrast', 'Passage', 'Anno', 'CONTRIBUTING.md']],
+    ['README.md', ['Dark High Contrast', 'Passage', 'Anno', 'Claudseq', 'CONTRIBUTING.md']],
     ['CONTRIBUTING.md', ['Node.js 22', 'LOGSEQ_CSS', 'Marketplace submission', 'anno-vX.Y.Z']],
-    ['docs/architecture.md', ['effect: true', 'MutationObserver', 'release.files', 'hls__']],
-    ['docs/adding-a-package.md', ['SDK', 'allowlist', 'Manual acceptance']],
+    ['docs/architecture.md', ['effect: true', 'MutationObserver', 'release.files', 'hls__', 'Claudseq bridge']],
+    ['docs/adding-a-package.md', ['SDK', 'allowlist', 'Manual acceptance', 'loopback']],
     ['docs/migrating-theme-2.md', ['hiddenProperties', 'biblePassageText', 'separately']]
   ]
 
@@ -64,6 +64,7 @@ test('each workspace folder carries its product prefix without renaming the pack
   const identities = {
     'packages/plugin-able-table': 'logseq-able-table',
     'packages/plugin-anno': 'logseq-anno',
+    'packages/plugin-claudseq': 'logseq-claudseq',
     'packages/plugin-passage': 'logseq-passage',
     'packages/theme-dark-high-contrast': 'logseq-dark-high-contrast-theme'
   }

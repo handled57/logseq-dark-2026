@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Claudseq for Logseq</title>
+  <desc id="desc">A light blue speech bubble holding an orange command prompt, on black</desc>
+  <rect width="128" height="128" rx="12" fill="#000000"/>
+  <path d="M24 30h80v54H58l-22 18v-18H24z" fill="none" stroke="#6fc3df" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M42 46l12 11l-12 11" fill="none" stroke="#f38518" stroke-width="7" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M62 68h24" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="square"/>
+</svg>

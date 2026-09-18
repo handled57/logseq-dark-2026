@@ -14,6 +14,11 @@ Use this checklist when adding another independently shipped Logseq package.
       host-origin constraint and keep `package.json` and `manifest.json` equal.
 - [ ] Keep the shipped runtime self-contained: no production dependencies,
       compilation, remote imports, network access, or sibling-workspace reads.
+      The one exception so far is Claudseq's loopback bridge, which the owner
+      approved for Claudseq alone. It is recorded in
+      [the architecture notes](architecture.md#the-claudseq-bridge). A new
+      package needs its own approval before it talks to anything, even on
+      loopback.
 - [ ] Namespace host attributes, element ids, style keys, settings, and global
       symbols so install, repaint, and teardown cannot collide with another
       package.
