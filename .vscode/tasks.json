@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "logseq: watch and reload",
+      "detail": "Restage dist/ on save and reload the plugin or theme inside Logseq",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "runOptions": { "runOn": "folderOpen" },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "group": "logseq-dev"
+      },
+      "problemMatcher": {
+        "owner": "logseq-dev",
+        "pattern": { "regexp": "^restage failed: (.*)$", "message": 1 },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^Watching \\d+ packages",
+          "endsPattern": "^Stamp: "
+        }
+      }
+    }
+  ]
+}

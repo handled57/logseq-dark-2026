@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFile, readdir } from 'node:fs/promises'
+import { access, cp, mkdir, readFile, readdir } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -36,4 +37,30 @@ export async function workspace(root = process.cwd()) {
 
 export async function selectedWorkspaces(all) {
   return all ? workspaces() : [await workspace()]
+}
+
+export async function stageBundle(target) {
+  await mkdir(target.bundle, { recursive: true })
+  for (const file of target.pkg.release.files) {
+    await cp(resolve(target.root, file), resolve(target.bundle, file), { recursive: true })
+  }
+  await mkdir(resolve(target.bundle, 'lib'), { recursive: true })
+  await cp(sdkSource, resolve(target.bundle, 'lib/lsplugin.user.js'))
+  await cp(licenseSource, resolve(target.bundle, 'LICENSE'))
+}
+
+export async function stageUnpackedLocalFiles(target, { announce = true } = {}) {
+  const staged = []
+  for (const file of target.pkg.release.unpackedLocalFiles ?? []) {
+    const source = resolve(target.root, file)
+    if (await access(source, constants.R_OK).then(() => true, () => false)) {
+      await mkdir(resolve(target.bundle, file, '..'), { recursive: true })
+      await cp(source, resolve(target.bundle, file))
+      staged.push(file)
+      if (announce) {
+        console.log(`Staged local ${file} into dist/${target.pkg.name}/ for unpacked testing; it is not in the ZIP.`)
+      }
+    }
+  }
+  return staged
 }
