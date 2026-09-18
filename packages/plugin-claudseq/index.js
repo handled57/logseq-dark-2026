@@ -6,16 +6,19 @@
  * composer, and a history of past sessions that can be reopened and resumed.
  *
  * Claude itself runs in the Claudseq bridge (bridge/claudseq-bridge.mjs), a
- * small Node process the user installs once. This script finds the bridge's
- * port and token in `~/.claudseq/bridge.json` through the host's own file IPC
- * and talks to it over loopback HTTP; the bridge runs `claude` and streams its
- * events back. History is Claude Code's own transcripts, which the bridge
- * reads; Claudseq writes nothing to the graph.
+ * small Node process that this script starts through the host's `runCli` and
+ * that stops when Logseq quits. `runCli` starts only commands on Logseq's
+ * allowlist, so the pane asks once before it adds Node to that list. This
+ * script finds the bridge's port and token in `~/.claudseq/bridge.json`
+ * through the host's own file IPC and talks to it over loopback HTTP; the
+ * bridge runs `claude` and streams its events back. History is Claude Code's
+ * own transcripts, which the bridge reads; Claudseq writes nothing to the
+ * graph.
  *
  * What the pane remembers — whether it is folded, how tall it is, which
- * session was open, and the model, effort, permission mode and working
- * directory — goes through `logseq.updateSettings` into this plugin's settings
- * file under Logseq's dotdir, never into the graph.
+ * session was open, and the model, effort, permission mode, working directory
+ * and Node path — goes through `logseq.updateSettings` into this plugin's
+ * settings file under Logseq's dotdir, never into the graph.
  *
  * `parent.document` and `parent.apis` are reachable because package.json
  * declares `effect: true`, which keeps this entry on the Logseq window's own
@@ -42,13 +45,13 @@ const VIEW_ATTR = 'data-claudseq-view'
 const HIDDEN_ATTR = 'data-claudseq-hidden'
 const SELECTED_ATTR = 'data-claudseq-selected'
 const ERROR_ATTR = 'data-claudseq-error'
+const FAILURE_ATTR = 'data-claudseq-failure'
 const HEIGHT_PROPERTY = '--claudseq-height'
 const COMMAND_KEY = 'claudseq-focus'
 const LOG_PREFIX = '[claudseq]'
 
 const NAV_SELECTOR = '.nav-contents-container'
 const PLACEHOLDER = '⌘ Esc to focus or unfocus Claude'
-const BRIDGE_LABEL = 'io.github.handled57.logseq-claudseq'
 
 const MIN_HEIGHT = 240
 const MAX_HEIGHT = 1600
@@ -92,7 +95,8 @@ const DEFAULTS = {
   model: 'default',
   effort: 'default',
   permissionMode: 'default',
-  workingDirectory: ''
+  workingDirectory: '',
+  nodePath: ''
 }
 
 /* ---------------------------------------------------------------- settings */
@@ -103,6 +107,7 @@ function readSettings(raw) {
   const source = raw && typeof raw === 'object' ? raw : {}
   const height = typeof source.paneHeight === 'number' ? source.paneHeight : Number.NaN
   const directory = typeof source.workingDirectory === 'string' ? source.workingDirectory.trim() : ''
+  const node = typeof source.nodePath === 'string' ? source.nodePath.trim() : ''
   return {
     paneCollapsed: source.paneCollapsed === true,
     paneHeight: Number.isFinite(height) ? Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(height))) : DEFAULTS.paneHeight,
@@ -110,7 +115,8 @@ function readSettings(raw) {
     model: MODELS.includes(source.model) ? source.model : DEFAULTS.model,
     effort: EFFORTS.includes(source.effort) ? source.effort : DEFAULTS.effort,
     permissionMode: MODES.includes(source.permissionMode) ? source.permissionMode : DEFAULTS.permissionMode,
-    workingDirectory: directory.startsWith('/') ? directory : ''
+    workingDirectory: directory.startsWith('/') ? directory : '',
+    nodePath: node.startsWith('/') ? node : ''
   }
 }
 
@@ -149,6 +155,13 @@ function settingsSchema() {
       enumChoices: MODES,
       enumPicker: 'select',
       default: DEFAULTS.permissionMode
+    },
+    {
+      key: 'nodePath',
+      type: 'string',
+      title: 'Node path',
+      description: 'The Node.js, version 20 or later, that starts Claudseq\'s bridge. Leave empty to use Homebrew\'s, Volta\'s or MacPorts\'. With nvm, fnm or asdf, give the full path `which node` prints. It cannot contain spaces.',
+      default: ''
     }
   ]
 }
@@ -166,7 +179,18 @@ function saveSettings(patch) {
 
 /* ------------------------------------------------------------------ bridge */
 
-const bridge = { config: null, state: 'connecting', detail: '', claudePath: '', outdated: '' }
+const bridge = { config: null, state: 'connecting', claudePath: '', outdated: '', node: '', failure: null }
+
+/* Where Node is looked for when the Node path setting is empty: Homebrew on
+ * Apple silicon and on Intel, Volta, and MacPorts. */
+const NODE_PLACES = ['/opt/homebrew/bin/node', '/usr/local/bin/node', '~/.volta/bin/node', '/opt/local/bin/node']
+/* `runCli` hands Logseq's shell the command as it is, unquoted, so a Node
+ * path is used only when that shell would read it as one plain word. */
+const PLAIN_COMMAND = /^\/[\w.@+/-]+$/
+const START_WAIT = 15000
+const START_POLL = 150
+const LOG_PATH = '~/.claudseq/bridge.log'
+const RETRY = ['retry', 'Retry']
 
 function bridgeError(kind, detail = '') {
   const error = new Error(detail || kind)
@@ -175,19 +199,26 @@ function bridgeError(kind, detail = '') {
 }
 
 /* `parent.apis.doAction` is the host's IPC bridge. It resolves with whatever
- * its handler returned — `readFile` hands back null for a missing file rather
- * than rejecting. */
+ * its handler returned — `readFile` hands back null for a missing file, and a
+ * failed `stat` hands back its error, rather than rejecting. */
 async function doAction(call) {
   const apis = parent.apis
-  if (typeof apis?.doAction !== 'function') throw bridgeError('missing', 'Claudseq needs the Logseq desktop app')
+  if (typeof apis?.doAction !== 'function') throw bridgeError('app', 'Claudseq needs the Logseq desktop app')
   return apis.doAction(call)
 }
 
-async function loadConfig() {
+let home = ''
+
+async function homeDirectory() {
+  if (home) return home
   const dotdir = await doAction(['getLogseqDotDirRoot'])
-  if (typeof dotdir !== 'string' || !dotdir) throw bridgeError('missing')
-  const home = dotdir.replace(/[\\/]\.logseq[\\/]?$/, '')
-  const text = await doAction(['readFile', `${home}/.claudseq/bridge.json`])
+  if (typeof dotdir !== 'string' || !dotdir) throw bridgeError('app', 'Logseq did not say where its dotdir is')
+  home = dotdir.replace(/[\\/]\.logseq[\\/]?$/, '')
+  return home
+}
+
+async function loadConfig() {
+  const text = await doAction(['readFile', `${await homeDirectory()}/.claudseq/bridge.json`])
   if (typeof text !== 'string' || !text.trim()) throw bridgeError('missing')
   let config
   try {
@@ -215,7 +246,8 @@ async function api(method, path, body, retry = true) {
   } catch (error) {
     throw bridgeError('down', error?.message ?? String(error))
   }
-  /* A reinstall writes a new token; one reread of the file picks it up. */
+  /* A bridge that started again has a new token; one reread of the file
+   * picks it up. */
   if (response.status === 401) {
     if (retry) {
       bridge.config = null
@@ -279,18 +311,152 @@ function openStream(liveId, after, onEntry, onEnd) {
   return controller
 }
 
-function bridgeScriptPath() {
+/* Whether the bridge answers, with the token its file holds now: a bridge
+ * that has just started has written a new one. */
+async function health() {
+  bridge.config = null
+  return api('GET', '/v1/health')
+}
+
+function pause(ms) {
+  return new Promise((settle) => parent.setTimeout(settle, ms))
+}
+
+function fail(kind, detail = {}) {
+  bridge.state = 'failed'
+  bridge.failure = { kind, ...detail }
+  renderNow()
+  return null
+}
+
+/* ----------------------------------------------------------- bridge start */
+
+/* A stat that fails resolves with its error; only a real one carries a
+ * numeric size. */
+async function exists(path) {
   try {
-    return decodeURIComponent(new URL('bridge/claudseq-bridge.mjs', location.href).pathname)
+    const found = await doAction(['stat', path])
+    return typeof found?.size === 'number'
   } catch {
-    return '~/.logseq/plugins/logseq-claudseq/bridge/claudseq-bridge.mjs'
+    return false
   }
 }
 
-function installCommand() {
-  const path = bridgeScriptPath()
-  /* A home-relative fallback must stay unquoted for the shell to expand it. */
-  return path.startsWith('~/') ? `node ${path} install` : `node '${path.replace(/'/g, "'\\''")}' install`
+async function findNode() {
+  const root = await homeDirectory()
+  if (settings.nodePath) {
+    if (!PLAIN_COMMAND.test(settings.nodePath)) return { problem: 'node-unplain', path: settings.nodePath }
+    return await exists(settings.nodePath) ? { node: settings.nodePath } : { problem: 'node-missing', path: settings.nodePath }
+  }
+  for (const place of NODE_PLACES) {
+    const path = place.replace(/^~/, root)
+    if (PLAIN_COMMAND.test(path) && await exists(path)) return { node: path }
+  }
+  return { problem: 'no-node' }
+}
+
+/* Logseq trims and lowercases both sides before it compares a command with
+ * its allowlist. */
+function sameCommand(one, other) {
+  return String(one).trim().toLowerCase() === String(other).trim().toLowerCase()
+}
+
+/* The user's `:commands-allowlist` from Logseq's configs.edn: an empty list
+ * when there is none, and null when it holds something Claudseq cannot
+ * extend without losing part of it. */
+async function allowlist() {
+  const value = await doAction(['userAppCfgs', 'commands-allowlist'])
+  if (value === null || value === undefined) return []
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string') ? [...value] : null
+}
+
+/* The answer to the Allow button. Logseq's setter replaces the whole list,
+ * so the list goes back whole with Node added; and the setter's own reply
+ * can fail to cross the IPC after the write has succeeded, so what counts is
+ * reading the entry back. */
+async function allowNode() {
+  const node = bridge.node
+  if (!node) return
+  try {
+    const list = await allowlist()
+    if (list === null) return fail('allowlist', { node })
+    if (!list.some((entry) => sameCommand(entry, node))) {
+      await doAction(['userAppCfgs', 'commands-allowlist', [...list, node]]).catch(() => {})
+    }
+    const saved = await allowlist()
+    if (!saved?.some((entry) => sameCommand(entry, node))) return fail('allowlist', { node })
+  } catch (error) {
+    console.warn(LOG_PREFIX, 'could not add Node to the allowlist', error)
+    return fail('allowlist', { node })
+  }
+  return connect()
+}
+
+function shellQuote(text) {
+  return `'${String(text).replace(/'/g, "'\\''")}'`
+}
+
+function bridgeScriptPath() {
+  const url = new URL('bridge/claudseq-bridge.mjs', location.href)
+  if (url.protocol !== 'file:') throw bridgeError('app', `Claudseq is loaded from ${url.protocol}, not from a folder`)
+  return decodeURIComponent(url.pathname)
+}
+
+async function lastLogLine() {
+  try {
+    const text = await doAction(['readFile', `${await homeDirectory()}/.claudseq/bridge.log`])
+    if (typeof text !== 'string') return ''
+    const lines = text.trim().split('\n')
+    return oneLine((lines[lines.length - 1] ?? '').replace(/^\S+ \[claudseq\] /, ''), 300)
+  } catch {
+    return ''
+  }
+}
+
+/* Start the bridge the one way a plugin can: through the host's `runCli`.
+ * It runs the command line through Logseq's shell, so the script's path is
+ * quoted, and resolves with the exit code once the command exits — for a
+ * bridge that started, when Logseq quits. Until then the bridge's health is
+ * asked for; an exit before it answers is a bridge that could not start,
+ * unless it exited 0, having found another already answering. */
+async function launch(node) {
+  bridge.state = 'starting'
+  renderNow()
+  let exit
+  doAction(['runCli', {
+    command: node,
+    args: `${shellQuote(bridgeScriptPath())} serve --until-stdin-closes`,
+    returnResult: false
+  }]).then((code) => { exit = typeof code === 'number' ? code : null }, () => { exit = null })
+  const deadline = Date.now() + START_WAIT
+  while (Date.now() < deadline) {
+    await pause(START_POLL)
+    try {
+      return await health()
+    } catch {
+      if (exit !== undefined && exit !== 0) break
+    }
+  }
+  return fail('start', { node, exit, log: await lastLogLine() })
+}
+
+async function startBridge() {
+  let found
+  try {
+    found = await findNode()
+    if (!found.node) return fail(found.problem, { path: found.path ?? '' })
+    bridge.node = found.node
+    const list = await allowlist()
+    if (!list?.some((entry) => sameCommand(entry, found.node))) {
+      bridge.state = 'consent'
+      renderNow()
+      return null
+    }
+    return await launch(found.node)
+  } catch (error) {
+    console.warn(LOG_PREFIX, 'could not start the bridge', error)
+    return fail(error?.kind === 'app' ? 'app' : 'error', { message: error?.message ?? String(error) })
+  }
 }
 
 /* ------------------------------------------------------------------- state */
@@ -553,45 +719,110 @@ function renderStatus() {
   const box = parts.status
   /* Rebuilt only when what it says changes, so its Retry button is not
    * swapped out from under a click while a reply streams. */
-  const key = JSON.stringify([bridge.state, notice, bridge.config?.port ?? null, bridge.claudePath, bridge.outdated])
+  const key = JSON.stringify([bridge.state, bridge.failure, bridge.node, notice, bridge.claudePath, bridge.outdated])
   if (key === statusKey) return
   statusKey = key
   clear(box)
-  const lines = []
-  let command = null
-  if (bridge.state === 'connecting') lines.push('Connecting to the Claudseq bridge…')
-  else if (bridge.state === 'missing') {
-    lines.push('Claudseq runs Claude Code through a small bridge on this Mac. Install it once from a terminal:')
-    command = installCommand()
-    lines.push('Then press Retry.')
-  } else if (bridge.state === 'down') {
-    lines.push(`The Claudseq bridge is not answering${bridge.config ? ` on 127.0.0.1:${bridge.config.port}` : ''}. Start it again by running install once more:`)
-    command = installCommand()
-  } else if (bridge.state === 'unauthorized') {
-    lines.push('The bridge refused Claudseq\'s token. Run install again to refresh it:')
-    command = installCommand()
-  } else if (bridge.state === 'noclaude') {
-    lines.push(`The bridge could not find claude${bridge.claudePath ? ` at ${bridge.claudePath}` : ''}. Install Claude Code, then run install again:`)
-    command = installCommand()
-  } else if (bridge.state === 'nograph') {
-    lines.push('Open a graph, or set a working directory in Claudseq\'s settings, to start a session.')
-  } else if (bridge.state === 'ready' && bridge.outdated) {
-    lines.push(`The bridge is version ${bridge.outdated} and Claudseq is ${logseq.baseInfo?.version}. Run install again to update the bridge:`)
-    command = installCommand()
-  }
+  const { lines = [], code = '', after = [], button = null } = statusContent()
   if (!lines.length && !notice) {
     show(box, false)
     return
   }
   show(box, true)
   box.setAttribute(STATE_ATTR, bridge.state)
+  if (bridge.state === 'failed') box.setAttribute(FAILURE_ATTR, bridge.failure?.kind ?? '')
+  else box.removeAttribute(FAILURE_ATTR)
   if (notice && bridge.state === 'ready') box.appendChild(h('p', { class: 'claudseq-status-line', [ERROR_ATTR]: '', text: notice }))
-  lines.forEach((line, index) => {
-    box.appendChild(h('p', { class: 'claudseq-status-line', text: line }))
-    if (index === 0 && command) box.appendChild(h('pre', { class: 'claudseq-command', [PART_ATTR]: 'install-command', text: command }))
-  })
-  if (bridge.state !== 'ready' && bridge.state !== 'connecting') {
-    box.appendChild(h('button', { class: 'claudseq-button', type: 'button', [ACTION_ATTR]: 'retry', text: 'Retry' }))
+  for (const line of lines) box.appendChild(h('p', { class: 'claudseq-status-line', text: line }))
+  if (code) box.appendChild(h('pre', { class: 'claudseq-command', [PART_ATTR]: 'command', text: code }))
+  for (const line of after) box.appendChild(h('p', { class: 'claudseq-status-line', text: line }))
+  if (button) {
+    const [action, label, primary] = button
+    box.appendChild(h('button', { class: primary ? 'claudseq-button claudseq-primary' : 'claudseq-button', type: 'button', [ACTION_ATTR]: action, text: label }))
+  }
+}
+
+/* What the status box says in each state: lines, then a path or log line
+ * set in monospace, then more lines, then one button. */
+function statusContent() {
+  switch (bridge.state) {
+    case 'connecting':
+      return { lines: ['Connecting to the Claudseq bridge…'] }
+    case 'starting':
+      return { lines: ['Starting the Claudseq bridge…'] }
+    case 'consent':
+      return {
+        lines: ['Claudseq runs Claude Code through a small bridge, which it starts with Node. Logseq starts only the programs on its allowlist, so Node needs adding to it, once:'],
+        code: bridge.node,
+        after: ['Allow adds this path to :commands-allowlist in Logseq\'s configs.edn. Logseq then lets any plugin run Node, as it already lets them run Git.'],
+        button: ['allow-node', 'Allow', true]
+      }
+    case 'down':
+      return { lines: ['The Claudseq bridge stopped answering. Claudseq will start it again in a moment.'], button: RETRY }
+    case 'noclaude':
+      return {
+        lines: [`The bridge could not find claude${bridge.claudePath ? ` at ${bridge.claudePath}` : ' on your login shell\'s PATH'}. Install Claude Code, then press Retry.`],
+        button: RETRY
+      }
+    case 'nograph':
+      return { lines: ['Open a graph, or set a working directory in Claudseq\'s settings, to start a session.'], button: RETRY }
+    case 'ready':
+      return bridge.outdated
+        ? { lines: [`This bridge is version ${bridge.outdated} and Claudseq is ${logseq.baseInfo?.version}. Quit and reopen Logseq to start the new one.`] }
+        : {}
+    case 'failed':
+      return failureContent(bridge.failure ?? {})
+    default:
+      return {}
+  }
+}
+
+function failureContent(failure) {
+  switch (failure.kind) {
+    case 'app':
+      return { lines: ['Claudseq needs the Logseq desktop app, loaded from a folder on this Mac.'] }
+    case 'no-node':
+      return {
+        lines: ['Claudseq starts its bridge with Node.js 20 or later, and found none in:'],
+        code: NODE_PLACES.join('\n'),
+        after: ['Install Node, or set Node path in Claudseq\'s settings, then press Retry.'],
+        button: RETRY
+      }
+    case 'node-missing':
+      return {
+        lines: ['There is no Node at the Node path in Claudseq\'s settings:'],
+        code: failure.path,
+        after: ['Correct the path, or clear it to look in the usual places, then press Retry.'],
+        button: RETRY
+      }
+    case 'node-unplain':
+      return {
+        lines: ['Logseq starts Node through a shell, so the Node path cannot contain spaces or shell characters:'],
+        code: failure.path,
+        after: ['Set a path without them in Claudseq\'s settings — a symlink to Node works — then press Retry.'],
+        button: RETRY
+      }
+    case 'allowlist':
+      return {
+        lines: ['Claudseq could not add Node to Logseq\'s allowlist. Add this path to :commands-allowlist in ~/Library/Application Support/Logseq/configs.edn, then quit and reopen Logseq:'],
+        code: failure.node,
+        button: RETRY
+      }
+    case 'error':
+      return { lines: ['Claudseq could not start its bridge:'], code: failure.message, button: RETRY }
+    default: {
+      const why = typeof failure.exit === 'number' && failure.exit !== 0
+        ? `The Claudseq bridge stopped as it started (exit code ${failure.exit}).`
+        : failure.exit === null
+          ? `Logseq did not start the Claudseq bridge with ${failure.node}. Quitting and reopening Logseq reloads its allowlist.`
+          : `The Claudseq bridge did not answer within ${START_WAIT / 1000} seconds.`
+      return {
+        lines: [failure.log ? `${why} Its log says:` : why],
+        code: failure.log,
+        after: [`Check that ${failure.node || 'Node'} is Node.js 20 or later. The bridge logs to ${LOG_PATH}.`],
+        button: RETRY
+      }
+    }
   }
 }
 
@@ -919,7 +1150,7 @@ function resetTimelineView() {
  * idle with nobody attached. */
 function leaveSession() {
   if (!current) return
-  clearTimeout(reconnectTimer)
+  parent.clearTimeout(reconnectTimer)
   current.stream?.abort()
   current.stream = null
   if (current.liveId && !(current.busy || current.timeline.state.busy)) {
@@ -968,10 +1199,18 @@ function attach(liveId, after) {
       scheduleRender()
       return
     }
-    bridge.state = 'down'
-    scheduleRender()
-    reconnectTimer = parent.setTimeout(() => connect().catch(() => {}), 3000)
+    lost()
   })
+}
+
+/* The bridge went away mid-session — it crashed, or was stopped. The pane
+ * starts it again in a moment; the session's transcript is still there, and
+ * the next message resumes it. */
+function lost() {
+  bridge.state = 'down'
+  scheduleRender()
+  parent.clearTimeout(reconnectTimer)
+  reconnectTimer = parent.setTimeout(() => connect().catch(() => {}), 3000)
 }
 
 async function refreshTitle() {
@@ -1119,8 +1358,10 @@ async function pickModel(model) {
 }
 
 function failed(error) {
-  if (['missing', 'down', 'unauthorized', 'noclaude'].includes(error?.kind)) {
-    bridge.state = error.kind
+  if (error?.kind === 'noclaude') {
+    bridge.state = 'noclaude'
+  } else if (['missing', 'down', 'unauthorized'].includes(error?.kind)) {
+    lost()
   } else {
     notice = `Claudseq could not reach Claude: ${error?.code ?? error?.message ?? error}`
   }
@@ -1236,6 +1477,9 @@ function onClick(event) {
       break
     case 'retry':
       connect().catch(() => {})
+      break
+    case 'allow-node':
+      allowNode().catch((error) => console.warn(LOG_PREFIX, error))
       break
     case 'send':
       if (current?.busy || current?.timeline.state.busy) stop()
@@ -1435,27 +1679,36 @@ async function resolveCwd() {
   }
 }
 
-async function connect() {
-  clearTimeout(reconnectTimer)
+let connecting = null
+
+/* One attempt at a time: Retry, a lost stream and a changed setting can each
+ * ask for one while a bridge is still starting. */
+function connect() {
+  connecting ??= reach().finally(() => { connecting = null })
+  return connecting
+}
+
+/* Reach the bridge that is running, or start one. */
+async function reach() {
+  parent.clearTimeout(reconnectTimer)
   bridge.state = 'connecting'
+  bridge.failure = null
   renderNow()
   cwd = await resolveCwd()
+  let found
   try {
-    bridge.config = null
-    const health = await api('GET', '/v1/health')
-    bridge.claudePath = health.claudePath ?? ''
-    /* The bridge is a copy made at install time, so an updated plugin can
-     * find an older bridge still running. It keeps working; the pane says
-     * how to bring it up to date. */
-    const version = logseq.baseInfo?.version
-    bridge.outdated = health.version && version && health.version !== version ? health.version : ''
-    if (!health.claudeFound) {
-      bridge.state = 'noclaude'
-      renderNow()
-      return
-    }
-  } catch (error) {
-    bridge.state = ['missing', 'down', 'unauthorized'].includes(error?.kind) ? error.kind : 'down'
+    found = await health()
+  } catch {
+    found = await startBridge()
+    if (!found) return
+  }
+  bridge.claudePath = found.claudePath ?? ''
+  /* A plugin updated while Logseq runs finds the older bridge still running.
+   * It keeps working; the pane says how to start the new one. */
+  const version = logseq.baseInfo?.version
+  bridge.outdated = found.version && version && found.version !== version ? found.version : ''
+  if (!found.claudeFound) {
+    bridge.state = 'noclaude'
     renderNow()
     return
   }
@@ -1501,7 +1754,7 @@ function teardown() {
   observer = null
   if (renderTimer !== null) parent.clearTimeout(renderTimer)
   renderTimer = null
-  clearTimeout(reconnectTimer)
+  parent.clearTimeout(reconnectTimer)
   if (current) {
     current.stream?.abort()
     current.stream = null
@@ -1541,9 +1794,10 @@ function main() {
     switchDirectory().catch((error) => console.warn(LOG_PREFIX, error))
   })
   logseq.onSettingsChanged?.((next) => {
-    const before = settings.workingDirectory
+    const before = settings
     settings = readSettings(next)
-    if (settings.workingDirectory !== before) switchDirectory().catch((error) => console.warn(LOG_PREFIX, error))
+    if (settings.workingDirectory !== before.workingDirectory) switchDirectory().catch((error) => console.warn(LOG_PREFIX, error))
+    else if (settings.nodePath !== before.nodePath && bridge.state !== 'ready') connect().catch(() => {})
     else scheduleRender()
   })
 
@@ -1589,7 +1843,7 @@ const STYLE = `
 #${PANE_ID} .claudseq-status { margin: 4px 0 10px; padding: 8px 10px; border: 1px dashed var(--claudseq-border); border-radius: 6px; }
 #${PANE_ID} .claudseq-status-line { margin: 0 0 6px; }
 #${PANE_ID} .claudseq-status-line[${ERROR_ATTR}] { color: var(--claudseq-error); }
-#${PANE_ID} .claudseq-command { margin: 0 0 8px; padding: 6px 8px; border: 1px solid var(--claudseq-border); border-radius: 4px; background: var(--claudseq-code-bg); font-family: var(--claudseq-mono); font-size: 11.5px; white-space: pre-wrap; word-break: break-all; user-select: all; }
+#${PANE_ID} .claudseq-command { margin: 0 0 8px; padding: 6px 8px; border: 1px solid var(--claudseq-border); border-radius: 4px; background: var(--claudseq-code-bg); font-family: var(--claudseq-mono); font-size: 11.5px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
 #${PANE_ID} .claudseq-timeline { --claudseq-gap: 10px; position: relative; display: flex; flex-direction: column; gap: var(--claudseq-gap); padding: 6px 0 0 16px; }
 #${PANE_ID} .claudseq-row { position: relative; min-width: 0; overflow-wrap: anywhere; }
 #${PANE_ID} .claudseq-row::before { content: ''; position: absolute; left: -15px; top: .5em; width: 7px; height: 7px; border-radius: 50%; background: var(--claudseq-dim); }

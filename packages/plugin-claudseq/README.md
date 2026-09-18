@@ -15,7 +15,10 @@ with your permission, edit them. Claudseq itself writes nothing to your graph.
   web build and mobile are not supported.
 - [Claude Code](https://code.claude.com/docs/en/overview) installed and signed
   in, so that `claude` runs in your terminal.
-- Node.js 20 or later on your login `PATH`. The bridge is a Node script.
+- Node.js 20 or later. Claudseq looks for it in `/opt/homebrew/bin`,
+  `/usr/local/bin`, `~/.volta/bin` and `/opt/local/bin`. If yours is
+  elsewhere, as with nvm, fnm or asdf, set **Node path** in Claudseq's
+  settings.
 
 ## Install
 
@@ -25,26 +28,41 @@ with your permission, edit them. Claudseq itself writes nothing to your graph.
    or `dist/logseq-claudseq/` in a clone after `npm run build`. The source
    folder, `packages/plugin-claudseq/`, lacks Logseq's SDK: loaded, it never
    starts, and Logseq reports that it takes too long to load.
-2. **Install the bridge, once.** A Logseq plugin cannot start programs, so
-   Claudseq runs `claude` through a small companion process called the bridge.
-   Until the bridge is installed, the pane shows the exact command. It looks
-   like this:
+2. **Allow Node, once.** The first time the pane opens, it asks to add Node
+   to Logseq's command allowlist and shows the path it found. Press
+   **Allow**.
 
-   ```sh
-   node ~/.logseq/plugins/logseq-claudseq/bridge/claudseq-bridge.mjs install
-   ```
+That is all. There is nothing to run in a terminal.
 
-   `install` finds `claude` on your login `PATH` and copies the bridge to
-   `~/.claudseq/`. It writes `~/.claudseq/bridge.json`, readable only by you,
-   with a random token and the port. Then it registers a login agent,
-   `io.github.handled57.logseq-claudseq`, so the bridge starts now and at every
-   login. It returns once the bridge answers; if it never does, it says so and
-   points at `~/.claudseq/bridge.log`.
-3. **Press Retry** in the pane, or reload the plugin.
+### Why Claudseq asks
 
-Run `install` again after updating Claudseq, if the pane says the bridge is
-out of date, or after moving `claude`. Reinstalling issues a new token, which
-the pane picks up by itself.
+Claudseq runs `claude` through a small companion process called the bridge.
+A Logseq plugin cannot start a program itself. What Logseq offers plugins
+instead is `runCli`, which runs only the commands on its allowlist. Git is on
+that list by default; Node is not. **Allow** adds the Node path to
+`:commands-allowlist` in `~/Library/Application Support/Logseq/configs.edn`,
+and the pane uses it for one thing: starting the bridge.
+
+The list is Logseq's, not Claudseq's. Once Node is on it, Logseq lets any
+plugin run that Node through `runCli`, as every plugin can already run Git.
+
+## The bridge
+
+The bridge, `bridge/claudseq-bridge.mjs`, is a Node script in the plugin's
+folder. The pane starts it when no bridge answers, which is usually the
+first time the pane opens after Logseq starts, and shows **Starting the
+Claudseq bridge…** for about a second. Every Logseq window shares the one
+bridge.
+
+- It finds `claude` and your login shell's `PATH`, because Logseq started
+  from the Dock has neither.
+- It writes `~/.claudseq/bridge.json`, readable only by you, with its port
+  and a random token that is new each time it starts.
+- It stops when Logseq quits, however Logseq quits, and stops every `claude`
+  it started. A reply Claude is still writing then ends. The session's
+  transcript keeps everything up to that point, and your next message
+  resumes it.
+- If it stops while Logseq is open, the pane starts it again.
 
 ## Using the pane
 
@@ -94,6 +112,7 @@ Sessions Claudseq starts are ordinary Claude Code sessions. They appear in
 | Model for new sessions | default | `default` follows your Claude Code configuration; otherwise `fable`, `opus`, `sonnet` or `haiku`. |
 | Effort for new sessions | default | `low` to `max`. A change applies from the next session. |
 | Permission mode for new sessions | default | `default` is Manual. The pane's mode button changes it too. |
+| Node path | empty | The Node.js, version 20 or later, that starts the bridge. Empty means the first one found in the places listed under Requirements. Logseq runs it through a shell, so it cannot contain spaces; a symlink to Node works. |
 
 Whether the pane is folded, its height and which session was open are kept
 with these settings, in Claudseq's own settings file under `~/.logseq/`.
@@ -104,8 +123,11 @@ Nothing goes into your graph.
 - The bridge listens on `127.0.0.1` only. It answers a request only when the
   `Host` header is exactly `127.0.0.1:<port>` and the request carries the
   token from `~/.claudseq/bridge.json`. A web page cannot read that file.
-- It starts `claude` directly, never through a shell. Your message reaches
-  Claude only as data on its standard input.
+- The pane starts the bridge through Logseq's `runCli`, which goes through a
+  shell. The bridge's path is quoted for it, and nothing you type is ever
+  part of that command.
+- The bridge starts `claude` directly, never through a shell. Your message
+  reaches Claude only as data on its standard input.
 - It never uses `bypassPermissions` and never grants it. "Allow for this
   session" is scoped to the running session only.
 - History is read from Claude Code's own transcripts in `~/.claude/projects/`.
@@ -115,21 +137,24 @@ Nothing goes into your graph.
 
 ## Uninstall
 
-```sh
-node ~/.claudseq/claudseq-bridge.mjs uninstall
-```
+1. Remove the plugin in Logseq.
+2. To take Node off Logseq's allowlist, delete its path from
+   `:commands-allowlist` in
+   `~/Library/Application Support/Logseq/configs.edn`, then restart Logseq.
+3. Delete `~/.claudseq/`, which holds only the bridge's config and log.
 
-This unloads the login agent and deletes `~/.claudseq`. Then remove the plugin
-in Logseq. Your Claude Code sessions stay in `~/.claude/projects/`.
+Your Claude Code sessions stay in `~/.claude/projects/`.
 
 ## Troubleshooting
 
-- `node ~/.claudseq/claudseq-bridge.mjs status` asks the running bridge for its
-  health.
-- The bridge logs to `~/.claudseq/bridge.log`, including any request it
-  refused because of its origin or host.
-- If the pane cannot find `claude`, install Claude Code and run `install`
-  again.
+- When the bridge will not start, the pane says why, with the last line of
+  the bridge's log. The whole log is `~/.claudseq/bridge.log`. It also lists
+  every request the bridge refused because of its origin or host.
+- To ask a running bridge for its health, run
+  `node <plugin folder>/bridge/claudseq-bridge.mjs status`.
+- If the pane cannot find `claude`, install Claude Code and press **Retry**.
+- If the pane says the bridge is an older version, which happens after
+  Claudseq is updated while Logseq is open, quit and reopen Logseq.
 
 ## Left out on purpose
 

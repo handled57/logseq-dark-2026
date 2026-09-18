@@ -2,10 +2,12 @@
  *
  * The three classic scripts — the Markdown renderer, the timeline model and
  * the runtime — run in one `vm` context, as index.html loads them, against a
- * stub host: a left sidebar shaped like Logseq 0.10.15's, the host's file IPC
- * (`parent.apis.doAction`, which resolves null for a missing file rather than
- * rejecting), a plugin API that records what it is asked, and a fake bridge
- * behind `fetch` whose event stream is a real ReadableStream of NDJSON.
+ * stub host: a left sidebar shaped like Logseq 0.10.15's, the host's IPC
+ * (`parent.apis.doAction`, which resolves null for a missing file and a failed
+ * stat's error rather than rejecting, and which holds Logseq's command
+ * allowlist and its `runCli`), a plugin API that records what it is asked, and
+ * a fake bridge behind `fetch` whose event stream is a real ReadableStream of
+ * NDJSON.
  *
  * test/fixtures/stream.ndjson is what two real `claude` 2.1.267 sessions
  * printed — a Bash call and an approved Write, then a background Agent and an
@@ -15,6 +17,7 @@
  */
 
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import vm from 'node:vm'
 import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
@@ -30,6 +33,7 @@ const GRAPH = '/Users/example/Library/Mobile Documents/iCloud~com~logseq~logseq/
 const PLUGIN_URL = 'file:///Users/example/.logseq/plugins/logseq-claudseq/index.html'
 const CONFIG = JSON.stringify({ port: 47816, token: 'a'.repeat(64), claudePath: '/opt/homebrew/bin/claude' })
 const SESSION = '7c04bdb7-757e-4abc-b765-618665f1172c'
+const NODE = '/opt/homebrew/bin/node'
 
 const delay = (ms) => new Promise((settle) => setTimeout(settle, ms))
 
@@ -78,11 +82,30 @@ function sidebar() {
   return { wrap, nav, footer }
 }
 
-function bridgeFake({ config = CONFIG, claudeFound = true, down = false, sessions = [], history = [], transcripts = {} } = {}) {
+/* The bridge behind `fetch`, and what the host knows of it: which Node
+ * binaries exist, what Logseq's command allowlist holds, and what starting
+ * the bridge through `runCli` does — `start` brings it up and never resolves,
+ * as a bridge that runs until Logseq quits; a number is a bridge that exits
+ * at once with that code; `refuse` is Logseq declining to run the command. */
+function bridgeFake({
+  config = CONFIG, claudeFound = true, down = false, sessions = [], history = [], transcripts = {},
+  nodes = [NODE], allowlist = [NODE], launches = 'start', log = ''
+} = {}) {
   const calls = []
   const streams = new Map()
   const encoder = new TextEncoder()
-  const state = { config, claudeFound, down, sessions, history, transcripts, created: 0 }
+  const state = { config, claudeFound, down, sessions, history, transcripts, created: 0, nodes, allowlist, launches, log, runs: [], allowlistWrites: [] }
+
+  function launch(options) {
+    state.runs.push(options)
+    if (state.launches === 'refuse') return Promise.resolve(null)
+    if (typeof state.launches === 'number') return delay(20).then(() => state.launches)
+    delay(60).then(() => {
+      state.config = CONFIG
+      state.down = false
+    })
+    return new Promise(() => {})
+  }
   const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
   async function fetch(url, init = {}) {
@@ -125,10 +148,10 @@ function bridgeFake({ config = CONFIG, claudeFound = true, down = false, session
     }
   }
 
-  return { state, calls, fetch, emit, streams }
+  return { state, calls, fetch, emit, streams, launch }
 }
 
-async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH } = {}) {
+async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH, url = PLUGIN_URL } = {}) {
   const body = element('body')
   const head = element('head')
   const left = body.appendChild(element('div'))
@@ -213,7 +236,7 @@ async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH } = {}
     TextDecoder,
     AbortController,
     URL,
-    location: { href: PLUGIN_URL },
+    location: { href: url },
     MutationObserver,
     fetch: bridge.fetch,
     logseq: plugin,
@@ -226,9 +249,24 @@ async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH } = {}
       apis: {
         async doAction(call) {
           actions.push(call)
-          const [action, path] = call
+          const [action, path, value] = call
           if (action === 'getLogseqDotDirRoot') return '/Users/example/.logseq'
-          if (action === 'readFile') return path === '/Users/example/.claudseq/bridge.json' ? bridge.state.config : null
+          if (action === 'readFile') {
+            if (path === '/Users/example/.claudseq/bridge.json') return bridge.state.config
+            if (path === '/Users/example/.claudseq/bridge.log') return bridge.state.log || null
+            return null
+          }
+          /* The host hands back a failed stat's error rather than rejecting. */
+          if (action === 'stat') return bridge.state.nodes.includes(path) ? { size: 1, mtime: new Date(), ctime: new Date() } : new Error(`ENOENT: no such file or directory, stat '${path}'`)
+          if (action === 'userAppCfgs') {
+            if (path !== 'commands-allowlist') return null
+            if (value === undefined) return bridge.state.allowlist
+            bridge.state.allowlistWrites.push(value)
+            bridge.state.allowlist = value
+            /* The setter's reply can fail to cross the IPC after it wrote. */
+            throw new Error('An object could not be cloned.')
+          }
+          if (action === 'runCli') return bridge.launch(path)
           return null
         }
       }
@@ -474,7 +512,8 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: 'default',
     effort: 'default',
     permissionMode: 'default',
-    workingDirectory: ''
+    workingDirectory: '',
+    nodePath: ''
   }
   for (const raw of [null, undefined, 'nonsense', 42, [], {}]) {
     assert.deepEqual({ ...context.readSettings(raw) }, defaults, JSON.stringify(raw))
@@ -486,7 +525,8 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: '--dangerously-skip-permissions',
     effort: 'ultra',
     permissionMode: 'bypassPermissions',
-    workingDirectory: 'relative/path'
+    workingDirectory: 'relative/path',
+    nodePath: 'node'
   }) }, defaults)
   assert.deepEqual({ ...context.readSettings({
     paneCollapsed: true,
@@ -495,7 +535,8 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: 'opus',
     effort: 'xhigh',
     permissionMode: 'plan',
-    workingDirectory: ' /Users/example/code '
+    workingDirectory: ' /Users/example/code ',
+    nodePath: ' /Users/example/.volta/bin/node '
   }) }, {
     paneCollapsed: true,
     paneHeight: 240,
@@ -503,7 +544,8 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: 'opus',
     effort: 'xhigh',
     permissionMode: 'plan',
-    workingDirectory: '/Users/example/code'
+    workingDirectory: '/Users/example/code',
+    nodePath: '/Users/example/.volta/bin/node'
   })
 })
 
@@ -520,21 +562,136 @@ test('a pane loaded with malformed settings still opens at its defaults', async 
 
 /* ----------------------------------------------------------------- bridge */
 
-test('without a bridge the pane shows the exact install command, and Retry connects', async () => {
-  const bridge = bridgeFake({ config: null })
-  const pane = await load({ bridge })
-  const status = await until(() => pane.part('status').getAttribute('data-claudseq-state') === 'missing' && pane.part('status'))
-  assert.ok(pane.part('timeline').attributes.has('data-claudseq-hidden'))
-  assert.equal(textOf(status.querySelector('[data-claudseq-part="install-command"]')), "node '/Users/example/.logseq/plugins/logseq-claudseq/bridge/claudseq-bridge.mjs' install")
-  assert.deepEqual(plain(pane.actions.filter(([action]) => action === 'readFile')), [['readFile', '/Users/example/.claudseq/bridge.json']])
+const hostCalls = (pane, name) => plain(pane.actions.filter(([action]) => action === name))
 
-  bridge.state.config = CONFIG
-  pane.click(pane.action('retry', status))
+function statusIn(pane, state) {
+  return until(() => pane.part('status').getAttribute('data-claudseq-state') === state && pane.part('status'))
+}
+
+test('a bridge that answers is used as it is, and nothing is started', async () => {
+  const pane = await load()
   await ready(pane)
+  assert.deepEqual(hostCalls(pane, 'runCli'), [])
+  assert.deepEqual(hostCalls(pane, 'stat'), [])
+  assert.deepEqual(hostCalls(pane, 'userAppCfgs'), [])
   assert.equal(pane.bridge.calls.find((call) => call.path === '/v1/health').authorization, `Bearer ${'a'.repeat(64)}`)
 })
 
-test('an older bridge keeps working, and the pane says how to update it', async () => {
+test('without a bridge the pane starts one through runCli, with its path quoted for the shell', async () => {
+  const bridge = bridgeFake({ config: null })
+  const pane = await load({ bridge, url: "file:///Users/example/My%20Plugins/it's%20claudseq/index.html" })
+  await statusIn(pane, 'starting')
+  await ready(pane)
+  assert.equal(bridge.state.runs.length, 1)
+  const [run] = plain(bridge.state.runs)
+  assert.deepEqual(run, {
+    command: NODE,
+    args: "'/Users/example/My Plugins/it'\\''s claudseq/bridge/claudseq-bridge.mjs' serve --until-stdin-closes",
+    returnResult: false
+  })
+  /* Logseq runs `command + " " + args` through a shell; that shell reads the
+   * script's path as one word, spaces and quote and all. */
+  const words = execFileSync('/bin/sh', ['-c', `printf '%s\\n' ${run.args}`], { encoding: 'utf8' }).trimEnd().split('\n')
+  assert.deepEqual(words, ["/Users/example/My Plugins/it's claudseq/bridge/claudseq-bridge.mjs", 'serve', '--until-stdin-closes'])
+  assert.deepEqual(bridge.state.allowlistWrites, [], 'the allowlist was written though Node was on it')
+})
+
+test('the pane asks before adding Node to Logseq\'s allowlist, and keeps what the list held', async () => {
+  const bridge = bridgeFake({ config: null, allowlist: ['pandoc', '/usr/local/bin/ag'] })
+  const pane = await load({ bridge })
+  const status = await statusIn(pane, 'consent')
+  assert.equal(textOf(status.querySelector('[data-claudseq-part="command"]')), NODE)
+  assert.match(textOf(status), /Allow adds this path to :commands-allowlist in Logseq's configs\.edn/)
+  assert.match(textOf(status), /any plugin run Node, as it already lets them run Git/)
+  assert.deepEqual(bridge.state.runs, [], 'the bridge was started before Node was allowed')
+  assert.deepEqual(bridge.state.allowlistWrites, [], 'the allowlist was written before Allow')
+
+  pane.click(pane.action('allow-node', status))
+  await ready(pane)
+  assert.deepEqual(plain(bridge.state.allowlistWrites), [['pandoc', '/usr/local/bin/ag', NODE]])
+  assert.equal(bridge.state.runs.length, 1)
+})
+
+test('an allowlist Claudseq cannot extend whole is left alone', async () => {
+  const bridge = bridgeFake({ config: null, allowlist: 'git' })
+  const pane = await load({ bridge })
+  const consent = await statusIn(pane, 'consent')
+  pane.click(pane.action('allow-node', consent))
+  const status = await statusIn(pane, 'failed')
+  assert.equal(status.getAttribute('data-claudseq-failure'), 'allowlist')
+  assert.match(textOf(status), /Add this path to :commands-allowlist in ~\/Library\/Application Support\/Logseq\/configs\.edn/)
+  assert.deepEqual(bridge.state.allowlistWrites, [])
+  assert.deepEqual(bridge.state.runs, [])
+})
+
+test('without Node the pane says where it looked, and the Node path setting is used', async () => {
+  const nvm = '/Users/example/.nvm/versions/node/v22.1.0/bin/node'
+  const bridge = bridgeFake({ config: null, nodes: [nvm], allowlist: [nvm] })
+  const pane = await load({ bridge })
+  let status = await statusIn(pane, 'failed')
+  assert.equal(status.getAttribute('data-claudseq-failure'), 'no-node')
+  assert.equal(textOf(status.querySelector('[data-claudseq-part="command"]')), '/opt/homebrew/bin/node\n/usr/local/bin/node\n~/.volta/bin/node\n/opt/local/bin/node')
+  assert.deepEqual(hostCalls(pane, 'stat').map(([, path]) => path), ['/opt/homebrew/bin/node', '/usr/local/bin/node', '/Users/example/.volta/bin/node', '/opt/local/bin/node'])
+
+  pane.plugin.settingsChanged({ nodePath: '/Users/example/My Tools/node' })
+  status = await until(() => pane.part('status').getAttribute('data-claudseq-failure') === 'node-unplain' && pane.part('status'))
+  assert.equal(textOf(status.querySelector('[data-claudseq-part="command"]')), '/Users/example/My Tools/node')
+
+  pane.plugin.settingsChanged({ nodePath: '/Users/example/nope/node' })
+  await until(() => pane.part('status').getAttribute('data-claudseq-failure') === 'node-missing')
+
+  pane.plugin.settingsChanged({ nodePath: nvm })
+  await ready(pane)
+  assert.deepEqual(plain(bridge.state.runs).map((run) => run.command), [nvm])
+})
+
+test('a bridge that exits as it starts shows its exit code and its log\'s last line, and Retry starts it again', async () => {
+  const bridge = bridgeFake({
+    config: null,
+    launches: 1,
+    log: '2026-09-18T10:00:00.000Z [claudseq] bridge 0.1.0 listening on 127.0.0.1:47816\n2026-09-18T11:00:00.000Z [claudseq] could not start: Node v18.20.0 is too old; the bridge needs Node 20 or later\n'
+  })
+  const pane = await load({ bridge })
+  const status = await statusIn(pane, 'failed')
+  assert.equal(status.getAttribute('data-claudseq-failure'), 'start')
+  assert.match(textOf(status), /stopped as it started \(exit code 1\)\. Its log says:/)
+  assert.equal(textOf(status.querySelector('[data-claudseq-part="command"]')), 'could not start: Node v18.20.0 is too old; the bridge needs Node 20 or later')
+  assert.match(textOf(status), /Check that \/opt\/homebrew\/bin\/node is Node\.js 20 or later/)
+
+  bridge.state.launches = 'start'
+  pane.click(pane.action('retry', status))
+  await ready(pane)
+  assert.equal(bridge.state.runs.length, 2)
+})
+
+test('Logseq refusing to run Node says so', async () => {
+  const pane = await load({ bridge: bridgeFake({ config: null, launches: 'refuse' }) })
+  const status = await statusIn(pane, 'failed')
+  assert.match(textOf(status), /Logseq did not start the Claudseq bridge with \/opt\/homebrew\/bin\/node/)
+})
+
+test('a bridge lost mid-session is started again', async () => {
+  const bridge = bridgeFake()
+  const pane = await load({ bridge })
+  await ready(pane)
+  pane.part('input').value = 'hello'
+  pane.click(pane.action('send'))
+  await until(() => bridge.streams.get('live-1'))
+
+  /* Logseq quit and was reopened, or the bridge crashed: it answers no more,
+   * and its stream breaks. */
+  bridge.state.down = true
+  bridge.state.config = null
+  bridge.streams.get('live-1').controller.error(new TypeError('network error'))
+  const status = await statusIn(pane, 'down')
+  assert.match(textOf(status), /stopped answering\. Claudseq will start it again in a moment/)
+
+  pane.click(pane.action('retry', status))
+  await ready(pane)
+  assert.equal(bridge.state.runs.length, 1)
+})
+
+test('an older bridge keeps working, and the pane says how to start the new one', async () => {
   const pane = await load()
   await ready(pane)
   pane.plugin.baseInfo = { version: '0.2.0' }
@@ -543,19 +700,14 @@ test('an older bridge keeps working, and the pane says how to update it', async 
   pane.plugin.currentGraph = { path: '/Users/example/Other', name: 'other' }
   pane.plugin.graphChanged()
   const status = await until(() => !pane.part('status').attributes.has('data-claudseq-hidden') && pane.part('status').getAttribute('data-claudseq-state') === 'ready' && pane.part('status'))
-  assert.match(textOf(status), /The bridge is version 0\.1\.0 and Claudseq is 0\.2\.0/)
-  assert.match(textOf(status.querySelector('[data-claudseq-part="install-command"]')), /claudseq-bridge\.mjs' install$/)
+  assert.match(textOf(status), /This bridge is version 0\.1\.0 and Claudseq is 0\.2\.0\. Quit and reopen Logseq to start the new one\./)
   assert.ok(!pane.part('timeline').attributes.has('data-claudseq-hidden'), 'an older bridge blocked the pane')
 })
 
-test('a bridge that is down, or that cannot find claude, says so', async () => {
-  const down = await load({ bridge: bridgeFake({ down: true }) })
-  await until(() => down.part('status').getAttribute('data-claudseq-state') === 'down')
-  assert.match(textOf(down.part('status')), /not answering on 127\.0\.0\.1:47816/)
-
+test('a bridge that cannot find claude says so', async () => {
   const missing = await load({ bridge: bridgeFake({ claudeFound: false }) })
-  await until(() => missing.part('status').getAttribute('data-claudseq-state') === 'noclaude')
-  assert.match(textOf(missing.part('status')), /could not find claude at \/opt\/homebrew\/bin\/claude/)
+  await statusIn(missing, 'noclaude')
+  assert.match(textOf(missing.part('status')), /could not find claude at \/opt\/homebrew\/bin\/claude\. Install Claude Code, then press Retry\./)
 })
 
 /* ---------------------------------------------------------------- session */

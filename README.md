@@ -50,9 +50,10 @@ theme installed.
 
 Claudseq puts a Claude Code pane below Favorites and Recent. It works with
 the `claude` CLI already installed on your Mac, in your graph's folder, and
-asks before Claude edits anything. A plugin cannot start programs, so Claudseq
-ships a small bridge. You install it once from a terminal, and it runs as a
-login agent on `127.0.0.1` behind a private token. Its sessions are ordinary
+asks before Claude edits anything. Claude runs through a small bridge on
+`127.0.0.1`, behind a private token. The pane starts it through Logseq's own
+`runCli` after asking once to add Node to Logseq's command allowlist, and it
+stops when Logseq quits; there is nothing to install from a terminal. Its sessions are ordinary
 Claude Code sessions, so they also appear in `claude --resume` and in the VS
 Code extension. See the [Claudseq guide](packages/plugin-claudseq/README.md).
 
@@ -62,8 +63,7 @@ When the packages are available in the Logseq Marketplace, install each one
 separately under **Plugins → Marketplace**: Dark High Contrast is a theme,
 Passage, Anno and Able Table are plugins. Selecting the theme does not install
 a command. Claudseq is not listed in the Marketplace. Install it from its
-release archive or unpacked folder, then install its bridge as its guide
-describes.
+release archive or unpacked folder, and allow Node when its pane asks.
 
 For development or pre-Marketplace testing, build the repository and load the
 package's extracted folder—not its source workspace—from Logseq's **Load

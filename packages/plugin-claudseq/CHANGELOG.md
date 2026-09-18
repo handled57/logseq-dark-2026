@@ -35,13 +35,20 @@ All notable changes to this package are documented here.
   a terminal. Opening one shows its transcript, and the next message resumes
   it. Sessions started in Claudseq also appear in `claude --resume` and in
   the VS Code extension.
-- **The bridge**, `bridge/claudseq-bridge.mjs`, is a Node script you install
-  once as a login agent. It runs `claude` for the pane. It listens on
-  127.0.0.1 only, and every request needs a private token and the exact host.
-  It starts `claude` without a shell and stops each one when its session
-  closes, after 30 minutes unattended, or at shutdown. `install`, `uninstall`
-  and `status` manage it. `install` returns only once the new bridge answers,
-  and fails with a pointer to its log if it never does.
+- **The bridge**, `bridge/claudseq-bridge.mjs`, is a Node script that runs
+  `claude` for the pane. There is nothing to install: the pane starts it
+  through Logseq's `runCli` whenever none answers. The first time, the pane
+  asks before it adds Node to Logseq's command allowlist, which `runCli`
+  requires. A **Node path** setting covers a Node the pane does not find by
+  itself.
+- The bridge stops when Logseq quits, however Logseq quits, and stops every
+  `claude` it started. If it stops while Logseq is open, the pane starts it
+  again. When it cannot start, the pane says why, with the last line of its
+  log.
+- The bridge listens on 127.0.0.1 only. Every request needs the exact host and
+  a private token, which is new each time the bridge starts. It starts
+  `claude` without a shell and stops each one when its session closes, after
+  30 minutes unattended, or when the bridge stops.
 - **Nothing is written to the graph.** The pane's own state goes into its
   settings file under `~/.logseq/`, and history is read from Claude Code's
   transcripts, never written.

@@ -126,12 +126,21 @@ test('the pane keeps its state out of the graph', () => {
   const source = code['index.js']
   assert.match(source, /logseq\.updateSettings/)
   assert.doesNotMatch(source, /makeSandboxStorage|FileStorage|Editor\.(?:insertBlock|updateBlock|appendBlockInPage|createPage|upsertBlockProperty)/, 'the pane writes to the graph')
-  assert.doesNotMatch(source, /'writeFile'|runCli/)
+  assert.doesNotMatch(source, /'writeFile'/)
   assert.match(source, /'readFile'/)
 })
 
+test('the pane runs one command, the bridge, and changes one Logseq setting, its command allowlist', () => {
+  const source = code['index.js']
+  assert.equal(source.match(/'runCli'/g)?.length, 1, 'the pane runs more than the bridge')
+  assert.match(source, /\['runCli', \{\s*command: node,\s*args: `\$\{shellQuote\(bridgeScriptPath\(\)\)\} serve --until-stdin-closes`,\s*returnResult: false\s*\}\]/)
+  const settingCalls = source.match(/'userAppCfgs'/g)?.length ?? 0
+  assert.ok(settingCalls > 0)
+  assert.equal(source.match(/'userAppCfgs', 'commands-allowlist'/g)?.length, settingCalls, 'the pane touches a Logseq setting other than the allowlist')
+})
+
 test('the bridge listens on loopback only, never uses a shell, and needs nothing installed', () => {
-  assert.match(bridgeCode, /listen\(port, '127\.0\.0\.1'/)
+  assert.match(bridgeCode, /server\.listen\(\w+, '127\.0\.0\.1'/)
   assert.doesNotMatch(bridgeCode, /listen\([^)]*'0\.0\.0\.0'|listen\([^)]*'::'/)
   assert.doesNotMatch(bridgeCode, /shell:\s*true/)
   /* `execFile` takes an argv array; `exec` takes a command line for a shell.
@@ -140,6 +149,7 @@ test('the bridge listens on loopback only, never uses a shell, and needs nothing
   assert.doesNotMatch(bridgeCode, /import \{[^}]*\bexec\b[^}]*\} from 'node:child_process'/)
   assert.doesNotMatch(bridgeCode, /dangerously-skip-permissions|'--permission-mode', 'bypassPermissions'/)
   assert.match(bridgeCode, /timingSafeEqual/)
+  assert.doesNotMatch(bridgeCode, /launchctl|LaunchAgents/, 'the bridge installs something')
   for (const [, specifier] of bridgeCode.matchAll(/^import .* from '([^']+)'/gm)) {
     assert.match(specifier, /^node:/, `the bridge imports ${specifier}`)
   }

@@ -94,7 +94,7 @@ that Logseq rendered correctly.
    `hls__<page title>` page Logseq writes on the first highlight. For Able
    Table's scaffold release, open a page holding Markdown tables and confirm
    nothing a reader sees changes. For Claudseq:
-   1. install its bridge from the extracted folder;
+   1. allow Node when the pane asks, and see the bridge start;
    2. send a prompt;
    3. allow one permission request and deny another;
    4. stop a turn;

@@ -2,13 +2,18 @@
 /* Claudseq bridge: the one process that runs the local `claude` CLI for the
  * Claudseq pane in Logseq's left sidebar.
  *
- * A Logseq plugin can neither start a process nor read one's output. The
- * host's `runCli` IPC runs only commands on a user-configured allowlist,
- * through a shell, and resolves with the exit code alone, and neither
- * `logseq.Request` nor `httpRequest` can stream. So the pane talks to this
- * script over HTTP instead, and this script talks to `claude` over its
- * headless stream-json protocol — the same one the Claude Agent SDK and the
- * VS Code extension use.
+ * A Logseq plugin can neither read a process's output nor stream a request:
+ * `logseq.Request` and `httpRequest` return whole bodies. What the host does
+ * offer is `runCli`, which starts a command on the user's allowlist through a
+ * shell and resolves with its exit code alone. The pane uses it once, to
+ * start this script with Node. From then on the pane talks to this script
+ * over HTTP, and this script talks to `claude` over its headless stream-json
+ * protocol — the same one the Claude Agent SDK and the VS Code extension use.
+ *
+ * Started that way, the bridge lives as long as Logseq does. `runCli` leaves
+ * the child's stdin a pipe whose other end Logseq holds and never writes to,
+ * so with `--until-stdin-closes` the bridge stops when that pipe closes: when
+ * Logseq quits, however it quits.
  *
  * What keeps that safe is narrow on purpose:
  *
@@ -16,9 +21,10 @@
  *   `Host` is exactly `127.0.0.1:<port>`, so a page that rebinds a DNS name to
  *   loopback gets nothing.
  * - Every request other than a CORS preflight carries `Authorization: Bearer
- *   <token>`. The token is 32 random bytes in `~/.claudseq/bridge.json`, which
- *   is mode 0600; the pane reads it through the host's own file IPC, and a web
- *   page cannot read it at all. It is compared in constant time.
+ *   <token>`. The token is 32 random bytes, new each time the bridge starts,
+ *   in `~/.claudseq/bridge.json`, which is mode 0600; the pane reads it
+ *   through the host's own file IPC, and a web page cannot read it at all. It
+ *   is compared in constant time.
  * - CORS admits one origin, `file://`: an `effect: true` plugin shares the
  *   Logseq window's origin, and that window is loaded from a file URL.
  * - `claude` is started from an argv array, never a shell, in the working
@@ -32,27 +38,26 @@
  * that `claude --resume` and the VS Code extension list too.
  *
  * Usage:
- *   node claudseq-bridge.mjs install [--port <n>]
- *   node claudseq-bridge.mjs uninstall
+ *   node claudseq-bridge.mjs serve [--port <n>] [--until-stdin-closes]
  *   node claudseq-bridge.mjs status
- *   node claudseq-bridge.mjs serve
  */
 
 import { execFile, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { constants, realpathSync } from 'node:fs'
-import { access, chmod, copyFile, mkdir, open, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { appendFileSync, constants, realpathSync } from 'node:fs'
+import { access, chmod, mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { createServer, request as httpRequest } from 'node:http'
 import { homedir } from 'node:os'
-import { delimiter, isAbsolute, join, resolve } from 'node:path'
+import { delimiter, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const VERSION = '0.1.0'
 export const ALLOWED_ORIGIN = 'file://'
 export const ENTRYPOINT = 'logseq-claudseq'
-export const LABEL = 'io.github.handled57.logseq-claudseq'
 export const DEFAULT_PORT = 47816
 export const CONFIG_FILE = 'bridge.json'
+export const LOG_FILE = 'bridge.log'
+const MAX_LOG = 1024 * 1024
 
 /* Manual goes by two names. `--permission-mode` accepts `manual` and not
  * `default`, yet every answer the CLI gives — init, status and the reply to
@@ -660,6 +665,7 @@ export function createBridge({
   token,
   port = 0,
   claudePath,
+  locateClaude = null,
   projectsDir,
   env = process.env,
   allowedOrigin = ALLOWED_ORIGIN,
@@ -691,19 +697,31 @@ export function createBridge({
     return found
   }
 
+  /* A bridge that started before Claude Code was installed, or before it
+   * moved, looks for it again when asked, rather than waiting for Logseq to
+   * restart it. */
+  async function claudeReady() {
+    if (await executable(bridge.claudePath)) return true
+    if (!locateClaude) return false
+    const found = await locateClaude().catch(() => null)
+    if (found) bridge.claudePath = found
+    return executable(bridge.claudePath)
+  }
+
   async function route(req, res, url, cors) {
     const parts = url.pathname.split('/').filter(Boolean)
     const method = req.method
     if (parts[0] !== 'v1') throw new HttpError(404, 'not_found')
 
     if (parts.length === 2 && parts[1] === 'health' && method === 'GET') {
+      const claudeFound = await claudeReady()
       return sendJson(res, 200, {
         ok: true,
         version: VERSION,
         pid: process.pid,
         sessions: bridge.sessions.size,
-        claudePath,
-        claudeFound: await executable(claudePath)
+        claudePath: bridge.claudePath,
+        claudeFound
       }, cors)
     }
 
@@ -740,7 +758,7 @@ export function createBridge({
         const running = [...bridge.sessions.values()].find((entry) => entry.claudeSessionId === resume && !entry.closed)
         if (running) return sendJson(res, 200, running.summary(), cors)
       }
-      if (!(await executable(claudePath))) throw new HttpError(424, 'claude_not_found', { claudePath })
+      if (!(await claudeReady())) throw new HttpError(424, 'claude_not_found', { claudePath: bridge.claudePath })
       if (bridge.sessions.size >= maxSessions) throw new HttpError(429, 'too_many_sessions')
 
       const created = new Session(bridge, { cwd, resume, model, effort, mode })
@@ -839,11 +857,11 @@ export function createBridge({
     }
   }
 
-  function listen() {
+  function listen(at = port) {
     return new Promise((settle, fail) => {
       bridge.server = createServer((req, res) => { handle(req, res) })
       bridge.server.once('error', fail)
-      bridge.server.listen(port, '127.0.0.1', () => {
+      bridge.server.listen(at, '127.0.0.1', () => {
         const actual = bridge.server.address().port
         bridge.port = actual
         bridge.expectedHost = `127.0.0.1:${actual}`
@@ -875,10 +893,20 @@ export function projectsDirectory(env = process.env) {
 
 export async function readConfig(stateDir) {
   const config = JSON.parse(await readFile(join(stateDir, CONFIG_FILE), 'utf8'))
-  if (!Number.isInteger(config.port) || typeof config.token !== 'string' || typeof config.claudePath !== 'string') {
+  if (!Number.isInteger(config.port) || typeof config.token !== 'string') {
     throw new Error(`${join(stateDir, CONFIG_FILE)} is not a Claudseq bridge configuration`)
   }
   return config
+}
+
+/* Written whole or not at all: the pane reads this file over and over while
+ * the bridge starts, and must never read half of it. */
+async function writeConfig(stateDir, config) {
+  const path = join(stateDir, CONFIG_FILE)
+  const temporary = join(stateDir, `.${CONFIG_FILE}.${process.pid}`)
+  await writeFile(temporary, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 })
+  await chmod(temporary, 0o600)
+  await rename(temporary, path)
 }
 
 function run(file, args, options = {}) {
@@ -890,45 +918,9 @@ function run(file, args, options = {}) {
   })
 }
 
-function xml(text) {
-  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-export function launchAgentPlist({ label, node, script, path, home, log }) {
-  const strings = (values) => values.map((value) => `\t\t<string>${xml(value)}</string>`).join('\n')
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-\t<key>Label</key>
-\t<string>${xml(label)}</string>
-\t<key>ProgramArguments</key>
-\t<array>
-${strings([node, script, 'serve'])}
-\t</array>
-\t<key>EnvironmentVariables</key>
-\t<dict>
-\t\t<key>PATH</key>
-\t\t<string>${xml(path)}</string>
-\t\t<key>HOME</key>
-\t\t<string>${xml(home)}</string>
-\t</dict>
-\t<key>RunAtLoad</key>
-\t<true/>
-\t<key>KeepAlive</key>
-\t<true/>
-\t<key>StandardOutPath</key>
-\t<string>${xml(log)}</string>
-\t<key>StandardErrorPath</key>
-\t<string>${xml(log)}</string>
-</dict>
-</plist>
-`
-}
-
-/* A LaunchAgent inherits launchd's PATH, not the login shell's, and Logseq
- * launched from the Dock inherits no better. Both are asked of the shell once,
- * here, and written down. */
+/* Logseq started from the Dock hands its children launchd's PATH, which has
+ * neither Homebrew nor `claude` on it. The login shell is asked for its own,
+ * once, when the bridge starts; every `claude` is given that one. */
 async function loginShell(shell, command) {
   return (await run(shell, ['-lc', command]).catch(() => '')).trim()
 }
@@ -949,99 +941,9 @@ async function findClaude(shell, loginPath) {
   return null
 }
 
-async function portIsFree(port) {
-  return new Promise((settle) => {
-    const probe = createServer()
-    probe.once('error', () => settle(false))
-    probe.listen(port, '127.0.0.1', () => probe.close(() => settle(true)))
-  })
-}
-
-async function anyFreePort() {
-  return new Promise((settle, fail) => {
-    const probe = createServer()
-    probe.once('error', fail)
-    probe.listen(0, '127.0.0.1', () => {
-      const { port } = probe.address()
-      probe.close(() => settle(port))
-    })
-  })
-}
-
 function option(args, name) {
   const index = args.indexOf(name)
   return index === -1 ? undefined : args[index + 1]
-}
-
-function agentPaths(env) {
-  const agentsDir = env.CLAUDSEQ_LAUNCH_AGENTS_DIR ?? join(homedir(), 'Library', 'LaunchAgents')
-  return { agentsDir, plist: join(agentsDir, `${LABEL}.plist`), launchctl: env.CLAUDSEQ_LAUNCHCTL ?? '/bin/launchctl' }
-}
-
-export async function install(args = [], env = process.env, out = console.log) {
-  const stateDir = stateDirectory(env)
-  const { agentsDir, plist, launchctl } = agentPaths(env)
-  const shell = env.SHELL || '/bin/zsh'
-  const loginPath = (await loginShell(shell, 'printf %s "$PATH"')) || env.PATH || '/usr/bin:/bin'
-  const claudePath = env.CLAUDSEQ_CLAUDE ?? await findClaude(shell, loginPath)
-  if (!claudePath) throw new Error('claude was not found on your login PATH. Install Claude Code, then run install again.')
-
-  const previous = await readConfig(stateDir).catch(() => null)
-  const requested = option(args, '--port')
-  let port = requested === undefined ? previous?.port ?? DEFAULT_PORT : Number.parseInt(requested, 10)
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`--port must be between 1024 and 65535, not ${requested}`)
-  if (requested === undefined && port !== previous?.port && !(await portIsFree(port))) port = await anyFreePort()
-
-  await mkdir(stateDir, { recursive: true, mode: 0o700 })
-  await chmod(stateDir, 0o700)
-  const script = join(stateDir, 'claudseq-bridge.mjs')
-  if (resolve(fileURLToPath(import.meta.url)) !== resolve(script)) await copyFile(fileURLToPath(import.meta.url), script)
-
-  const configPath = join(stateDir, CONFIG_FILE)
-  const config = { port, token: randomBytes(32).toString('hex'), claudePath, version: VERSION }
-  await writeFile(configPath, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 })
-  await chmod(configPath, 0o600)
-
-  await mkdir(agentsDir, { recursive: true })
-  await writeFile(plist, launchAgentPlist({
-    label: LABEL,
-    node: process.execPath,
-    script,
-    path: loginPath,
-    home: env.HOME ?? homedir(),
-    log: join(stateDir, 'bridge.log')
-  }))
-
-  const domain = `gui/${process.getuid()}`
-  await run(launchctl, ['bootout', `${domain}/${LABEL}`]).catch(() => {})
-  await run(launchctl, ['bootstrap', domain, plist])
-
-  /* launchd starts the agent a moment after `bootstrap` returns, and a bridge
-   * from an earlier install can still be answering with its old token. The
-   * install is done when the new bridge answers with the new one. */
-  const wait = Number(env.CLAUDSEQ_START_WAIT_MS ?? 10_000)
-  const deadline = Date.now() + wait
-  let health = await askHealth(config, 1000)
-  while (health.status !== 200 && Date.now() < deadline) {
-    await new Promise((settle) => setTimeout(settle, 150))
-    health = await askHealth(config, 1000)
-  }
-
-  out(`Claudseq bridge ${VERSION} installed.`)
-  out(`  claude:  ${claudePath}`)
-  out(`  listens: http://127.0.0.1:${port} (loopback only)`)
-  out(`  config:  ${configPath}`)
-  out(`  agent:   ${plist}`)
-  if (health.status !== 200) {
-    throw new Error(`the login agent is loaded, but the bridge did not answer on 127.0.0.1:${port} within ${wait / 1000} s (${health.error ?? `HTTP ${health.status}`}). See ${join(stateDir, 'bridge.log')}.`)
-  }
-  let pid = ''
-  try {
-    pid = JSON.parse(health.text).pid ?? ''
-  } catch {}
-  out(`  running: pid ${pid}`)
-  out('Reload Claudseq in Logseq, or open its pane, to connect.')
-  return config
 }
 
 /* One authenticated health request; a refused connection, a timeout and an
@@ -1066,12 +968,18 @@ function askHealth(config, timeout) {
   })
 }
 
-export async function uninstall(env = process.env, out = console.log) {
-  const { plist, launchctl } = agentPaths(env)
-  await run(launchctl, ['bootout', `gui/${process.getuid()}/${LABEL}`]).catch(() => {})
-  await rm(plist, { force: true })
-  await rm(stateDirectory(env), { recursive: true, force: true })
-  out('Claudseq bridge removed: the login agent is unloaded and ~/.claudseq is deleted.')
+/* The bridge `bridge.json` names, when it answers with the token written
+ * there. With a wait, it is asked again until the wait runs out: a bridge
+ * that a second Logseq window started a moment earlier has the port before
+ * it has written the file. */
+async function answeringBridge(stateDir, wait = 0) {
+  const deadline = Date.now() + wait
+  for (;;) {
+    const config = await readConfig(stateDir).catch(() => null)
+    if (config && (await askHealth(config, 1000)).status === 200) return config
+    if (Date.now() >= deadline) return null
+    await new Promise((settle) => setTimeout(settle, 150))
+  }
 }
 
 export async function status(env = process.env, out = console.log) {
@@ -1079,42 +987,117 @@ export async function status(env = process.env, out = console.log) {
   const config = await readConfig(stateDir)
   const health = await askHealth(config, 3000)
   if (health.status !== 200) {
-    out(`Claudseq bridge is not answering on 127.0.0.1:${config.port}: ${health.error ?? `HTTP ${health.status}`}. See ${join(stateDir, 'bridge.log')}.`)
+    out(`Claudseq bridge is not answering on 127.0.0.1:${config.port}: ${health.error ?? `HTTP ${health.status}`}. See ${join(stateDir, LOG_FILE)}.`)
     return false
   }
   out(health.text)
   return true
 }
 
-async function serve(env = process.env) {
-  const stateDir = stateDirectory(env)
-  const config = await readConfig(stateDir)
-  const bridge = createBridge({
-    token: config.token,
-    port: config.port,
-    claudePath: env.CLAUDSEQ_CLAUDE ?? config.claudePath,
-    projectsDir: projectsDirectory(env),
-    env,
-    idleMs: env.CLAUDSEQ_IDLE_MS ? Number(env.CLAUDSEQ_IDLE_MS) : undefined
-  })
-  await bridge.listen()
-  bridge.log(`bridge ${VERSION} listening on ${bridge.expectedHost} (pid ${process.pid})`)
-  let stopping = false
-  const stop = async (signal) => {
-    if (stopping) return
-    stopping = true
-    bridge.log(`${signal}: closing ${bridge.sessions.size} session(s)`)
-    await bridge.close()
-    process.exit(0)
+/* The log is a file, never stdout or stderr: those are pipes to Logseq, and
+ * once Logseq has quit a write to one fails — while the bridge is still
+ * stopping the `claude` processes it started. The pane reads the file's last
+ * line when the bridge will not start. */
+function fileLog(path) {
+  return (line) => {
+    try {
+      appendFileSync(path, `${new Date().toISOString()} [claudseq] ${line}\n`, { mode: 0o600 })
+    } catch {}
   }
-  process.on('SIGTERM', () => stop('SIGTERM'))
-  process.on('SIGINT', () => stop('SIGINT'))
+}
+
+/* Start the bridge, or find that one already answers and leave it be. It
+ * resolves with the running bridge, or with null when there was nothing to
+ * do; a failure is written to the log before it is thrown. */
+export async function serve(args = [], env = process.env) {
+  const stateDir = stateDirectory(env)
+  await mkdir(stateDir, { recursive: true, mode: 0o700 })
+  await chmod(stateDir, 0o700)
+  const logPath = join(stateDir, LOG_FILE)
+  const log = fileLog(logPath)
+  try {
+    return await start()
+  } catch (error) {
+    log(`could not start: ${error.message}`)
+    throw error
+  }
+
+  async function start() {
+    if (Number(process.versions.node.split('.')[0]) < 20) {
+      throw new Error(`Node ${process.version} is too old; the bridge needs Node 20 or later`)
+    }
+    const running = await answeringBridge(stateDir)
+    if (running) {
+      log(`a bridge already answers on 127.0.0.1:${running.port}; this one is not needed`)
+      return null
+    }
+
+    const previous = await readConfig(stateDir).catch(() => null)
+    const requested = option(args, '--port')
+    const port = requested === undefined ? previous?.port ?? DEFAULT_PORT : Number.parseInt(requested, 10)
+    if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`--port must be between 1024 and 65535, not ${requested}`)
+
+    const shell = env.SHELL || '/bin/zsh'
+    const loginPath = (await loginShell(shell, 'printf %s "$PATH"')) || env.PATH || '/usr/bin:/bin'
+    const locateClaude = async () => env.CLAUDSEQ_CLAUDE ?? await findClaude(shell, loginPath)
+    const token = randomBytes(32).toString('hex')
+    const bridge = createBridge({
+      token,
+      claudePath: await locateClaude(),
+      locateClaude,
+      projectsDir: projectsDirectory(env),
+      env: { ...env, PATH: loginPath },
+      idleMs: env.CLAUDSEQ_IDLE_MS ? Number(env.CLAUDSEQ_IDLE_MS) : undefined,
+      log
+    })
+
+    let listening
+    try {
+      listening = await bridge.listen(port)
+    } catch (error) {
+      if (error.code !== 'EADDRINUSE') throw error
+      const other = await answeringBridge(stateDir, 2000)
+      if (other) {
+        log(`a bridge started alongside this one answers on 127.0.0.1:${other.port}; this one is not needed`)
+        return null
+      }
+      log(`127.0.0.1:${port} is taken by another program; listening on a free port instead`)
+      listening = await bridge.listen(0)
+    }
+
+    const size = (await stat(logPath).catch(() => null))?.size ?? 0
+    if (size > MAX_LOG) await rename(logPath, `${logPath}.1`).catch(() => {})
+    await writeConfig(stateDir, { port: listening, token, pid: process.pid, version: VERSION, claudePath: bridge.claudePath })
+    log(`bridge ${VERSION} listening on ${bridge.expectedHost} (pid ${process.pid}, node ${process.version}, claude ${bridge.claudePath ?? 'not found'})`)
+
+    let stopping = false
+    const stop = async (reason, code = 0) => {
+      if (stopping) return
+      stopping = true
+      log(`${reason}: closing ${bridge.sessions.size} session(s)`)
+      await bridge.close()
+      process.exit(code)
+    }
+    for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(signal, () => stop(signal))
+    process.on('uncaughtException', (error) => {
+      log(`internal error: ${error?.stack ?? error}`)
+      stop('internal error', 1)
+    })
+    if (args.includes('--until-stdin-closes')) {
+      const closed = () => stop('stdin closed')
+      process.stdin.on('end', closed)
+      process.stdin.on('close', closed)
+      process.stdin.on('error', closed)
+      process.stdin.resume()
+    }
+    return bridge
+  }
 }
 
 /* Node names a module by its real path, but argv keeps the path as typed: run
  * through a symlink — `/var` is one on macOS, and so may be a home folder —
  * the two differ, and a bridge that compared them as given would exit without
- * serving, over and over under launchd. */
+ * serving while the pane waited for it. */
 function runDirectly() {
   if (!process.argv[1]) return false
   try {
@@ -1128,14 +1111,12 @@ const invoked = runDirectly()
 if (invoked) {
   const [command, ...rest] = process.argv.slice(2)
   const commands = {
-    install: () => install(rest),
-    uninstall: () => uninstall(),
-    status: async () => { if (!(await status())) process.exitCode = 1 },
-    serve: () => serve()
+    serve: () => serve(rest),
+    status: async () => { if (!(await status())) process.exitCode = 1 }
   }
   const selected = commands[command]
   if (!selected) {
-    console.error('usage: claudseq-bridge.mjs install [--port <n>] | uninstall | status | serve')
+    console.error('usage: claudseq-bridge.mjs serve [--port <n>] [--until-stdin-closes] | status')
     process.exitCode = 2
   } else {
     selected().catch((error) => {

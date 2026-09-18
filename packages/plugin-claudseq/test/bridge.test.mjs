@@ -6,15 +6,16 @@
  * `fetch`, because `fetch` will not send a `Host` header of the caller's
  * choosing and the Host check is one of the things under test.
  *
- * Nothing here touches the real `~/.claudseq`, `~/.claude` or
- * `~/Library/LaunchAgents`: every directory the bridge reads or writes is a
- * temporary one handed to it, and `launchctl` is a script that records its
- * arguments and starts the installed bridge on a free port, as launchd would.
+ * Nothing here touches the real `~/.claudseq` or `~/.claude`: every
+ * directory the bridge reads or writes is a temporary one handed to it. A
+ * bridge that runs as a process of its own is started the way Logseq's
+ * `runCli` starts it — its command line through a shell, with its stdin a
+ * pipe that the test holds, as Logseq does, and closes, as quitting does.
  */
 
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { access, chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { request } from 'node:http'
 import { createServer } from 'node:net'
@@ -23,8 +24,8 @@ import { dirname, join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
-  ALLOWED_ORIGIN, ENTRYPOINT, LABEL, claudeArgs, createBridge, install, listHistory,
-  projectDirName, readTranscript, sessionScoped, status, titleOf, uninstall
+  ALLOWED_ORIGIN, ENTRYPOINT, VERSION, claudeArgs, createBridge, listHistory,
+  projectDirName, readTranscript, sessionScoped, status, titleOf
 } from '../bridge/claudseq-bridge.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -522,31 +523,6 @@ async function freePort() {
   })
 }
 
-test('shutting the bridge down kills every claude it started', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'claudseq-serve-'))
-  const port = await freePort()
-  await writeFile(join(dir, 'bridge.json'), JSON.stringify({ port, token: TOKEN, claudePath: fake }), { mode: 0o600 })
-  const server = spawn(process.execPath, [script, 'serve'], {
-    env: { ...process.env, CLAUDSEQ_STATE_DIR: dir, CLAUDSEQ_PROJECTS_DIR: join(dir, 'projects') },
-    stdio: ['ignore', 'ignore', 'pipe']
-  })
-  try {
-    await until(async () => (await call(port).catch(() => ({}))).status === 200)
-    const created = await call(port, { method: 'POST', path: '/v1/sessions', body: { cwd: dir } })
-    assert.equal(created.status, 201)
-    const pid = created.json.pid
-    assert.ok(alive(pid))
-
-    const exited = new Promise((settle) => server.on('exit', (code) => settle(code)))
-    server.kill('SIGTERM')
-    assert.equal(await exited, 0)
-    await until(() => !alive(pid))
-  } finally {
-    if (server.exitCode === null) server.kill('SIGKILL')
-    await rm(dir, { recursive: true, force: true })
-  }
-})
-
 /* ----------------------------------------------------------------- history */
 
 async function writeSession(projects, cwdDir, id, lines, mtime) {
@@ -684,97 +660,233 @@ test('history and transcripts are served over the authenticated API', async () =
   }
 })
 
-/* ----------------------------------------------------------------- install */
 
-/* A stand-in for `launchctl` that records its arguments. With `serve`, it
- * also does what launchd does with the agent: `bootstrap` starts the
- * installed bridge in the background, a moment later, and `bootout` stops it
- * and waits for it to exit. Its output goes to a file, never to the pipes
- * `install` reads, or `install` would wait on them for as long as it runs. */
-async function fakeLaunchctl(dir, { serve = false } = {}) {
-  const launchctl = join(dir, 'launchctl')
-  const calls = join(dir, 'launchctl.log')
-  const pidFile = join(dir, 'serve.pid')
-  const lines = ['#!/bin/sh', `echo "$@" >> '${calls}'`]
-  if (serve) {
-    lines.push(
-      'case "$1" in',
-      `  bootout) if [ -f '${pidFile}' ]; then pid="$(cat '${pidFile}')"; kill "$pid" 2>/dev/null; while kill -0 "$pid" 2>/dev/null; do sleep 0.05; done; rm -f '${pidFile}'; fi ;;`,
-      `  bootstrap) (sleep 0.3; exec env CLAUDSEQ_STATE_DIR='${join(dir, 'state')}' '${process.execPath}' '${join(dir, 'state', 'claudseq-bridge.mjs')}' serve) </dev/null >>'${join(dir, 'serve.log')}' 2>&1 & echo $! > '${pidFile}' ;;`,
-      'esac'
-    )
-  }
-  await writeFile(launchctl, lines.join('\n') + '\n')
-  await chmod(launchctl, 0o755)
-  return { launchctl, calls, pidFile }
+/* ---------------------------------------------------------------- starting */
+
+/* The command line the pane hands Logseq's `runCli`. */
+function commandLine(args = '') {
+  return `'${process.execPath}' '${script}' serve --until-stdin-closes ${args}`.trim()
 }
 
-test('install writes a private config and a login agent, waits for the bridge to answer, and uninstall removes both', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'claudseq-install-'))
-  const { launchctl, calls, pidFile } = await fakeLaunchctl(dir, { serve: true })
-  const port = await freePort()
-  const env = {
+function serveEnv(dir, env = {}) {
+  return {
     ...process.env,
     SHELL: '/bin/sh',
     CLAUDSEQ_STATE_DIR: join(dir, 'state'),
-    CLAUDSEQ_LAUNCH_AGENTS_DIR: join(dir, 'agents'),
-    CLAUDSEQ_LAUNCHCTL: launchctl,
-    CLAUDSEQ_CLAUDE: fake
+    CLAUDSEQ_PROJECTS_DIR: join(dir, 'projects'),
+    CLAUDSEQ_CLAUDE: fake,
+    ...env
   }
-  try {
-    const said = []
-    const config = await install(['--port', String(port)], env, (line) => said.push(line))
-    /* Answering means the bridge started from the agent is up with the token
-     * this install wrote. */
-    const running = said.find((line) => line.includes('running: pid'))
-    assert.ok(running, `install did not say the bridge is running:\n${said.join('\n')}`)
-    const health = await call(port, { token: config.token })
-    assert.equal(health.status, 200)
-    assert.equal(running.trim(), `running: pid ${health.json.pid}`)
-    const checked = []
-    assert.equal(await status(env, (line) => checked.push(line)), true)
-    assert.match(checked.join('\n'), /"ok":true/)
+}
 
-    const written = JSON.parse(await readFile(join(dir, 'state', 'bridge.json'), 'utf8'))
-    assert.deepEqual(written, config)
-    assert.equal(written.port, port)
-    assert.equal(written.claudePath, fake)
-    assert.match(written.token, /^[0-9a-f]{64}$/)
+/* A bridge started as Logseq's `runCli` starts one: the command line through
+ * a shell, every stdio a pipe, stdout and stderr read and dropped, and stdin
+ * held open and never written to. Ending `stdin` is what Logseq quitting
+ * does to it. */
+function launch(dir, { args = '', env = {} } = {}) {
+  const child = spawn(commandLine(args), [], { shell: true, detached: false, env: serveEnv(dir, env) })
+  child.stdout.on('data', () => {})
+  child.stderr.on('data', () => {})
+  const closed = new Promise((settle) => child.on('close', (code) => settle(code)))
+  /* A bridge that never exits fails the test rather than hanging it. */
+  const exited = Promise.race([closed, delay(8000).then(() => { throw new Error('the bridge did not exit') })])
+  exited.catch(() => {})
+  return { child, exited, stdin: child.stdin }
+}
+
+async function written(dir) {
+  return JSON.parse(await readFile(join(dir, 'state', 'bridge.json'), 'utf8').catch(() => 'null'))
+}
+
+async function logOf(dir) {
+  return readFile(join(dir, 'state', 'bridge.log'), 'utf8').catch(() => '')
+}
+
+async function answering(dir) {
+  const config = await written(dir)
+  if (!config) return null
+  const health = await call(config.port, { token: config.token }).catch(() => null)
+  return health?.status === 200 ? { config, health: health.json } : null
+}
+
+function stopProcess(pid) {
+  if (pid && alive(pid)) process.kill(pid, 'SIGKILL')
+}
+
+test('a bridge started as runCli starts it writes a private config once it listens, and stops with Logseq, taking every claude with it', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-serve-'))
+  const port = await freePort()
+  const bridge = launch(dir, { args: `--port ${port}` })
+  let config = null
+  try {
+    const up = await until(() => answering(dir))
+    config = up.config
+    assert.equal(config.port, port)
+    assert.match(config.token, /^[0-9a-f]{64}$/)
+    assert.equal(config.version, VERSION)
+    assert.equal(config.claudePath, fake)
+    assert.equal(up.health.pid, config.pid)
     assert.equal((await stat(join(dir, 'state', 'bridge.json'))).mode & 0o777, 0o600)
     assert.equal((await stat(join(dir, 'state'))).mode & 0o777, 0o700)
-    assert.deepEqual(await readFile(join(dir, 'state', 'claudseq-bridge.mjs')), await readFile(script))
+    assert.match(await logOf(dir), new RegExp(`listening on 127\\.0\\.0\\.1:${port} \\(pid ${config.pid}`))
 
-    const plist = await readFile(join(dir, 'agents', `${LABEL}.plist`), 'utf8')
-    assert.ok(plist.includes(`<string>${process.execPath}</string>`))
-    assert.ok(plist.includes(`<string>${join(dir, 'state', 'claudseq-bridge.mjs')}</string>`))
-    assert.ok(plist.includes('<string>serve</string>'))
-    assert.ok(!plist.includes(written.token), 'the token leaked into the plist')
+    const checked = []
+    assert.equal(await status(serveEnv(dir), (line) => checked.push(line)), true)
+    assert.match(checked.join('\n'), /"ok":true/)
 
-    const uid = process.getuid()
-    assert.deepEqual((await readFile(calls, 'utf8')).trim().split('\n'), [
-      `bootout gui/${uid}/${LABEL}`,
-      `bootstrap gui/${uid} ${join(dir, 'agents', `${LABEL}.plist`)}`
-    ])
+    const created = await call(port, { method: 'POST', path: '/v1/sessions', token: config.token, body: { cwd: dir } })
+    assert.equal(created.status, 201, created.text)
+    const pid = created.json.pid
+    assert.ok(alive(pid))
 
-    /* A reinstall replaces the running bridge: the old token stops working
-     * and the new one is answered before install returns. */
-    const firstPid = health.json.pid
-    const second = await install([], env, () => {})
-    assert.equal(second.port, port, 'a reinstall moved the port')
-    assert.notEqual(second.token, config.token, 'a reinstall kept the old token')
-    assert.equal((await call(port, { token: second.token })).status, 200)
-    assert.equal((await call(port, { token: config.token })).status, 401)
-    assert.equal(alive(firstPid), false, 'the first bridge outlived its reinstall')
-
-    await uninstall(env, () => {})
-    await assert.rejects(access(join(dir, 'agents', `${LABEL}.plist`), constants.F_OK))
-    await assert.rejects(access(join(dir, 'state'), constants.F_OK))
-    await assert.rejects(access(pidFile, constants.F_OK))
-    await assert.rejects(call(port, { token: second.token }), 'a bridge still answers after uninstall')
+    bridge.stdin.end()
+    assert.equal(await bridge.exited, 0)
+    await until(() => !alive(pid))
+    await until(() => !alive(config.pid))
+    assert.match(await logOf(dir), /stdin closed: closing 1 session\(s\)/)
   } finally {
-    const pid = Number(await readFile(pidFile, 'utf8').catch(() => ''))
-    if (pid && alive(pid)) process.kill(pid)
+    stopProcess(config?.pid)
+    bridge.child.kill('SIGKILL')
     await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a Logseq killed outright takes its bridge and every claude with it', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-kill-'))
+  const port = await freePort()
+  /* A stand-in for Logseq's main process, doing what its `runCli` does. */
+  const host = spawn(process.execPath, ['-e', `
+    const { spawn } = require('node:child_process')
+    const job = spawn(process.argv[1], [], { shell: true, detached: false })
+    job.stdout.on('data', () => {})
+    job.stderr.on('data', () => {})
+    setInterval(() => {}, 1000)
+  `, commandLine(`--port ${port}`)], { env: serveEnv(dir), stdio: 'ignore' })
+  let config = null
+  let pid = null
+  try {
+    config = (await until(() => answering(dir))).config
+    const created = await call(port, { method: 'POST', path: '/v1/sessions', token: config.token, body: { cwd: dir } })
+    assert.equal(created.status, 201, created.text)
+    pid = created.json.pid
+    assert.ok(alive(pid))
+
+    host.kill('SIGKILL')
+    await until(() => !alive(config.pid))
+    await until(() => !alive(pid))
+  } finally {
+    host.kill('SIGKILL')
+    stopProcess(config?.pid)
+    stopProcess(pid)
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a bridge asked to stop kills every claude it started', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-term-'))
+  const port = await freePort()
+  const bridge = launch(dir, { args: `--port ${port}` })
+  let config = null
+  try {
+    config = (await until(() => answering(dir))).config
+    const created = await call(port, { method: 'POST', path: '/v1/sessions', token: config.token, body: { cwd: dir } })
+    assert.equal(created.status, 201)
+    const pid = created.json.pid
+    process.kill(config.pid, 'SIGTERM')
+    assert.equal(await bridge.exited, 0)
+    await until(() => !alive(pid))
+  } finally {
+    stopProcess(config?.pid)
+    bridge.child.kill('SIGKILL')
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a second start finds the running bridge and leaves it be', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-again-'))
+  const port = await freePort()
+  const first = launch(dir, { args: `--port ${port}` })
+  let config = null
+  try {
+    config = (await until(() => answering(dir))).config
+    const second = launch(dir)
+    assert.equal(await second.exited, 0)
+    assert.deepEqual(await written(dir), config, 'a second start rewrote the config')
+    assert.equal((await call(port, { token: config.token })).status, 200)
+    assert.match(await logOf(dir), new RegExp(`a bridge already answers on 127\\.0\\.0\\.1:${port}; this one is not needed`))
+  } finally {
+    first.stdin.end()
+    await first.exited
+    stopProcess(config?.pid)
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('two windows starting a bridge at once end up with one', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-race-'))
+  const port = await freePort()
+  const both = [launch(dir, { args: `--port ${port}` }), launch(dir, { args: `--port ${port}` })]
+  let config = null
+  try {
+    const firstOut = await Promise.race(both.map((entry, index) => entry.exited.then((code) => ({ code, index }))))
+    assert.equal(firstOut.code, 0)
+    config = (await until(() => answering(dir))).config
+    assert.equal(config.port, port)
+    const survivor = both[1 - firstOut.index]
+    assert.equal(survivor.child.exitCode, null, 'neither bridge kept running')
+    survivor.stdin.end()
+    assert.equal(await survivor.exited, 0)
+  } finally {
+    for (const entry of both) entry.child.kill('SIGKILL')
+    stopProcess(config?.pid)
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a port another program holds moves the bridge to a free one', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-taken-'))
+  const squatter = createServer()
+  const port = await new Promise((settle) => squatter.listen(0, '127.0.0.1', () => settle(squatter.address().port)))
+  const bridge = launch(dir, { args: `--port ${port}` })
+  let config = null
+  try {
+    config = (await until(() => answering(dir), { timeout: 8000 })).config
+    assert.notEqual(config.port, port)
+    assert.match(await logOf(dir), new RegExp(`127\\.0\\.0\\.1:${port} is taken by another program`))
+    bridge.stdin.end()
+    assert.equal(await bridge.exited, 0)
+  } finally {
+    squatter.close()
+    stopProcess(config?.pid)
+    bridge.child.kill('SIGKILL')
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a bridge that cannot start says why in its log and exits with an error', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-fail-'))
+  try {
+    const bridge = launch(dir, { args: '--port 80' })
+    assert.equal(await bridge.exited, 1)
+    assert.match(await logOf(dir), /could not start: --port must be between 1024 and 65535, not 80\n$/)
+    assert.equal(await written(dir), null)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a claude installed after the bridge started is found when the pane asks', async () => {
+  let located = null
+  const bridge = await start({ claudePath: null, locateClaude: async () => located })
+  try {
+    assert.equal((await call(bridge.port)).json.claudeFound, false)
+    located = fake
+    const health = await call(bridge.port)
+    assert.equal(health.json.claudeFound, true)
+    assert.equal(health.json.claudePath, fake)
+    await bridge.open()
+  } finally {
+    await bridge.close()
   }
 })
 
@@ -794,40 +906,7 @@ test('the bridge runs its command when it is started through a symlink', async (
       child.on('close', (code) => settle({ code, stderr }))
     })
     assert.equal(result.code, 2)
-    assert.match(result.stderr, /^usage: claudseq-bridge\.mjs install/)
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
-})
-
-test('install says so, and fails, when the bridge it loaded never answers', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'claudseq-install-'))
-  const { launchctl } = await fakeLaunchctl(dir)
-  const port = await freePort()
-  const env = {
-    ...process.env,
-    SHELL: '/bin/sh',
-    CLAUDSEQ_STATE_DIR: join(dir, 'state'),
-    CLAUDSEQ_LAUNCH_AGENTS_DIR: join(dir, 'agents'),
-    CLAUDSEQ_LAUNCHCTL: launchctl,
-    CLAUDSEQ_CLAUDE: fake,
-    CLAUDSEQ_START_WAIT_MS: '400'
-  }
-  try {
-    const said = []
-    const started = Date.now()
-    await assert.rejects(install(['--port', String(port)], env, (line) => said.push(line)), (error) => {
-      assert.match(error.message, new RegExp(`did not answer on 127\\.0\\.0\\.1:${port} within 0\\.4 s \\(connect ECONNREFUSED`))
-      assert.ok(error.message.includes(join(dir, 'state', 'bridge.log')), 'the error does not point at the log')
-      return true
-    })
-    assert.ok(Date.now() - started >= 400, 'install gave up before its wait was over')
-    assert.ok(said.some((line) => line.includes(`listens: http://127.0.0.1:${port}`)), 'install did not say what it wrote')
-    assert.ok(!said.some((line) => line.includes('running:')), 'install said a silent bridge is running')
-
-    const checked = []
-    assert.equal(await status(env, (line) => checked.push(line)), false)
-    assert.match(checked.join('\n'), new RegExp(`not answering on 127\\.0\\.0\\.1:${port}: connect ECONNREFUSED.*bridge\\.log`))
+    assert.match(result.stderr, /^usage: claudseq-bridge\.mjs serve/)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

@@ -251,17 +251,69 @@ exception is narrow and was approved by the owner. Claudseq's pane talks to its 
 loopback interface, and to nothing else. Every other package keeps the rule
 as stated.
 
-**Why a bridge.** A Logseq plugin cannot start a process or read one's
-output. The host's `runCli` action runs only commands on a user-configured
-allowlist, and runs them through a shell. It resolves with the exit code
-alone, and the output goes to toast notifications, never to the caller.
+It is also the one package that changes a Logseq setting, and it changes one
+only: after the user presses **Allow**, it adds a Node path to
+`:commands-allowlist`, so that `runCli` will start the bridge. The owner
+approved this too, and it extends to no other setting or package.
+
+**Why a bridge.** A Logseq plugin cannot read a process's output, and
 `logseq.Request` cannot stream. So `bridge/claudseq-bridge.mjs` runs `claude`
-for the pane. It is a Node script that uses built-in modules only, and the
-user installs it once. `install` resolves the absolute paths of `claude` and
-`node` and the login shell's `PATH`, because a login agent inherits none of
-them. It copies the script to `~/.claudseq/` and writes
-`~/.claudseq/bridge.json`. Then it registers the LaunchAgent
-`io.github.handled57.logseq-claudseq`, which runs `serve`.
+for the pane and streams its events back over loopback HTTP. It is a Node
+script that uses built-in modules only. It ships in the plugin's folder and
+runs from there; nothing is installed.
+
+**How it starts.** The one way a plugin can start a program is the host's
+`runCli` action, `parent.apis.doAction(['runCli', {command, args,
+returnResult}])`. In Logseq 0.10.15 it:
+
+- accepts the command only when it exists and is on the allowlist, after
+  trimming and lowercasing both sides. The allowlist is Git, Pandoc, ag, grep
+  and alda, plus `:commands-allowlist` in the app's `configs.edn`;
+- spawns `command + " " + args` with `shell: true`, every stdio a pipe;
+- reads stdout and stderr, and sends them to a toast only when
+  `returnResult` is set;
+- resolves with the exit code when the process closes, or with nothing, after
+  an error toast, when it refuses the command.
+
+When no bridge answers, the pane finds Node in its Node path setting, or else
+in `/opt/homebrew/bin`, `/usr/local/bin`, `~/.volta/bin` or `/opt/local/bin`.
+It uses a path only if it is a plain word to the shell, because the command
+reaches the shell unquoted. If that path is not on the allowlist, the pane
+shows it and asks. **Allow** reads `:commands-allowlist` through
+`userAppCfgs`, appends the path and writes the whole list back, because the
+setter replaces the value. The setter's reply can fail to cross the IPC after
+the write succeeds, so the pane then reads the entry back. It leaves a value
+that is not a list of strings alone and says so. The consequence belongs to
+Logseq, and the pane says it in the prompt: any plugin may then run that Node
+through `runCli`, as any plugin may already run Git.
+
+The pane then calls `runCli` with that Node and
+`'<plugin folder>/bridge/claudseq-bridge.mjs' serve --until-stdin-closes`,
+with the path single-quoted for the shell and `returnResult` off. It asks for
+health every 150 ms for up to 15 s. An exit before an answer means the bridge
+could not start, unless the code is 0, which means it found another bridge
+already answering. In that case the pane shows the exit code and the last
+line of `~/.claudseq/bridge.log`.
+
+**Lifecycle.** `serve` yields to a bridge that already answers with the
+token in `bridge.json`. Otherwise it asks the login shell once for its `PATH`
+and for `claude`, because Logseq started from the Dock has neither. It
+listens on the port it last used, 47816 at first. When that port is held by a
+bridge that another window started at the same moment, it yields to that
+bridge. When another program holds it, it listens on a free port instead.
+Only after listening does it write `bridge.json`, whole, by rename. The token
+in it is new each time.
+
+`runCli` leaves the bridge's stdin a pipe whose write end only Logseq's main
+process holds, and never writes to. With `--until-stdin-closes`, the bridge
+stops when that pipe reaches end of file. That happens when Logseq quits, even
+when it is killed. The bridge then stops every `claude` it started. It logs to
+a file and never to stdout or stderr, because once Logseq is gone a write to
+either pipe fails while the bridge is still stopping its children.
+
+A bridge that stops while Logseq runs is started again by the pane, and one
+bridge serves every window. A plugin updated while Logseq runs finds the older
+bridge still answering; the pane keeps using it and says to reopen Logseq.
 
 **Threat model.** The bridge starts Claude Code with the user's credentials,
 in whichever folder a request names. So it answers only a caller who can read
@@ -269,9 +321,9 @@ a file in the user's home:
 
 - It listens on `127.0.0.1` only.
 - Every request carries `Authorization: Bearer <token>`. The token is 32
-  random bytes. It is stored in `bridge.json`, which is mode 0600 in a 0700
-  folder, and compared in constant time over SHA-256 digests. Reinstalling
-  issues a new one, and on a 401 the pane reads the file again once.
+  random bytes, new each time the bridge starts. It is stored in
+  `bridge.json`, which is mode 0600 in a 0700 folder, and compared in constant
+  time over SHA-256 digests. On a 401 the pane reads the file again once.
 - The `Host` header must be exactly `127.0.0.1:<port>`. This defeats DNS
   rebinding: a page that points its own name at 127.0.0.1 still sends that
   name as the host.
@@ -283,6 +335,11 @@ A web page can reach the port, but it has no token and cannot read the file
 that holds it. The pane reads that file through
 `parent.apis.doAction(['readFile', …])`, and finds home as the parent of
 `getLogseqDotDirRoot`.
+
+The one command line the pane builds contains nothing but the Node path,
+which is checked to be a plain word, and the plugin folder's path, which is
+single-quoted. No prompt, setting other than Node path, or model output is
+part of it.
 
 **Processes.** Each open session is one `claude` child. The bridge starts it
 with an argv array, never a shell, in the folder the pane names. The argv
@@ -303,7 +360,9 @@ extension's history and `claude --resume` both hide such sessions.
 
 A child is sent SIGTERM, then SIGKILL three seconds later. That happens when
 its session closes, after 30 minutes with no pane attached, and when the
-bridge stops. At most eight run at once.
+bridge stops, including when Logseq quits. At most eight run at once. A
+bridge that started before `claude` was installed looks for it again when
+the pane asks, so Retry works without restarting Logseq.
 
 **Events.** The pane follows a session over one streaming `fetch` of NDJSON.
 The bridge numbers every event and keeps the last 5,000 for each session. At
