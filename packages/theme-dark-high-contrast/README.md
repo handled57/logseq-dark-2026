@@ -18,7 +18,7 @@ A Logseq theme that adapts the visual language of Visual Studio Code's built-in 
 - Block headings are set 20% below the sizes Logseq gives them, so a heading reads as the head of its outline rather than dominating the notes under it. Every level keeps Logseq's proportions, and page titles are unchanged.
 - Every heading level is ruled off with a thin white line. The rule starts where the heading's text starts and runs to the end of the block's content column, and it holds while the heading is being typed.
 - Every block in the main editor ends on the same right edge whether or not it is referenced, so a heading's rule, a table, a box edge and the point a line wraps at no longer step left and right down the page.
-- Optionally hides the property table on blocks matching any number of property pairs (see below).
+- Optionally hides the property table on blocks matching any of the property rules, each written as its own row of property and value in the theme's settings (see below).
 - Styles a passage block so it reads as one of Logseq's named admonitions, with verse numbers set in a gutter beside the text where the passage takes a line to a verse. Writing one is the [Passage](../plugin-passage) plugin's job, and the theme does not require it.
 - Sets a named admonition and a passage in the same size as the block around them, rather than the larger type Logseq gives an admonition, so the page reads at one size and the box, its divider and its icon are what mark the block out.
 - Sizes named-admonition and passage icons at 1.5 times the first line's font and aligns them with that line while their semantic divider continues through the full block height.
@@ -288,18 +288,23 @@ persisted and writes nothing to the graph. Page front matter, sidebars, embeds,
 queries, whiteboards, document mode and the right-side fold-button layout keep
 Logseq's own presentation.
 
-Configure it in **Plugins → Dark High Contrast → Settings** under **Properties that hide the property table**. The field takes any number of pairs, separated by commas, semicolons or newlines:
+Configure it in **Plugins → Dark High Contrast → Settings** under **Properties that hide the property table**. Every rule is a row of its own — a property, the value of it to match, and a button that removes the rule — and the empty row at the bottom is where the next rule is written:
 
 ```text
-type: foo, status: done, kind: reference
+[ type   ] [ passage ] [ − ]
+[ status ] [ done    ] [ − ]
+[        ] [         ]
 ```
 
-- A block is hidden as soon as it matches **any one** pair; the same key may appear as often as you like (`type: foo, type: bar`).
-- Keys and values are matched case-insensitively against the rendered property table.
-- `key: *`, or a bare `key` with no value, matches every value of that key.
-- Leave the field empty to render every block normally.
+- A block is hidden as soon as it matches **any one** row; the same property may appear in as many rows as you like.
+- Properties and values are matched case-insensitively against the rendered property table, and the rows keep whatever case you write them in.
+- A row whose value is left empty matches every value of that property, and reads back as `*`.
+- A row is written when you leave it or press Enter. Clearing a row's property removes that rule, exactly as its button does.
+- Remove every row to render each block normally.
 
-The default is `type: passage`, which hides the drawer on the one block type this theme writes itself. A graph configured under 1.2.0 keeps its behavior: the old **Property key** and **Values that hide properties** settings are folded into this field the first time 1.3.0 loads.
+The rules are stored as one line of text, so the two rows above read `type: passage, status: done` in the graph's `logseq/settings.json`, and a rule list edited there — or shown by a Logseq whose settings panel these rows do not recognise — takes pairs separated by commas, semicolons or newlines, with `key: *` or a bare `key` as the wildcard. Because a comma, semicolon or colon would split the rule holding it, typing one into a row folds it to a space.
+
+The default is the single row `type: passage`, which hides the drawer on the one block type this theme writes itself. A graph configured under 1.2.0 keeps its behavior: the old **Property key** and **Values that hide properties** settings are folded into these rules the first time 1.3.0 loads.
 
 Every block carrying one of the configured keys also gets `data-hc-block-type` set to that property's value, so `theme.css` can key rules to a block's type:
 

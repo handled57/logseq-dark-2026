@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here.
 
+## 2.19.0 - 2026-09-18
+
+- Write the property-hiding rules a row at a time. Logseq draws one text field
+  for a string setting, so every rule shared a single line and the reader kept
+  the `key: value` shape and the separators between them right by hand. The
+  entry now hides that field and hangs a row on the setting for each rule — the
+  property, the value of it to match, and a button that removes the rule —
+  ending on an empty row to write the next one in. A row is committed when it is
+  left or Enter is pressed, clearing a property removes its rule, a value left
+  empty is stored as the `*` that matches every value of the property, and a
+  comma, semicolon or colon typed into a row folds to a space rather than
+  splitting the rule that holds it.
+- Keep the setting itself one string of `key: value` pairs. The rows are a
+  control over the same value, so a graph that never opens the panel, a rule
+  list edited in `settings.json`, and the matching every block is tested against
+  are all unchanged; the panel writes only when a row actually changes, and
+  opening it rewrites nothing. A Logseq whose settings panel this no longer
+  recognises falls back to the text field it has always drawn.
+- Show the rules in the case they were written in. Matching still folds case, so
+  the rows read back as typed while a rule and a property agree however either
+  is written.
+
 ## 2.18.0 - 2026-09-13
 
 - Set a named admonition and a passage in the size of the block around them.
