@@ -18,6 +18,11 @@ All notable changes to this package are documented here.
   - a footer when a turn is interrupted or fails.
 
   An agent's steps fold inside its Agent row. A reply is drawn as it streams.
+- **Focus mode**, on by default, works like the VS Code extension's Focus
+  view. Each run of Claude's thinking and tool calls between two messages
+  folds into one line that says what it holds, or what is running now, and
+  opens to show it. `/focus` in the pane, or the Focus mode setting, turns
+  it off.
 - **Permission requests** appear as a card with Allow, Allow for this session
   and Deny, plus an optional reason. What you allow for the session is never
   saved to a settings file, and bypassing permissions is never offered.
@@ -25,7 +30,7 @@ All notable changes to this package are documented here.
   focus between the composer and the block you were editing. The toolbar
   holds:
   - an @-mention of the open page;
-  - Claude Code's slash commands;
+  - `/focus` and Claude Code's slash commands;
   - a count of running agents;
   - a model and effort picker;
   - the permission mode (Manual, Accept edits, Plan, Auto);

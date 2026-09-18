@@ -16,9 +16,10 @@
  * graph.
  *
  * What the pane remembers — whether it is folded, how tall it is, which
- * session was open, and the model, effort, permission mode, working directory
- * and Node path — goes through `logseq.updateSettings` into this plugin's
- * settings file under Logseq's dotdir, never into the graph.
+ * session was open, and the model, effort, permission mode, Focus mode,
+ * working directory and Node path — goes through `logseq.updateSettings`
+ * into this plugin's settings file under Logseq's dotdir, never into the
+ * graph.
  *
  * `parent.document` and `parent.apis` are reachable because package.json
  * declares `effect: true`, which keeps this entry on the Logseq window's own
@@ -74,6 +75,8 @@ const MODE_LABELS = {
   dontAsk: "Don't ask",
   bypassPermissions: 'Bypass'
 }
+/* Commands the pane answers itself, listed first among the slash commands. */
+const PANE_COMMANDS = ['focus']
 const EFFORT_LABELS = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' }
 const ENTRYPOINTS = {
   cli: 'CLI',
@@ -95,6 +98,7 @@ const DEFAULTS = {
   model: 'default',
   effort: 'default',
   permissionMode: 'default',
+  focusMode: true,
   workingDirectory: '',
   nodePath: ''
 }
@@ -115,6 +119,7 @@ function readSettings(raw) {
     model: MODELS.includes(source.model) ? source.model : DEFAULTS.model,
     effort: EFFORTS.includes(source.effort) ? source.effort : DEFAULTS.effort,
     permissionMode: MODES.includes(source.permissionMode) ? source.permissionMode : DEFAULTS.permissionMode,
+    focusMode: source.focusMode !== false,
     workingDirectory: directory.startsWith('/') ? directory : '',
     nodePath: node.startsWith('/') ? node : ''
   }
@@ -155,6 +160,13 @@ function settingsSchema() {
       enumChoices: MODES,
       enumPicker: 'select',
       default: DEFAULTS.permissionMode
+    },
+    {
+      key: 'focusMode',
+      type: 'boolean',
+      title: 'Focus mode',
+      description: 'Folds Claude\'s thinking and tool calls into one line between its messages, so the timeline shows your prompts and Claude\'s replies. Click a line to see what it holds. /focus in the pane turns Focus mode on or off.',
+      default: DEFAULTS.focusMode
     },
     {
       key: 'nodePath',
@@ -826,20 +838,67 @@ function failureContent(failure) {
   }
 }
 
+/* Focus mode is the extension's Focus view. Each run of Claude's activity
+ * between two things said — its thinking, its tool calls with their results,
+ * and the permissions already answered — is drawn as one row that says what
+ * it holds, or what is running now, and opens to show it. Everything said
+ * stays in the open, and so does a permission still waiting for an answer.
+ * The model is the same either way; only this drawing of it changes. */
+function foldable(row) {
+  return row.kind === 'thinking' || row.kind === 'tool' || (row.kind === 'permission' && Boolean(row.resolved))
+}
+
+function timelineItems(rows, busy) {
+  if (!settings.focusMode) return rows.map((row) => ({ key: row.key, rev: row.rev, row }))
+  const items = []
+  for (let index = 0; index < rows.length; index += 1) {
+    if (!foldable(rows[index])) {
+      items.push({ key: rows[index].key, rev: rows[index].rev, row: rows[index] })
+      continue
+    }
+    const start = index
+    while (index + 1 < rows.length && foldable(rows[index + 1])) index += 1
+    /* A permission is left out of a run only while it waits. */
+    items.push(activity(rows.slice(start, index + 1), busy, rows[index + 1]?.kind === 'permission'))
+  }
+  return items
+}
+
+/* A run's row, labelled the way the extension labels it: what is happening
+ * now, while the turn runs, then how many tool calls it holds and how many
+ * failed, or that it was only thinking. */
+function activity(members, busy, waiting) {
+  const key = `activity:${members[0].key}`
+  const tools = members.filter((row) => row.kind === 'tool')
+  const failed = tools.filter((row) => row.status === 'error').length
+  const running = busy ? tools.filter((row) => row.status === 'pending').at(-1) : undefined
+  const thinking = busy && members.some((row) => row.kind === 'thinking' && row.streaming)
+  const live = waiting ? 'Waiting for permission…' : running ? `Running ${running.name ?? 'a tool'}…` : thinking ? 'Thinking…' : ''
+  let count = ''
+  if (tools.length) count = `${tools.length} tool call${tools.length === 1 ? '' : 's'}${failed ? ` · ${failed} failed` : ''}`
+  else if (members.every((row) => row.kind === 'thinking')) count = live ? '' : 'Thinking'
+  else count = `${members.length} hidden step${members.length === 1 ? '' : 's'}`
+  const status = live ? 'pending' : failed ? 'error' : tools.some((row) => row.status === 'pending') ? 'pending' : 'ok'
+  const open = expanded.has(key)
+  const fold = { key, members, live, count, status, open }
+  return { key, rev: JSON.stringify([open, live, count, status, members.map((row) => [row.key, row.rev])]), fold }
+}
+
 function renderTimeline() {
   if (!current) return
   const nearBottom = stickToBottom
   const rows = current.timeline.rows
+  const items = timelineItems(rows, Boolean(current.busy || current.timeline.state.busy))
   const seen = new Set()
   let previous = null
-  for (const row of rows) {
-    seen.add(row.key)
-    let cached = rowCache.get(row.key)
-    if (!cached || cached.rev !== row.rev) {
-      const element = renderRow(row)
+  for (const item of items) {
+    seen.add(item.key)
+    let cached = rowCache.get(item.key)
+    if (!cached || cached.rev !== item.rev) {
+      const element = item.fold ? renderActivity(item.fold) : renderRow(item.row)
       if (cached) cached.element.remove()
-      cached = { rev: row.rev, element }
-      rowCache.set(row.key, cached)
+      cached = { rev: item.rev, element }
+      rowCache.set(item.key, cached)
     }
     const expectedNext = previous ? previous.nextElementSibling : parts.timeline.children[0] ?? null
     if (expectedNext !== cached.element) parts.timeline.insertBefore(cached.element, previous ? previous.nextElementSibling : parts.timeline.children[0] ?? null)
@@ -961,6 +1020,29 @@ function renderRow(row) {
   return element
 }
 
+function renderActivity(fold) {
+  const element = h('div', { class: 'claudseq-row', [ROW_ATTR]: 'activity', [KEY_ATTR]: fold.key, [STATUS_ATTR]: fold.status })
+  element.appendChild(h('button', {
+    class: 'claudseq-activity-toggle',
+    type: 'button',
+    [ACTION_ATTR]: 'expand',
+    [KEY_ATTR]: fold.key,
+    'aria-expanded': fold.open ? 'true' : 'false'
+  }, [
+    fold.live ? h('span', { class: 'claudseq-activity-live', text: fold.live }) : null,
+    /* In a narrow sidebar the label wraps as words do, and the count keeps
+     * its chevron. */
+    h('span', { class: 'claudseq-activity-count' }, [fold.count ? doc.createTextNode(fold.count) : null, icon('chevron')])
+  ]))
+  if (fold.open) {
+    const steps = h('div', { class: 'claudseq-timeline claudseq-steps' })
+    for (const row of fold.members) steps.appendChild(renderRow(row))
+    element.appendChild(steps)
+    element.appendChild(h('button', { class: 'claudseq-link-button claudseq-activity-collapse', type: 'button', [ACTION_ATTR]: 'expand', [KEY_ATTR]: fold.key, text: 'Collapse' }))
+  }
+  return element
+}
+
 function renderPermission(element, row) {
   if (row.resolved) {
     const verdict = row.resolved === 'allow'
@@ -1048,15 +1130,23 @@ function renderMenu() {
   show(box, true)
   box.setAttribute(VALUE_ATTR, menu)
   if (menu === 'slash') {
-    const commands = current?.timeline.state.slashCommands ?? []
+    const claude = current?.timeline.state.slashCommands ?? []
+    const commands = [...PANE_COMMANDS, ...claude.filter((name) => !PANE_COMMANDS.includes(name))]
     const filter = parts.input.value?.startsWith('/') ? parts.input.value.slice(1).split(/\s/)[0].toLowerCase() : ''
     const matches = commands.filter((name) => name.toLowerCase().includes(filter))
-    if (!matches.length) {
-      box.appendChild(h('div', { class: 'claudseq-menu-note', text: commands.length ? 'No matching commands' : 'Commands appear once a session has started.' }))
-    }
     for (const name of matches.slice(0, 50)) {
-      box.appendChild(h('button', { class: 'claudseq-menu-item', type: 'button', role: 'menuitem', [ACTION_ATTR]: 'slash-pick', [VALUE_ATTR]: name, text: `/${name}` }))
+      box.appendChild(h('button', {
+        class: 'claudseq-menu-item',
+        type: 'button',
+        role: 'menuitem',
+        [ACTION_ATTR]: 'slash-pick',
+        [VALUE_ATTR]: name,
+        title: name === 'focus' ? `Turn Focus mode ${settings.focusMode ? 'off' : 'on'}` : null,
+        text: `/${name}`
+      }))
     }
+    if (!claude.length) box.appendChild(h('div', { class: 'claudseq-menu-note', text: 'Claude\'s commands appear once a session has started.' }))
+    else if (!matches.length) box.appendChild(h('div', { class: 'claudseq-menu-note', text: 'No matching commands' }))
     return
   }
   if (menu === 'model') {
@@ -1281,6 +1371,10 @@ async function ensureLive() {
 
 async function send() {
   const text = parts.input.value ?? ''
+  if (text.trim() === '/focus') {
+    toggleFocusMode()
+    return
+  }
   if (!text.trim() || pendingSend || !current || bridge.state !== 'ready') return
   if (current.busy || current.timeline.state.busy) return
   pendingSend = true
@@ -1325,6 +1419,18 @@ async function answer(key, behavior, always = false) {
   } catch (error) {
     failed(error)
   }
+}
+
+/* /focus is the pane's own command, as Focus view is the extension's own:
+ * `claude` running headless has none. It turns Focus mode on or off, and
+ * nothing reaches Claude. */
+function toggleFocusMode() {
+  saveSettings({ focusMode: !settings.focusMode })
+  parts.input.value = ''
+  autosize()
+  menu = null
+  logseq.UI?.showMsg?.(`Focus mode is ${settings.focusMode ? 'on' : 'off'}`)
+  renderNow()
 }
 
 async function cycleMode() {
@@ -1494,6 +1600,11 @@ function onClick(event) {
       break
     case 'slash-pick':
       menu = null
+      if (value === 'focus') {
+        toggleFocusMode()
+        parts.input.focus()
+        break
+      }
       parts.input.value = ''
       insertText(`/${value} `)
       renderNow()
@@ -1516,11 +1627,12 @@ function onClick(event) {
     case 'expand': {
       if (expanded.has(key)) expanded.delete(key)
       else expanded.add(key)
-      /* The row that holds the toggle is drawn again; an agent's step is
-       * drawn inside its Agent row, so that is the one to redraw. */
-      const rowKey = key.slice(0, key.lastIndexOf(':'))
-      const owner = current?.timeline.rows.find((row) => row.key === rowKey || row.children?.some((child) => child.key === rowKey))
-      const cached = owner ? rowCache.get(owner.key) : null
+      /* What the timeline draws around the toggle is drawn again: its own
+       * row, the Agent row an agent's step is drawn inside, or the fold of
+       * Claude's activity it sits in. */
+      let item = target
+      while (item && item.parentElement !== parts.timeline) item = item.parentElement
+      const cached = item ? rowCache.get(item.getAttribute(KEY_ATTR)) : null
       if (cached) cached.rev = null
       renderNow()
       break
@@ -1871,6 +1983,13 @@ const STYLE = `
 #${PANE_ID} .claudseq-io-text { margin: 0; padding: 0; border: 0; font-family: var(--claudseq-mono); font-size: 11.5px; white-space: pre-wrap; word-break: break-word; background: none; }
 #${PANE_ID} .claudseq-link-button { padding: 0; border: 0; background: none; color: var(--ls-link-text-color, var(--claudseq-accent)); font-size: 12px; cursor: pointer; }
 #${PANE_ID} .claudseq-steps { margin-top: 6px; gap: 6px; }
+#${PANE_ID} .claudseq-activity-toggle { display: inline-block; max-width: 100%; padding: 0; border: 0; background: none; color: var(--claudseq-dim); text-align: left; cursor: pointer; }
+#${PANE_ID} .claudseq-activity-toggle:hover { color: var(--claudseq-text); }
+#${PANE_ID} .claudseq-activity-live { margin-right: 6px; color: var(--claudseq-text); }
+#${PANE_ID} .claudseq-activity-count { white-space: nowrap; }
+#${PANE_ID} .claudseq-activity-toggle .claudseq-icon { width: 14px; height: 14px; margin-left: 4px; vertical-align: -2px; transition: transform .15s; }
+#${PANE_ID} .claudseq-activity-toggle[aria-expanded="true"] .claudseq-icon { transform: rotate(90deg); }
+#${PANE_ID} .claudseq-activity-collapse { margin-top: 6px; }
 #${PANE_ID} .claudseq-notice { color: var(--claudseq-dim); font-style: italic; }
 #${PANE_ID} .claudseq-footer { color: var(--claudseq-dim); }
 #${PANE_ID} .claudseq-footer[${ERROR_ATTR}] { color: var(--claudseq-error); }

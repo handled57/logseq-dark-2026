@@ -98,7 +98,9 @@ that Logseq rendered correctly.
    2. send a prompt;
    3. allow one permission request and deny another;
    4. stop a turn;
-   5. reopen a session from History.
+   5. reopen a session from History;
+   6. open a fold of Claude's activity, then turn Focus mode off and on
+      with `/focus`.
 5. Restart or reload the package and check teardown/reload behavior. Exercise
    hover, focus, selection, narrow desktop layouts, and settings affected by the
    change.

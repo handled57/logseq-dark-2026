@@ -80,6 +80,15 @@ bridge.
   - notes such as `Agent "…" finished`.
 
   An agent's own steps fold inside its Agent row.
+- **Focus mode**, on by default, works like the VS Code extension's Focus
+  view. Each run of Claude's thinking and tool calls between two messages
+  folds into one line, such as **2 tool calls** or **1 tool call · 1
+  failed**, so the timeline reads as your prompts and Claude's replies.
+  While Claude works, the line says what is happening: **Thinking…**,
+  **Running Bash…** or **Waiting for permission…**. Click the line to open
+  it and **Collapse** to close it. A permission request stays in view until
+  you answer it. Type **/focus**, or pick it from the **/** menu, to turn
+  Focus mode off or on.
 - **Permission requests.** In Manual mode, Claude asks before it edits a file
   or runs a command. Choose **Allow**, **Allow for this session** or **Deny**.
   You can give a reason when you deny. "For this session" is never saved to a
@@ -88,7 +97,7 @@ bridge.
   moves focus between the composer and the block you were editing.
 - **Toolbar**, from left to right:
   - **+** mentions the page you have open, by its file path;
-  - **/** lists Claude Code's slash commands;
+  - **/** lists **/focus** and Claude Code's slash commands;
   - **● N agents** appears while background agents run;
   - the **model and effort** pill picks either;
   - the **hand** button cycles the permission mode through Manual, Accept
@@ -112,6 +121,7 @@ Sessions Claudseq starts are ordinary Claude Code sessions. They appear in
 | Model for new sessions | default | `default` follows your Claude Code configuration; otherwise `fable`, `opus`, `sonnet` or `haiku`. |
 | Effort for new sessions | default | `low` to `max`. A change applies from the next session. |
 | Permission mode for new sessions | default | `default` is Manual. The pane's mode button changes it too. |
+| Focus mode | on | Folds Claude's thinking and tool calls between its messages into one line each. `/focus` in the pane changes it too. |
 | Node path | empty | The Node.js, version 20 or later, that starts the bridge. Empty means the first one found in the places listed under Requirements. Logseq runs it through a shell, so it cannot contain spaces; a symlink to Node works. |
 
 Whether the pane is folded, its height and which session was open are kept

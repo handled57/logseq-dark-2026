@@ -338,9 +338,10 @@ test('unloading leaves no node, attribute or style of Claudseq behind', async ()
 /* --------------------------------------------------------------- timeline */
 
 test('a recorded session renders every row type, in order', async () => {
-  /* The recording was made in /Users/example/notes, so that is the graph. */
+  /* The recording was made in /Users/example/notes, so that is the graph.
+   * With Focus mode off, every row is drawn in the open. */
   const notes = '/Users/example/notes'
-  const pane = await load({ graph: notes, settings: { openSession: SESSION }, bridge: bridgeFake({ sessions: [{ id: 'live-1', claudeSessionId: SESSION, cwd: notes, busy: false, seq: 0, turnSeq: 0 }] }) })
+  const pane = await load({ graph: notes, settings: { openSession: SESSION, focusMode: false }, bridge: bridgeFake({ sessions: [{ id: 'live-1', claudeSessionId: SESSION, cwd: notes, busy: false, seq: 0, turnSeq: 0 }] }) })
   await ready(pane)
   await until(() => pane.bridge.streams.has('live-1'))
   pane.bridge.emit('live-1', fixture)
@@ -384,11 +385,11 @@ test('a recorded session renders every row type, in order', async () => {
 
   pane.click(pane.action('slash'))
   await pane.idle()
-  assert.deepEqual(pane.part('menu').querySelectorAll('.claudseq-menu-item').map(textOf), ['/compact', '/review', '/init', '/security-review'])
+  assert.deepEqual(pane.part('menu').querySelectorAll('.claudseq-menu-item').map(textOf), ['/focus', '/compact', '/review', '/init', '/security-review'])
 })
 
 test('a pending permission offers Allow, Allow for this session and Deny, and each answers the bridge', async () => {
-  const pane = await load({ settings: { openSession: SESSION }, bridge: bridgeFake({ sessions: [{ id: 'live-1', claudeSessionId: SESSION, cwd: GRAPH, busy: true, seq: 0, turnSeq: 1, turnStartedAt: '2026-09-18T02:35:24Z' }] }) })
+  const pane = await load({ settings: { openSession: SESSION, focusMode: false }, bridge: bridgeFake({ sessions: [{ id: 'live-1', claudeSessionId: SESSION, cwd: GRAPH, busy: true, seq: 0, turnSeq: 1, turnStartedAt: '2026-09-18T02:35:24Z' }] }) })
   await ready(pane)
   await until(() => pane.bridge.streams.has('live-1'))
   const asked = fixture.findIndex((event) => event.type === 'control_request')
@@ -421,6 +422,152 @@ test('a pending permission offers Allow, Allow for this session and Deny, and ea
 
   pane.bridge.emit('live-1', [{ type: 'claudseq', subtype: 'permission_resolved', request_id: requestId, behavior: 'deny', always: false }])
   await until(() => textOf(pane.rows().find((row) => row.getAttribute('data-claudseq-row') === 'permission')) === 'Denied Write')
+})
+
+/* ------------------------------------------------------------- focus mode */
+
+const kinds = (pane) => pane.rows().map((row) => row.getAttribute('data-claudseq-row'))
+/* What a fold of Claude's activity says: what is running now, if anything,
+ * then what it holds. */
+const foldLabel = (fold) => fold.querySelector('.claudseq-activity-toggle').children.map(textOf).filter(Boolean)
+
+test('Focus mode folds Claude\'s activity between its messages, and a fold opens to show it', async () => {
+  const notes = '/Users/example/notes'
+  const pane = await load({ graph: notes, settings: { openSession: SESSION }, bridge: bridgeFake({ sessions: [{ id: 'live-1', claudeSessionId: SESSION, cwd: notes, busy: false, seq: 0, turnSeq: 0 }] }) })
+  await ready(pane)
+  await until(() => pane.bridge.streams.has('live-1'))
+  pane.bridge.emit('live-1', fixture)
+  await until(() => pane.rows().length === 11)
+
+  assert.deepEqual(kinds(pane), [
+    'user', 'activity', 'text',
+    'user', 'activity', 'text',
+    'user', 'activity', 'text', 'notice', 'footer'
+  ])
+  const folds = pane.rows().filter((row) => row.getAttribute('data-claudseq-row') === 'activity')
+  assert.deepEqual(folds.map(foldLabel), [['2 tool calls'], ['1 tool call · 1 failed'], ['Thinking']])
+  assert.deepEqual(folds.map((fold) => fold.getAttribute('data-claudseq-status')), ['ok', 'error', 'ok'])
+  assert.ok(folds.every((fold) => fold.querySelector('.claudseq-activity-toggle').getAttribute('aria-expanded') === 'false'))
+  assert.equal(folds[0].querySelector('[data-claudseq-row]'), null, 'a folded run drew its rows')
+  assert.equal(textOf(pane.rows()[2]), 'Done.')
+
+  /* Open, a fold shows its rows as Focus mode off draws them, the permission
+   * already answered among them, and ends in a Collapse. */
+  pane.click(folds[0].querySelector('.claudseq-activity-toggle'))
+  await pane.idle()
+  const steps = () => pane.rows()[1].querySelector('.claudseq-steps').children
+  assert.equal(pane.rows()[1].querySelector('.claudseq-activity-toggle').getAttribute('aria-expanded'), 'true')
+  assert.deepEqual(steps().map((row) => row.getAttribute('data-claudseq-row')), ['thinking', 'tool', 'tool', 'permission', 'thinking'])
+  assert.deepEqual(steps()[1].querySelectorAll('.claudseq-io-text').map(textOf), ['echo sidecar-probe', 'sidecar-probe'])
+  assert.equal(textOf(steps()[3]), 'Allowed Write for this session')
+
+  /* A row's own toggle still works inside a fold. */
+  pane.click(steps()[0].querySelector('[data-claudseq-action="expand"]'))
+  await pane.idle()
+  assert.match(textOf(steps()[0]), /^ThinkingThe user wants me to:/)
+
+  pane.click(pane.rows()[1].querySelector('.claudseq-activity-collapse'))
+  await pane.idle()
+  assert.equal(pane.rows()[1].querySelector('.claudseq-steps'), null)
+  assert.equal(pane.rows()[1].querySelector('.claudseq-activity-toggle').getAttribute('aria-expanded'), 'false')
+})
+
+test('while Claude works, its fold says what is running, and a permission waiting stays in the open', async () => {
+  const pane = await load({ settings: { openSession: SESSION }, bridge: bridgeFake({ sessions: [{ id: 'live-1', claudeSessionId: SESSION, cwd: GRAPH, busy: true, seq: 0, turnSeq: 1, turnStartedAt: '2026-09-18T02:35:24Z' }] }) })
+  await ready(pane)
+  await until(() => pane.bridge.streams.has('live-1'))
+  const fold = () => pane.rows().find((row) => row.getAttribute('data-claudseq-row') === 'activity')
+
+  pane.bridge.emit('live-1', fixture.slice(0, 11))
+  await until(() => fold())
+  assert.deepEqual(foldLabel(fold()), ['Thinking…'])
+  assert.equal(fold().getAttribute('data-claudseq-status'), 'pending')
+
+  pane.bridge.emit('live-1', fixture.slice(11, 49))
+  await until(() => foldLabel(fold())[0] === 'Running Bash…')
+  assert.deepEqual(foldLabel(fold()), ['Running Bash…', '1 tool call'])
+
+  const asked = fixture.findIndex((event) => event.type === 'control_request')
+  pane.bridge.emit('live-1', fixture.slice(49, asked + 1))
+  await until(() => foldLabel(fold())[0] === 'Waiting for permission…')
+  assert.deepEqual(kinds(pane), ['user', 'activity', 'permission'])
+  assert.deepEqual(foldLabel(fold()), ['Waiting for permission…', '2 tool calls'])
+  assert.equal(pane.rows()[2].getAttribute('data-claudseq-state'), 'pending')
+
+  /* Answered, the permission joins the run it interrupted. */
+  pane.bridge.emit('live-1', [{ type: 'claudseq', subtype: 'permission_resolved', request_id: fixture[asked].request_id, behavior: 'allow', always: false }])
+  await until(() => pane.rows().length === 2)
+  assert.deepEqual(kinds(pane), ['user', 'activity'])
+  assert.deepEqual(foldLabel(fold()), ['Running Write…', '2 tool calls'])
+})
+
+test('a fold read back from a transcript names nothing as running', async () => {
+  const transcripts = {
+    [SESSION]: {
+      id: SESSION,
+      cwd: GRAPH,
+      title: 'List my pages',
+      records: [
+        { type: 'user', message: { role: 'user', content: 'List my pages' } },
+        { type: 'assistant', message: { id: 'msg_1', role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: { command: 'ls pages' } }] } },
+        { type: 'user', message: { role: 'user', content: [{ type: 'text', text: '[Request interrupted by user for tool use]' }] } }
+      ],
+      agents: {}
+    }
+  }
+  const pane = await load({ settings: { openSession: SESSION }, bridge: bridgeFake({ transcripts }) })
+  await ready(pane)
+  await until(() => pane.rows().length === 3)
+  assert.deepEqual(kinds(pane), ['user', 'activity', 'footer'])
+  assert.deepEqual(foldLabel(pane.rows()[1]), ['1 tool call'])
+  assert.equal(pane.rows()[1].getAttribute('data-claudseq-status'), 'pending', 'the fold keeps the dot its unfinished call has')
+})
+
+test('/focus turns Focus mode off and on in the pane, and never reaches Claude', async () => {
+  const notes = '/Users/example/notes'
+  const pane = await load({ graph: notes, settings: { openSession: SESSION }, bridge: bridgeFake({ sessions: [{ id: 'live-1', claudeSessionId: SESSION, cwd: notes, busy: false, seq: 0, turnSeq: 0 }] }) })
+  await ready(pane)
+  await until(() => pane.bridge.streams.has('live-1'))
+  pane.bridge.emit('live-1', fixture)
+  await until(() => pane.rows().length === 11)
+  const posts = () => pane.bridge.calls.filter((call) => call.method === 'POST').length
+  const before = posts()
+
+  const input = pane.part('input')
+  input.value = '/focus'
+  pane.pane.dispatch('input', { target: input })
+  assert.deepEqual(pane.part('menu').querySelectorAll('.claudseq-menu-item').map(textOf), ['/focus'])
+  pane.pane.dispatch('keydown', { target: input, key: 'Enter' })
+  await until(() => pane.rows().length === 17)
+  assert.equal(pane.plugin.settings.focusMode, false)
+  assert.equal(pane.plugin.messages.at(-1), 'Focus mode is off')
+  assert.equal(input.value, '')
+  assert.ok(pane.part('menu').attributes.has('data-claudseq-hidden'))
+
+  /* Picked from the slash menu, it turns Focus mode back on. */
+  pane.click(pane.action('slash'))
+  await pane.idle()
+  const item = pane.part('menu').querySelectorAll('.claudseq-menu-item')[0]
+  assert.equal(item.getAttribute('title'), 'Turn Focus mode on')
+  pane.click(item)
+  await until(() => pane.rows().length === 11)
+  assert.equal(pane.plugin.settings.focusMode, true)
+  assert.equal(pane.plugin.messages.at(-1), 'Focus mode is on')
+
+  /* Logseq's own settings switch it too. */
+  pane.plugin.settingsChanged({ ...pane.plugin.settings, focusMode: false })
+  await until(() => pane.rows().length === 17)
+  assert.equal(posts(), before, '/focus reached the bridge')
+})
+
+test('before a session starts, the slash menu offers /focus and says Claude\'s commands come later', async () => {
+  const pane = await load()
+  await ready(pane)
+  pane.click(pane.action('slash'))
+  await pane.idle()
+  assert.deepEqual(pane.part('menu').querySelectorAll('.claudseq-menu-item').map(textOf), ['/focus'])
+  assert.equal(pane.part('menu').querySelectorAll('.claudseq-menu-item')[0].getAttribute('title'), 'Turn Focus mode off')
+  assert.equal(textOf(pane.part('menu').querySelector('.claudseq-menu-note')), 'Claude\'s commands appear once a session has started.')
 })
 
 /* --------------------------------------------------------------- markdown */
@@ -512,6 +659,7 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: 'default',
     effort: 'default',
     permissionMode: 'default',
+    focusMode: true,
     workingDirectory: '',
     nodePath: ''
   }
@@ -525,6 +673,7 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: '--dangerously-skip-permissions',
     effort: 'ultra',
     permissionMode: 'bypassPermissions',
+    focusMode: 'off',
     workingDirectory: 'relative/path',
     nodePath: 'node'
   }) }, defaults)
@@ -535,6 +684,7 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: 'opus',
     effort: 'xhigh',
     permissionMode: 'plan',
+    focusMode: false,
     workingDirectory: ' /Users/example/code ',
     nodePath: ' /Users/example/.volta/bin/node '
   }) }, {
@@ -544,6 +694,7 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     model: 'opus',
     effort: 'xhigh',
     permissionMode: 'plan',
+    focusMode: false,
     workingDirectory: '/Users/example/code',
     nodePath: '/Users/example/.volta/bin/node'
   })
@@ -844,7 +995,7 @@ test('history lists this folder\'s sessions, filters them, and reopens one', asy
       }
     }
   }
-  const pane = await load({ bridge: bridgeFake({ history, transcripts }) })
+  const pane = await load({ settings: { focusMode: false }, bridge: bridgeFake({ history, transcripts }) })
   await ready(pane)
 
   pane.click(pane.action('history'))
