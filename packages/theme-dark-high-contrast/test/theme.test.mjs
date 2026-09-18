@@ -181,10 +181,16 @@ test('the theme ships nothing that belongs to Passage', async () => {
 test('the property script reads the host document and hides only its own table', () => {
   assert.match(script, /parent\.document/)
   /* Every attribute and style key the theme writes is its own, so a sibling
-   * plugin annotating the same document is never read, replaced or cleared. */
+   * plugin annotating the same document is never read, replaced or cleared.
+   * `data-key` is the one exception, and it is the host's: Logseq keys each
+   * rendered setting in a plugin's settings panel by its schema key, and the
+   * entry reads that to find its own setting among them. */
+  const hostOwned = new Set(["'data-key'"])
   for (const attribute of script.match(/'data-[\w-]+'/g) ?? []) {
+    if (hostOwned.has(attribute)) continue
     assert.match(attribute, /^'data-hc-/, `${attribute} is not namespaced to the theme`)
   }
+  assert.doesNotMatch(script, /(?:set|remove)Attribute\(\s*SETTINGS_KEY_ATTR/)
   assert.match(script, /\.block-properties\[\$\{HIDDEN_ATTR\}\] \{ display: none; \}/)
   assert.match(script, /logseq\.ready\(main\)/)
 

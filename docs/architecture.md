@@ -483,6 +483,18 @@ there needs no patch of Logseq's; the collapse itself is
 the fold arrow calls. The listener is registered beside the observer and removed
 in the same teardown, so unloading returns the bullet to Logseq.
 
+It also annotates one host surface that is not a block: the plugin settings
+panel Logseq renders from the schema. A string setting is drawn as a single text
+field, which is the wrong control for the property-hiding rules, a list of
+`key: value` pairs; the theme finds its own setting by the schema key Logseq
+keys the rendered item with, hides that field through `theme.css`, and hangs a
+row of two fields and a remove button on the item for each rule. The setting
+keeps its stored shape — one string of pairs — so the rows are a control over
+the same value rather than a second source for it: the panel writes only when a
+row changes, opening it rewrites nothing, and a Logseq whose panel the theme no
+longer recognises leaves the native field in place. Rows are never rebuilt while
+the caret is in one, and teardown removes them like every other annotation.
+
 The theme also adds nodes of its own rather than only attributes: each pass
 marks every render in `#main-content-container` that can be folded on its own
 with `data-hc-collapsible`, hangs one `data-hc-collapse` button inside it, and

@@ -187,6 +187,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   const blockMenuItems = []
   const collapses = []
   const blockWrites = []
+  const settingWrites = []
   let blockReads = 0
   const navigations = []
   const documentListeners = new Map()
@@ -215,6 +216,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
       },
       document: {
         body: host,
+        activeElement: null,
         getElementById: () => element(),
         createElement: (tag) => node(tag),
         addEventListener(type, handler) {
@@ -276,6 +278,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
         this.schema = schema
       },
       updateSettings(patch) {
+        settingWrites.push(patch)
         Object.assign(this.settings, patch)
       },
       provideStyle(style) {
@@ -292,6 +295,7 @@ function load(settings, blocks = [], storedBlocks = {}, host = node('body')) {
   source.runInContext(context)
   context.blockReads = () => blockReads
   context.blockWrites = blockWrites
+  context.settingWrites = settingWrites
   context.navigations = navigations
   context.blockMenuItems = blockMenuItems
   context.collapses = collapses
@@ -1451,4 +1455,227 @@ test('the theme neither writes nor clears a node another plugin owns', async () 
     ['hc-hidden-properties'],
     'the theme provides one style key, and it is namespaced to the theme'
   )
+})
+
+/* The rule rows the entry hangs on its own setting in Logseq's plugin settings
+ * panel, in place of the single text field the host draws for a string. The
+ * setting itself keeps its shape, so everything above still describes what the
+ * rules do; what these cover is the panel that writes them. */
+function settingsPanel({ byCode = false } = {}) {
+  const host = node('body')
+  const panel = host.appendChild(node('div', { classes: ['cp__plugins-settings-inner'] }))
+  const item = panel.appendChild(node('div', {
+    classes: ['desc-item'],
+    /* Logseq keys the rendered setting by its schema key and prints that key
+     * beside the title; a panel that only does the latter is read the same. */
+    attributes: byCode ? {} : { 'data-key': 'hiddenProperties' }
+  }))
+  const heading = item.appendChild(node('h2'))
+  if (byCode) heading.appendChild(node('code', { textContent: 'hiddenProperties' }))
+  const label = item.appendChild(node('label', { classes: ['form-control'] }))
+  const native = label.appendChild(node('input'))
+
+  /* A second setting in the same panel, which must be left alone. */
+  const other = panel.appendChild(node('div', {
+    classes: ['desc-item'],
+    attributes: { 'data-key': 'defaultRailColor' }
+  }))
+  other.appendChild(node('label', { classes: ['form-control'] })).appendChild(node('input'))
+
+  return { host, item, native, other, panel }
+}
+
+async function openSettings(settings, options) {
+  const panel = settingsPanel(options)
+  const context = load(settings, [], {}, panel.host)
+  await Promise.resolve()
+  return { ...panel, context }
+}
+
+function rows(item) {
+  return item.querySelectorAll('[data-hc-rule-row]')
+}
+
+function pairs(item) {
+  return rows(item).map((row) => [
+    row.querySelector('[data-hc-rule-key]').value,
+    row.querySelector('[data-hc-rule-value]').value
+  ])
+}
+
+function field(row, marker) {
+  return row.querySelector(`[data-hc-rule-${marker}]`)
+}
+
+function write(row, marker, value) {
+  const input = field(row, marker)
+  input.value = value
+  input.dispatch('change')
+  return input
+}
+
+test('the settings panel gets one row per rule, and an empty row to add the next', async () => {
+  const { item } = await openSettings({ hiddenProperties: 'type: passage, status: done' })
+
+  assert.deepEqual(pairs(item), [['type', 'passage'], ['status', 'done'], ['', '']])
+  // The empty row is not a rule yet, so it carries no button to remove one.
+  assert.deepEqual(
+    rows(item).map((row) => Boolean(row.querySelector('[data-hc-rule-remove]'))),
+    [true, true, false]
+  )
+})
+
+test('every row field is named and the empty row reads as the wildcard it writes', async () => {
+  const { item } = await openSettings({ hiddenProperties: 'type: passage' })
+  const [first] = rows(item)
+
+  assert.equal(field(first, 'key').getAttribute('aria-label'), 'Property')
+  assert.equal(field(first, 'value').getAttribute('aria-label'), 'Value')
+  assert.equal(field(first, 'value').getAttribute('placeholder'), '*')
+  assert.equal(
+    first.querySelector('[data-hc-rule-remove]').getAttribute('aria-label'),
+    'Remove this property rule'
+  )
+})
+
+test('the panel is found by the key Logseq prints beside the title too', async () => {
+  const { item } = await openSettings({ hiddenProperties: 'type: passage' }, { byCode: true })
+
+  assert.deepEqual(pairs(item), [['type', 'passage'], ['', '']])
+})
+
+test('only this setting is given rows; the others keep their own control', async () => {
+  const { item, other, native } = await openSettings({ hiddenProperties: 'type: passage' })
+
+  assert.equal(item.getAttribute('data-hc-rule-editor-host'), '')
+  assert.equal(other.getAttribute('data-hc-rule-editor-host'), null)
+  assert.equal(other.querySelectorAll('[data-hc-rule-row]').length, 0)
+  // The host's own field is left where Logseq put it; theme.css hides it.
+  assert.equal(native.parentElement.parentElement, item)
+})
+
+test('opening the panel writes nothing to the settings file', async () => {
+  const { context } = await openSettings({ hiddenProperties: 'type: passage,, status:done ' })
+
+  assert.deepEqual(context.settingWrites, [])
+})
+
+test('filling the empty row adds a rule and opens another empty row', async () => {
+  const { item, context } = await openSettings({ hiddenProperties: 'type: passage' })
+  const [, draft] = rows(item)
+
+  write(draft, 'key', 'status')
+  write(draft, 'value', 'done')
+
+  assert.equal(context.logseq.settings.hiddenProperties, 'type: passage, status: done')
+  assert.deepEqual(pairs(item), [['type', 'passage'], ['status', 'done'], ['', '']])
+  // The row that became a rule earns the button that removes it.
+  assert.ok(rows(item)[1].querySelector('[data-hc-rule-remove]'))
+})
+
+test('a row left without a value matches every value of its property', async () => {
+  const { item, context } = await openSettings({ hiddenProperties: '' })
+  const [draft] = rows(item)
+
+  write(draft, 'key', 'type')
+
+  assert.equal(context.logseq.settings.hiddenProperties, 'type: *')
+  assert.deepEqual(pairs(item), [['type', '*'], ['', '']])
+})
+
+test('the remove button drops that one rule', async () => {
+  const { item, context } = await openSettings({
+    hiddenProperties: 'type: passage, status: done, kind: note'
+  })
+
+  rows(item)[1].querySelector('[data-hc-rule-remove]').dispatch('click')
+
+  assert.equal(context.logseq.settings.hiddenProperties, 'type: passage, kind: note')
+  assert.deepEqual(pairs(item), [['type', 'passage'], ['kind', 'note'], ['', '']])
+})
+
+test('clearing a property drops its rule and its row', async () => {
+  const { item, context } = await openSettings({ hiddenProperties: 'type: passage, status: done' })
+
+  write(rows(item)[0], 'key', '  ')
+
+  assert.equal(context.logseq.settings.hiddenProperties, 'status: done')
+  assert.deepEqual(pairs(item), [['status', 'done'], ['', '']])
+})
+
+test('a separator typed into a field cannot split the rule it is written in', async () => {
+  const { item, context } = await openSettings({ hiddenProperties: '' })
+  const [draft] = rows(item)
+
+  write(draft, 'key', 'type: kind')
+  write(draft, 'value', 'passage, note;\nquote')
+
+  assert.equal(context.logseq.settings.hiddenProperties, 'type kind: passage note quote')
+  // What the row shows is what the rule carries, not what could not be stored.
+  assert.deepEqual(pairs(item), [['type kind', 'passage note quote'], ['', '']])
+})
+
+test('a rule written in the panel is the rule the blocks are matched against', async () => {
+  const { item, context } = await openSettings({ hiddenProperties: '' })
+  const [draft] = rows(item)
+
+  write(draft, 'key', 'Status')
+  write(draft, 'value', 'Done')
+
+  // The rows keep the reader's own words; matching folds their case.
+  assert.deepEqual(pairs(item), [['Status', 'Done'], ['', '']])
+  // Copied into an array of plain strings: the rules cross out of the vm realm,
+  // so both they and the array holding them carry that realm's prototypes.
+  assert.deepEqual([...context.rules()].map(({ key, value }) => `${key}=${value}`), ['status=done'])
+  assert.equal(context.shouldHide(context.rules(), { status: 'done' }), true)
+  assert.equal(context.shouldHide(context.rules(), { type: 'passage' }), false)
+})
+
+test('a setting changed elsewhere redraws the rows', async () => {
+  const { item, context } = await openSettings({ hiddenProperties: 'type: passage' })
+
+  context.logseq.settings.hiddenProperties = 'kind: note'
+  context.paint()
+
+  assert.deepEqual(pairs(item), [['kind', 'note'], ['', '']])
+})
+
+test('the rows are never redrawn under the caret of the reader writing in them', async () => {
+  const { item, context } = await openSettings({ hiddenProperties: 'type: passage' })
+  const [, draft] = rows(item)
+  const typing = field(draft, 'key')
+
+  typing.value = 'stat'
+  context.parent.document.activeElement = typing
+  context.logseq.settings.hiddenProperties = 'kind: note'
+  context.paint()
+
+  assert.deepEqual(pairs(item), [['type', 'passage'], ['stat', '']])
+
+  // The pass after the row is left takes the change up.
+  context.parent.document.activeElement = null
+  context.paint()
+  assert.deepEqual(pairs(item), [['kind', 'note'], ['', '']])
+})
+
+test('a panel that closes takes its rows with it', async () => {
+  const { item, host, context } = await openSettings({ hiddenProperties: 'type: passage' })
+
+  assert.equal(host.querySelectorAll('[data-hc-rule-editor]').length, 1)
+  item.remove()
+  context.paint()
+
+  assert.equal(host.querySelectorAll('[data-hc-rule-editor]').length, 0)
+})
+
+test('unloading the theme leaves the settings panel as Logseq drew it', async () => {
+  const { item, host, context } = await openSettings({ hiddenProperties: 'type: passage' })
+
+  const [unload] = context.logseq.unloads
+  await unload()
+
+  assert.equal(host.querySelectorAll('[data-hc-rule-editor]').length, 0)
+  assert.equal(host.querySelectorAll('[data-hc-rule-row]').length, 0)
+  assert.equal(item.getAttribute('data-hc-rule-editor-host'), null)
+  assert.equal(item.querySelectorAll('input').length, 1, 'the host’s own field is untouched')
 })

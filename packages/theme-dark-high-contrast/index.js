@@ -144,10 +144,12 @@ const settingsSchema = [
     default: DEFAULT_RULES,
     title: 'Properties that hide the property table',
     description:
-      'Any number of key:value pairs, separated by commas, semicolons or newlines — for example ' +
-      '"type: foo, type: bar, status: done". A block whose properties match any one pair renders ' +
-      'bare. Write "key: *", or the bare key, to match every value of that key. Leave empty to ' +
-      'render every block normally.'
+      'One row per rule: a property and the value of it to match. A block whose properties match ' +
+      'any one row renders bare. Leave a value empty, or write "*", to match every value of that ' +
+      'property, and use the last row to add another rule. With no rows, every block renders ' +
+      'normally. Written as text — in settings.json, or wherever these rows are not drawn — it ' +
+      'is the same rules as "type: passage, status: done", separated by commas, semicolons or ' +
+      'newlines.'
   },
   {
     key: RAIL_COLOR_SETTING,
@@ -250,6 +252,245 @@ function migrateLegacySettings() {
 
 function rules() {
   return parseRules(readSetting(RULES_SETTING, DEFAULT_RULES))
+}
+
+/* The settings panel's own editor for those rules.
+ *
+ * Logseq builds a plugin's settings panel from the schema it is handed, and
+ * the only control it has for a string is one text field: the whole rule list
+ * on a single line, with the separators and the `key: value` shape left to the
+ * reader to keep right. A rule is a pair, so the panel gets a row of two
+ * fields and a remove button for each one, and an empty row at the end to
+ * write the next rule in.
+ *
+ * The panel is the host's own render, so this is annotation like everything
+ * else here: the native field stays where Logseq put it and theme.css hides
+ * it, the rows are hung after it, and a panel Logseq rebuilds is simply
+ * annotated again on the next pass. The setting keeps its shape — one string
+ * of `key: value` pairs — so a graph that never opens the panel, a reader who
+ * edits `settings.json` by hand, and a Logseq whose panel this no longer
+ * recognises all behave exactly as they did before.
+ */
+const SETTINGS_ITEM_SELECTOR = '.desc-item'
+const SETTINGS_KEY_ATTR = 'data-key'
+const RULE_EDITOR_ATTR = 'data-hc-rule-editor'
+const RULE_EDITOR_HOST_ATTR = 'data-hc-rule-editor-host'
+const RULE_EDITOR_STATE_ATTR = 'data-hc-rule-editor-state'
+const RULE_ROW_ATTR = 'data-hc-rule-row'
+const RULE_DRAFT_ATTR = 'data-hc-rule-draft'
+const RULE_KEY_ATTR = 'data-hc-rule-key'
+const RULE_VALUE_ATTR = 'data-hc-rule-value'
+const RULE_REMOVE_ATTR = 'data-hc-rule-remove'
+
+/* What the setting holds, as the reader wrote it. `rules()` folds case to match
+ * a rendered table with; the panel shows the words back rather than a
+ * lower-cased copy of them. */
+function rawRules() {
+  const value = logseq.settings?.[RULES_SETTING]
+  return parseRules(typeof value === 'string' ? value : DEFAULT_RULES)
+}
+
+function serializeRules(list) {
+  return list.map(({ key, value }) => `${key}: ${value}`).join(', ')
+}
+
+/* A separator typed into a field would split one rule into two the next time
+ * the setting is read back, and a colon in a key would move the split that
+ * makes the pair. Neither can be part of a key or a value, so they fold to a
+ * space as the row is committed, and the field is written back with what was
+ * stored rather than leaving a character on screen that the rule does not
+ * carry. */
+function cleanRulePart(text, { isKey = false } = {}) {
+  return text.replace(isKey ? /[\n,;:]+/g : /[\n,;]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function ruleField(row, marker) {
+  return row.querySelector?.(`[${marker}]`) ?? null
+}
+
+function ruleFieldValue(row, marker) {
+  const field = ruleField(row, marker)
+  return typeof field?.value === 'string' ? field.value : ''
+}
+
+function ruleRowKey(row) {
+  return cleanRulePart(ruleFieldValue(row, RULE_KEY_ATTR), { isKey: true })
+}
+
+function ruleRowValue(row) {
+  return cleanRulePart(ruleFieldValue(row, RULE_VALUE_ATTR))
+}
+
+/* A row with no key is not a rule: the last row is the empty one to write the
+ * next rule in, and clearing a key is how a reader deletes a rule without
+ * reaching for its button. */
+function editorRules(editor) {
+  const found = []
+
+  for (const row of editor.children) {
+    const key = ruleRowKey(row)
+    if (key) found.push({ key, value: ruleRowValue(row) || ANY_VALUE })
+  }
+
+  return found
+}
+
+function ruleEditorOf(item) {
+  return item.querySelector?.(`[${RULE_EDITOR_ATTR}]`) ?? null
+}
+
+function editingRule(editor) {
+  const active = doc.activeElement
+  return Boolean(active) && active.closest?.(`[${RULE_EDITOR_ATTR}]`) === editor
+}
+
+function makeRuleField(marker, label, placeholder, value) {
+  const field = doc.createElement('input')
+
+  field.setAttribute(marker, '')
+  field.setAttribute('type', 'text')
+  field.setAttribute('spellcheck', 'false')
+  field.setAttribute('aria-label', label)
+  field.setAttribute('placeholder', placeholder)
+  field.value = value
+  /* `change`, not `input`: it is the event the host's own settings fields
+   * commit on, so a rule is written when the row is left or Enter is pressed
+   * rather than on every keystroke, and the panel is not re-rendered under the
+   * reader's hands. */
+  field.addEventListener('change', () => commitRules(field.closest(`[${RULE_EDITOR_ATTR}]`)))
+
+  return field
+}
+
+function addRemoveButton(row) {
+  const button = doc.createElement('button')
+
+  button.setAttribute('type', 'button')
+  button.setAttribute(RULE_REMOVE_ATTR, '')
+  button.setAttribute('aria-label', 'Remove this property rule')
+  button.setAttribute('title', 'Remove this property rule')
+  // A minus sign rather than a hyphen: this is an operator, and it is read out.
+  button.textContent = '−'
+  button.addEventListener('click', (event) => {
+    event.preventDefault?.()
+    const editor = row.closest(`[${RULE_EDITOR_ATTR}]`)
+    row.remove()
+    commitRules(editor)
+  })
+
+  return row.appendChild(button)
+}
+
+function makeRuleRow({ key = '', value = '' } = {}) {
+  const row = doc.createElement('div')
+
+  row.setAttribute(RULE_ROW_ATTR, '')
+  row.appendChild(makeRuleField(RULE_KEY_ATTR, 'Property', 'property', key))
+  row.appendChild(makeRuleField(RULE_VALUE_ATTR, 'Value', ANY_VALUE, value))
+
+  /* The empty row at the end is not a rule yet, so it carries no button to
+   * remove one; it earns it the moment a key is written into it. */
+  if (key) addRemoveButton(row)
+  else row.setAttribute(RULE_DRAFT_ATTR, '')
+
+  return row
+}
+
+function fillRuleEditor(editor, list) {
+  for (const row of [...editor.children]) row.remove()
+  for (const rule of list) editor.appendChild(makeRuleRow(rule))
+  editor.appendChild(makeRuleRow())
+}
+
+/* What the rows mean once a change has landed on one: a row whose key was
+ * cleared is a deleted rule, the empty row becomes a rule of its own as soon as
+ * it carries a key, and the editor always ends on one empty row. */
+function normalizeRuleRows(editor) {
+  for (const row of [...editor.children]) {
+    const key = ruleRowKey(row)
+    const value = ruleRowValue(row)
+    const draft = row.getAttribute(RULE_DRAFT_ATTR) !== null
+
+    if (!key && !draft) {
+      row.remove()
+      continue
+    }
+
+    const keyField = ruleField(row, RULE_KEY_ATTR)
+    const valueField = ruleField(row, RULE_VALUE_ATTR)
+    if (keyField) keyField.value = key
+    if (valueField) valueField.value = key ? value || ANY_VALUE : value
+
+    if (!key || !draft) continue
+    row.removeAttribute(RULE_DRAFT_ATTR)
+    addRemoveButton(row)
+  }
+
+  const last = editor.children[editor.children.length - 1]
+  if (!last || last.getAttribute(RULE_DRAFT_ATTR) === null) editor.appendChild(makeRuleRow())
+}
+
+/* The rows are the source of the setting only while one is being changed, so
+ * an unchanged panel writes nothing: opening the settings must not rewrite a
+ * graph's `settings.json`, and a rule list that reads back as it already stands
+ * is not a change. */
+function commitRules(editor) {
+  if (!editor) return
+
+  normalizeRuleRows(editor)
+  const serialized = serializeRules(editorRules(editor))
+  editor.setAttribute(RULE_EDITOR_STATE_ATTR, serialized)
+  if (serialized === serializeRules(rawRules())) return
+
+  logseq.updateSettings({ [RULES_SETTING]: serialized })
+}
+
+function ruleSettingsItems() {
+  const items = []
+
+  for (const item of doc.querySelectorAll(SETTINGS_ITEM_SELECTOR)) {
+    /* Logseq keys the rendered setting by its schema key, and prints that key
+     * beside the title; either is enough to tell this setting from the others
+     * in the same panel. */
+    const key = item.getAttribute(SETTINGS_KEY_ATTR) ?? item.querySelector('code')?.textContent?.trim()
+    if (key === RULES_SETTING) items.push(item)
+  }
+
+  return items
+}
+
+function refreshRuleEditors() {
+  const items = ruleSettingsItems()
+  const editors = new Set()
+
+  for (const item of items) {
+    item.setAttribute(RULE_EDITOR_HOST_ATTR, '')
+
+    let editor = ruleEditorOf(item)
+    if (!editor) {
+      editor = doc.createElement('div')
+      editor.setAttribute(RULE_EDITOR_ATTR, '')
+      item.appendChild(editor)
+    }
+    editors.add(editor)
+
+    const stored = serializeRules(rawRules())
+    if (editor.getAttribute(RULE_EDITOR_STATE_ATTR) === stored) continue
+    /* Never rebuilt under the reader's own caret: a setting changed elsewhere
+     * is taken up on the first pass after the row is left. */
+    if (editingRule(editor)) continue
+
+    fillRuleEditor(editor, rawRules())
+    editor.setAttribute(RULE_EDITOR_STATE_ATTR, stored)
+  }
+
+  const hosts = new Set(items)
+  for (const editor of doc.querySelectorAll(`[${RULE_EDITOR_ATTR}]`)) {
+    if (!editors.has(editor)) editor.remove()
+  }
+  for (const item of doc.querySelectorAll(`[${RULE_EDITOR_HOST_ATTR}]`)) {
+    if (!hosts.has(item)) item.removeAttribute(RULE_EDITOR_HOST_ATTR)
+  }
 }
 
 /* Read the rendered table rather than the database: a property row is a direct
@@ -927,6 +1168,7 @@ function paint() {
 
   markCollapsible()
   addOpenMenuItem()
+  refreshRuleEditors()
 }
 
 function menuLabel(item) {
@@ -1139,6 +1381,8 @@ function teardown() {
   for (const host of doc.querySelectorAll(`[${COLLAPSIBLE_ATTR}]`)) releaseCollapsible(host)
   for (const control of doc.querySelectorAll(`[${CONTROL_ATTR}]`)) control.remove()
   for (const control of doc.querySelectorAll(`[${PROPERTY_TOGGLE_ATTR}]`)) control.remove()
+  for (const editor of doc.querySelectorAll(`[${RULE_EDITOR_ATTR}]`)) editor.remove()
+  for (const item of doc.querySelectorAll(`[${RULE_EDITOR_HOST_ATTR}]`)) item.removeAttribute(RULE_EDITOR_HOST_ATTR)
 
   for (const item of doc.querySelectorAll(`[${OPEN_MENU_ATTR}]`)) item.removeAttribute(OPEN_MENU_ATTR)
   for (const table of doc.querySelectorAll(`[${HIDDEN_ATTR}]`)) table.removeAttribute(HIDDEN_ATTR)
