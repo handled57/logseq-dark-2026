@@ -1,0 +1,230 @@
+/* Structural tests for the Able Table package: metadata, the entry, and what
+ * the package is allowed to ship.
+ *
+ * Able Table installs on its own, so nothing here may reach into a sibling
+ * workspace: the package carries every file it needs, and no file that
+ * belongs to a theme or to another plugin.
+ */
+
+import assert from 'node:assert/strict'
+import { access, readFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
+const marketplace = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'))
+const entry = await readFile(resolve(root, 'index.html'), 'utf8')
+const script = await readFile(resolve(root, 'index.js'), 'utf8')
+/* What the runtime says about itself is prose; these checks read the code
+ * without it. */
+const code = script.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+test('the released version matches the newest changelog entry', async () => {
+  // Pinning the version as a literal here would let package.json and the
+  // changelog drift apart; deriving it keeps one source of truth.
+  const changelog = await readFile(resolve(root, 'CHANGELOG.md'), 'utf8')
+  const [, released] = changelog.match(/^## (\d+\.\d+\.\d+) - \d{4}-\d{2}-\d{2}$/m) ?? []
+
+  assert.ok(released, 'the changelog has no dated release heading')
+  assert.equal(pkg.version, released)
+  // Finished work ships as a release rather than accumulating unreleased.
+  assert.doesNotMatch(changelog, /^## Unreleased\s*\n\s*\n\s*-/m, 'the changelog left an entry unreleased')
+})
+
+test('the package is a plugin, not a theme, and carries no dependencies', () => {
+  assert.equal(pkg.name, 'logseq-able-table')
+  assert.equal(pkg.author, 'Peter Cole')
+  assert.equal(pkg.repo, 'handled57/logseq-dark-2026')
+  // `effect` is load-bearing, not descriptive: a side-effect-free package has
+  // its entry rewritten to lsp://logseq.io/, a different origin from the host
+  // window, which puts `parent.document` — where every rendered table lives —
+  // out of reach.
+  assert.equal(pkg.effect, true)
+  assert.equal(pkg.theme, undefined)
+  assert.equal(pkg.logseq.themes, undefined)
+  assert.equal(pkg.main, 'index.html')
+  assert.equal(pkg.logseq.main, 'index.html')
+  assert.equal(pkg.logseq.id, pkg.name)
+  // The SDK is vendored under lib/, so installing from a release needs no
+  // install step and no runtime dependency resolution.
+  assert.deepEqual(pkg.dependencies, undefined)
+  assert.deepEqual(pkg.devDependencies, undefined)
+})
+
+test('marketplace metadata is classic-only and agrees with the package', () => {
+  assert.equal(marketplace.id, pkg.name)
+  assert.equal(marketplace.repo, pkg.repo)
+  assert.equal(marketplace.author, pkg.author)
+  assert.equal(marketplace.title, pkg.title)
+  assert.equal(marketplace.theme, false)
+  assert.equal(marketplace.effect, pkg.effect)
+  assert.equal(marketplace.web, false)
+  assert.equal(marketplace.supportsDB, false)
+  assert.equal(marketplace.supportsDBOnly, false)
+})
+
+test('the plugin entry loads the vendored SDK, then the runtime', async () => {
+  const sdk = await readFile(resolve(root, '..', '..', 'vendor', 'logseq', 'lsplugin.user.js'), 'utf8')
+  assert.ok(sdk.length > 10_000, 'the vendored SDK is unexpectedly small')
+
+  assert.match(entry, /<script src="\.\/lib\/lsplugin\.user\.js"><\/script>/)
+  assert.match(entry, /<script src="\.\/index\.js"><\/script>/)
+  assert.ok(
+    entry.indexOf('lsplugin.user.js') < entry.indexOf('index.js'),
+    'index.js runs before the SDK defines the logseq global'
+  )
+})
+
+test('the package ships no stylesheet and no icon a theme owns', async () => {
+  await assert.rejects(access(resolve(root, 'theme.css'), constants.F_OK))
+  assert.deepEqual(pkg.files.filter((file) => file.endsWith('.css')), [])
+  const icon = await readFile(resolve(root, 'icon.svg'), 'utf8')
+  assert.match(icon, /^<svg\b/)
+  assert.match(icon, /<\/svg>\s*$/)
+  assert.equal(pkg.logseq.icon, './icon.svg')
+})
+
+test('the release ships exactly the runtime and its documentation', () => {
+  assert.deepEqual(pkg.release.files, [
+    'package.json',
+    'manifest.json',
+    'index.html',
+    'index.js',
+    'icon.svg',
+    'README.md',
+    'CHANGELOG.md',
+    'THIRD_PARTY_NOTICES.md'
+  ])
+  // Nothing is generated or staged locally, so there is nothing to keep out
+  // of the archive afterwards.
+  assert.equal(pkg.release.unpackedLocalFiles, undefined)
+})
+
+test('the runtime observes the host document and marks tables, and offers no setting', () => {
+  assert.match(script, /parent\.document/)
+  assert.match(script, /logseq\.ready\(main\)/)
+  assert.match(script, /new MutationObserver/)
+  assert.match(script, /parent\.requestAnimationFrame/)
+  assert.match(script, /querySelectorAll\(MAIN_EDITOR_SELECTOR\)/)
+  assert.match(script, /TABLE_WRAPPER_SELECTOR/)
+  assert.match(script, /logseq\.beforeunload/)
+
+  /* Every control sits inside rendered block content, where a click of
+   * Logseq's own opens the block for editing; the capture phase is what keeps
+   * each one to itself. */
+  for (const type of ['mousedown', 'click', 'keydown', 'keyup', 'input', 'focusout']) {
+    assert.match(code, new RegExp(`'${type}'`), `${type} is not answered`)
+  }
+  assert.match(code, /addEventListener\(type, handler, true\)/)
+  assert.match(code, /removeEventListener\?\.\(type, handler, true\)/)
+
+  /* The settings file is where a table's own settings are remembered, but it
+   * is not a preferences screen: every switch here belongs to one table and is
+   * reached from that table's panel, so there is no schema for Logseq to draw
+   * a plugin-wide settings page from. */
+  assert.doesNotMatch(code, /useSettingsSchema/)
+  assert.match(code, /logseq\.updateSettings\(/)
+  assert.match(code, /logseq\.settings/)
+})
+
+/* Sticky settings are the one thing this plugin keeps between sessions, and
+ * the whole point of keeping them in Logseq's own dotdir is that searching,
+ * sorting or filtering a table still changes nothing any graph tracks. */
+test('nothing a table is set to is written anywhere the graph can see', () => {
+  /* Every one of these would put a file, a block or a property inside the
+   * graph. The sandbox storage is on the list because Logseq resolves it
+   * against the current graph's assets root. */
+  for (const api of [
+    'makeSandboxStorage',
+    'FileStorage',
+    'Assets',
+    'logseq.Editor',
+    'logseq.DB',
+    'upsertBlockProperty',
+    'updateBlock',
+    'insertBlock',
+    'write_rootdir_file',
+    'writeFile'
+  ]) {
+    assert.doesNotMatch(code, new RegExp(api.replace(/\./g, '\\.')), `the runtime reaches for ${api}`)
+  }
+
+  // The graph is read, never written: it only says which branch of the store
+  // a table's settings belong under.
+  assert.match(code, /getCurrentGraph/)
+})
+
+test('everything written into the host document is namespaced to Able Table', () => {
+  assert.doesNotMatch(code, /data-passage-/, "the runtime writes Passage's attribute")
+  assert.doesNotMatch(code, /data-anno-/, "the runtime writes Anno's attribute")
+
+  for (const attribute of script.match(/'data-[\w-]+'/g) ?? []) {
+    assert.match(attribute, /^'data-able-/, `${attribute} is not namespaced to Able Table`)
+  }
+  assert.match(code, /STYLE_KEY = 'able-table'/)
+})
+
+test("the theme's collapse control is read in CSS alone, and never written", () => {
+  /* docs/contracts/table-controls-v1.md: a one-directional, read-only hook.
+   * The plugin may notice the theme's control to step out of its way, and may
+   * do nothing else with it — no script reads it, and no package is a
+   * dependency of the other. */
+  assert.deepEqual(
+    [...new Set(code.match(/data-hc-[\w-]*/g) ?? [])],
+    ['data-hc-collapse'],
+    'the runtime names a theme attribute other than the published hook'
+  )
+  assert.match(code, /div\.table-wrapper:has\(> \[data-hc-collapse\]\) > \[data-able-settings\]/)
+  // Read through a selector, never through the DOM API and never as a value.
+  assert.doesNotMatch(code, /Attribute\(\s*[`'"]data-hc-/)
+  assert.doesNotMatch(code, /[`'"]data-hc-[\w-]*[`'"]/)
+
+  // Every number it borrows carries Able Table's own fallback, so every control
+  // is drawn and placed with no theme installed. Which names are read is pinned
+  // too: each one is a fact the contract publishes, and a third cannot be
+  // reached for without amending it.
+  const borrowed = new Set()
+  for (const use of code.match(/var\(--hc-[\w-]+[^)]*\)/g) ?? []) {
+    assert.match(use, /^var\(--hc-[\w-]+, [^)]+\)$/, `${use} has no fallback`)
+    borrowed.add(use.match(/--hc-[\w-]+/)[0])
+  }
+  assert.deepEqual([...borrowed].sort(), ['--hc-collapse-control-size', '--hc-rail-bullet-y'])
+})
+
+/* docs/contracts/table-controls-v1.md: the second number the hook publishes.
+ * Logseq draws a block's bullet at the top of the block, which is where the
+ * row already is; Dark High Contrast hangs a table block's bullet a way into
+ * the box the table opens with, and the row has to follow it there or the
+ * bullet marks nothing. */
+test('the full table search field opens on the line the block\'s bullet marks', () => {
+  assert.match(code, /\[data-able-search\] \{[^}]*margin: var\(--hc-rail-bullet-y, 0px\) 0 0\.25rem;/)
+  // A fallback of none: with no theme declaring the drop, the row stays at the
+  // top of the block, where the host's own bullet is.
+  assert.doesNotMatch(code, /margin-top: 1\.75/)
+})
+
+/* A panel and a menu are the only things here that overhang the block they
+ * belong to, and a block is as far as z-index reaches: a theme may make each
+ * block a stacking context — Dark High Contrast isolates every row — and inside
+ * one, no z-index of the menu's own can beat the block painted after it. */
+test('a block showing a panel or a menu is raised over the block after it', () => {
+  for (const chrome of ['data-able-panel', 'data-able-column-menu']) {
+    assert.match(
+      code,
+      new RegExp(`#main-content-container \\.ls-block:has\\(> \\.block-main-container \\[${chrome}\\]\\)`),
+      `nothing raises a block showing ${chrome}`
+    )
+  }
+
+  /* The raise is on the host's block, because raising anything of Able Table's
+   * own would stay inside that stacking context and change nothing. */
+  assert.match(code, /\.block-main-container \[data-able-column-menu\]\) \{\s*\n\s*z-index: 1;\s*\n\s*\}/)
+
+  /* Paint order only. Giving the host's block a position, a transform or a
+   * size would move the reader's text to open a menu. */
+  const raise = code.match(/#main-content-container \.ls-block:has[\s\S]*?\}/)[0]
+  assert.doesNotMatch(raise, /position:|transform:|width:|height:|margin:|padding:/)
+})

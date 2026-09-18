@@ -26,12 +26,21 @@ behavior lives in one package:
 - Anno behavior: `packages/plugin-anno/index.js`, which owns both the import prompt
   and the asset-naming rule that decides which page Logseq collects a PDF's
   highlights on.
+- Able Table behavior: `packages/plugin-able-table/index.js`, which owns the
+  plugin's lifecycle, the per-table settings control, and full table search.
+- Claudseq behavior is split across four files in `packages/plugin-claudseq/`:
+  - `index.js` owns the pane: mounting, rendering, sessions and the bridge
+    client;
+  - `timeline.js` is the one model for both live events and transcripts;
+  - `markdown.js` builds replies from DOM nodes only;
+  - `bridge/claudseq-bridge.mjs` is the loopback bridge that runs `claude`.
 - Package identity and exact archive allowlist: each package's `package.json`,
   cross-checked with its `manifest.json`.
 - Shared SDK: `vendor/logseq/lsplugin.user.js`; never copy it into a source
   workspace.
 - Shared release logic and test fixtures: `scripts/` and `test/support/`.
 - Cross-package content semantics: `docs/contracts/passage-v1.md`.
+- Cross-package host-DOM hooks: `docs/contracts/table-controls-v1.md`.
 
 Keep package-specific tests, README, changelog, icons, and notices in that
 package. Update public documentation, changelog, and version metadata with
@@ -82,12 +91,22 @@ that Logseq rendered correctly.
 4. Test each package by itself, and together when a change can affect their
    content contract or their host-DOM coexistence. For Anno, import a PDF into
    a scratch graph and confirm the asset, the page, the link, and the
-   `hls__<page title>` page Logseq writes on the first highlight.
+   `hls__<page title>` page Logseq writes on the first highlight. For Able
+   Table's scaffold release, open a page holding Markdown tables and confirm
+   nothing a reader sees changes. For Claudseq:
+   1. allow Node when the pane asks, and see the bridge start;
+   2. send a prompt;
+   3. allow one permission request and deny another;
+   4. stop a turn;
+   5. reopen a session from History;
+   6. open a fold of Claude's activity, then turn Focus mode off and on
+      with `/focus`.
 5. Restart or reload the package and check teardown/reload behavior. Exercise
    hover, focus, selection, narrow desktop layouts, and settings affected by the
    change.
 6. Confirm the ZIP itself installs without `npm install`, compilation, a sibling
-   workspace, or network access.
+   workspace, or network access. Claudseq's bridge adds a loopback listener
+   and nothing else; `claude` reaches its own service by itself.
 
 The built `dist/logseq-passage/` may contain a developer's ignored local
 `resources/nrsvue.text.json` for manual testing alongside the NET index the
@@ -112,14 +131,16 @@ Changes follow the issue and linked-branch workflow:
 
 ## Versions and releases
 
-Theme, Passage and Anno versions are independent. A release changes only the
-selected package's `package.json`, `manifest.json` when applicable, and
-changelog, then builds and verifies that package's archive. The package-scoped
-tag names are `theme-vX.Y.Z`, `passage-vX.Y.Z` and `anno-vX.Y.Z`. A tag must match both the selected
-workspace's package version and the newest version in its changelog. The release
-job runs the full repository gate, rebuilds and verifies the selected workspace,
-and attaches only that workspace's ZIP to its GitHub release. Historical `v*`
-tags remain in Git history but do not trigger the independent release workflow.
+Theme, Passage, Anno, Able Table and Claudseq versions are independent. A
+release changes only the selected package's `package.json`, `manifest.json`
+when applicable, and changelog, then builds and verifies that package's
+archive. The package-scoped tag names are `theme-vX.Y.Z`, `passage-vX.Y.Z`,
+`anno-vX.Y.Z`, `able-table-vX.Y.Z` and `claudseq-vX.Y.Z`. Claudseq's bridge
+carries the package's version, and a test holds the two equal. A tag must match both the selected workspace's package
+version and the newest version in its changelog. The release job runs the full
+repository gate, rebuilds and verifies the selected workspace, and attaches
+only that workspace's ZIP to its GitHub release. Historical `v*` tags remain in
+Git history but do not trigger the independent release workflow.
 
 Every user-visible change to a package is released. Bump that package's version
 in the topic branch alongside the change, so its changelog entry is a dated
@@ -131,4 +152,5 @@ the newest changelog entry, merge the change, complete manual Logseq acceptance,
 and then create its package-scoped tag. CI is responsible only for validation
 and the GitHub release artifact. It does not perform Marketplace submission.
 Publishing or updating a Marketplace listing remains a separate, deliberate
-maintainer action.
+maintainer action. Claudseq has no listing owner: it is distributed through
+its GitHub release archive only.

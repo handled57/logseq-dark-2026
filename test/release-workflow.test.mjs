@@ -21,6 +21,16 @@ test('package tags select one version-matched release archive', async () => {
     release_name: 'Anno 0.2.0',
     workspace: 'packages/plugin-anno'
   })
+  assert.deepEqual(await selectRelease('able-table-v0.4.0'), {
+    archive: 'dist/logseq-able-table-0.4.0.zip',
+    release_name: 'Able Table 0.4.0',
+    workspace: 'packages/plugin-able-table'
+  })
+  assert.deepEqual(await selectRelease('claudseq-v0.1.0'), {
+    archive: 'dist/logseq-claudseq-0.1.0.zip',
+    release_name: 'Claudseq 0.1.0',
+    workspace: 'packages/plugin-claudseq'
+  })
 })
 
 test('release selection rejects legacy, unknown, and mismatched tags', async () => {
@@ -29,6 +39,8 @@ test('release selection rejects legacy, unknown, and mismatched tags', async () 
   await assert.rejects(selectRelease('theme-v2.0.1'), /does not match .*package.json version/)
   await assert.rejects(selectRelease('passage-v1.0.0'), /does not match .*package.json version/)
   await assert.rejects(selectRelease('anno-v9.9.9'), /does not match .*package.json version/)
+  await assert.rejects(selectRelease('able-table-v9.9.9'), /does not match .*package.json version/)
+  await assert.rejects(selectRelease('claudseq-v9.9.9'), /does not match .*package.json version/)
 })
 
 test('workflows validate all changes and publish only the selected archive', async () => {
@@ -41,6 +53,8 @@ test('workflows validate all changes and publish only the selected archive', asy
   assert.match(publishWorkflow, /- "theme-v\*"/)
   assert.match(publishWorkflow, /- "passage-v\*"/)
   assert.match(publishWorkflow, /- "anno-v\*"/)
+  assert.match(publishWorkflow, /- "able-table-v\*"/)
+  assert.match(publishWorkflow, /- "claudseq-v\*"/)
   assert.doesNotMatch(publishWorkflow, /- "v\*"/)
   assert.match(publishWorkflow, /scripts\/select-release\.mjs/)
   assert.match(publishWorkflow, /npm run check --workspace "\$\{\{ steps\.package\.outputs\.workspace \}\}"/)

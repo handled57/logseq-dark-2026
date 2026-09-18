@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Able Table for Logseq</title>
+  <desc id="desc">A white table grid on black, with one row highlighted in orange and a cyan magnifier over a corner cell</desc>
+  <rect width="128" height="128" rx="12" fill="#000000"/>
+  <rect x="16" y="24" width="72" height="72" fill="none" stroke="#ffffff" stroke-width="6"/>
+  <path d="M16 48h72M16 72h72M40 24v72M64 24v72" stroke="#ffffff" stroke-width="4"/>
+  <rect x="17" y="49" width="70" height="22" fill="#f38518"/>
+  <circle cx="92" cy="92" r="16" fill="none" stroke="#6fc3df" stroke-width="7"/>
+  <path d="M103 103l14 14" fill="none" stroke="#6fc3df" stroke-width="7" stroke-linecap="round"/>
+</svg>

@@ -2,21 +2,34 @@
 
 ## Package boundaries
 
-This repository contains three runtimes, not one application split across
-folders. Dark High Contrast, Passage and Anno have separate Logseq identities,
-settings, entry scripts, metadata, versions, archives, and lifecycles. None
-imports another or relies on sibling-package files.
+This repository contains five runtimes, not one application split across
+folders. Dark High Contrast, Passage, Anno, Able Table and Claudseq have
+separate Logseq identities, settings, entry scripts, metadata, versions,
+archives, and lifecycles. None imports another or relies on sibling-package
+files.
 
 The theme and Passage have one product-level agreement, the versioned
 [Passage v1 content contract](contracts/passage-v1.md). Passage writes ordinary
 block source; the theme independently reads that source and styles the render.
 The shared fixtures in the contract are driven by tests in both workspaces. Anno
 is party to no contract: what it writes is an asset and a plain Logseq link, and
-what reads them is Logseq itself.
+what reads them is Logseq itself. The theme and Able Table have a second, narrower agreement, the versioned
+[Table controls v1 hook](contracts/table-controls-v1.md): the theme publishes
+`data-hc-collapse` as a direct child of `div.table-wrapper` sized by
+`--hc-collapse-control-size`, and Able Table reads it — in CSS alone, never
+writing, clearing or requiring it — to learn whether a table's top-right corner
+is already taken. The hook also publishes `--hc-rail-bullet-y`, the distance a
+block hangs its bullet below the top of its row, which Able Table reads the same
+way so the field it opens a table block with begins on the line that bullet
+marks. Every such read carries a fallback of Able Table's own, and the set of
+names read is pinned, so a third cannot be reached for without amending the
+contract. Both sides pin the hook in their own suite. Claudseq is party to no contract
+either: it reads and writes nothing of another package's, and its one
+dependency outside Logseq is the `claude` CLI, reached through its own bridge.
 
 ## Host origin and `effect: true`
 
-All three packages inspect or augment Logseq's host document. Logseq 0.10.15
+All five packages inspect or augment Logseq's host document. Logseq 0.10.15
 moves a side-effect-free plugin entry to the `lsp://logseq.io/` origin, where
 browser same-origin rules prevent access to `parent.document` and to the host's
 own `parent.apis` bridge. Consequently every package's and manifest's metadata
@@ -28,9 +41,16 @@ it inserts its namespaced menu entry while that picker exists. The theme needs
 host access to classify rendered blocks and to hide only configured property
 tables. Anno needs it twice over: it draws its prompt in the host document, and
 the only route a plugin has to the graph folder is `parent.apis.doAction`, the
-host's IPC bridge, because no plugin API writes an asset. A future package that
-does not need host access should decide `effect` from its own requirements
-rather than copying this setting automatically.
+host's IPC bridge, because no plugin API writes an asset. Able Table needs host
+access because the plugin API renders no table of its own: every table it finds
+and marks is a `<table>` Logseq already put in `parent.document`. Claudseq
+needs it for its place and its key: it mounts its pane in the host's left
+sidebar, and it reads its bridge's token through `parent.apis.doAction`. The
+entry's origin matters to it a third way: `effect: true` keeps the entry on
+the `file://` origin Logseq's window has, which is the one origin its bridge
+admits. A future
+package that does not need host access should decide `effect` from its own
+requirements rather than copying this setting automatically.
 
 ## Theme cascade and bullet rail
 
@@ -223,22 +243,236 @@ owner of its quoted text, UUID, colour and PDF-page properties. Transactions
 that edit an existing annotation do not qualify, so changing the setting is not
 retroactive.
 
+## The Claudseq bridge
+
+Claudseq is the one package that runs something outside Logseq, and it is the
+one exception to the repository's rule against runtime network access. The
+exception is narrow and was approved by the owner. Claudseq's pane talks to its own bridge over the
+loopback interface, and to nothing else. Every other package keeps the rule
+as stated.
+
+It is also the one package that changes a Logseq setting, and it changes one
+only: after the user presses **Allow**, it adds a Node path to
+`:commands-allowlist`, so that `runCli` will start the bridge. The owner
+approved this too, and it extends to no other setting or package.
+
+**Why a bridge.** A Logseq plugin cannot read a process's output, and
+`logseq.Request` cannot stream. So `bridge/claudseq-bridge.mjs` runs `claude`
+for the pane and streams its events back over loopback HTTP. It is a Node
+script that uses built-in modules only. It ships in the plugin's folder and
+runs from there; nothing is installed.
+
+**How it starts.** The one way a plugin can start a program is the host's
+`runCli` action, `parent.apis.doAction(['runCli', {command, args,
+returnResult}])`. In Logseq 0.10.15 it:
+
+- accepts the command only when it exists and is on the allowlist, after
+  trimming and lowercasing both sides. The allowlist is Git, Pandoc, ag, grep
+  and alda, plus `:commands-allowlist` in the app's `configs.edn`;
+- spawns `command + " " + args` with `shell: true`, every stdio a pipe;
+- reads stdout and stderr, and sends them to a toast only when
+  `returnResult` is set;
+- resolves with the exit code when the process closes, or with nothing, after
+  an error toast, when it refuses the command.
+
+When no bridge answers, the pane finds Node in its Node path setting, or else
+in `/opt/homebrew/bin`, `/usr/local/bin`, `~/.volta/bin` or `/opt/local/bin`.
+It uses a path only if it is a plain word to the shell, because the command
+reaches the shell unquoted. If that path is not on the allowlist, the pane
+shows it and asks. **Allow** reads `:commands-allowlist` through
+`userAppCfgs`, appends the path and writes the whole list back, because the
+setter replaces the value. The setter's reply can fail to cross the IPC after
+the write succeeds, so the pane then reads the entry back. It leaves a value
+that is not a list of strings alone and says so. The consequence belongs to
+Logseq, and the pane says it in the prompt: any plugin may then run that Node
+through `runCli`, as any plugin may already run Git.
+
+The pane then calls `runCli` with that Node and
+`'<plugin folder>/bridge/claudseq-bridge.mjs' serve --until-stdin-closes`,
+with the path single-quoted for the shell and `returnResult` off. It asks for
+health every 150 ms for up to 15 s. An exit before an answer means the bridge
+could not start, unless the code is 0, which means it found another bridge
+already answering. In that case the pane shows the exit code and the last
+line of `~/.claudseq/bridge.log`.
+
+**Lifecycle.** `serve` yields to a bridge that already answers with the
+token in `bridge.json`. Otherwise it asks the login shell once for its `PATH`
+and for `claude`, because Logseq started from the Dock has neither. It
+listens on the port it last used, 47816 at first. When that port is held by a
+bridge that another window started at the same moment, it yields to that
+bridge. When another program holds it, it listens on a free port instead.
+Only after listening does it write `bridge.json`, whole, by rename. The token
+in it is new each time.
+
+`runCli` leaves the bridge's stdin a pipe whose write end only Logseq's main
+process holds, and never writes to. With `--until-stdin-closes`, the bridge
+stops when that pipe reaches end of file. That happens when Logseq quits, even
+when it is killed. The bridge then stops every `claude` it started. It logs to
+a file and never to stdout or stderr, because once Logseq is gone a write to
+either pipe fails while the bridge is still stopping its children.
+
+A bridge that stops while Logseq runs is started again by the pane, and one
+bridge serves every window. A plugin updated while Logseq runs finds the older
+bridge still answering; the pane keeps using it and says to reopen Logseq.
+
+**Threat model.** The bridge starts Claude Code with the user's credentials,
+in whichever folder a request names. So it answers only a caller who can read
+a file in the user's home:
+
+- It listens on `127.0.0.1` only.
+- Every request carries `Authorization: Bearer <token>`. The token is 32
+  random bytes, new each time the bridge starts. It is stored in
+  `bridge.json`, which is mode 0600 in a 0700 folder, and compared in constant
+  time over SHA-256 digests. On a 401 the pane reads the file again once.
+- The `Host` header must be exactly `127.0.0.1:<port>`. This defeats DNS
+  rebinding: a page that points its own name at 127.0.0.1 still sends that
+  name as the host.
+- CORS admits one origin, `file://`. The plugin's `effect: true` entry shares
+  it with Logseq's window. Any refused origin or host is logged to
+  `~/.claudseq/bridge.log`.
+
+A web page can reach the port, but it has no token and cannot read the file
+that holds it. The pane reads that file through
+`parent.apis.doAction(['readFile', …])`, and finds home as the parent of
+`getLogseqDotDirRoot`.
+
+The one command line the pane builds contains nothing but the Node path,
+which is checked to be a plain word, and the plugin folder's path, which is
+single-quoted. No prompt, setting other than Node path, or model output is
+part of it.
+
+**Processes.** Each open session is one `claude` child. The bridge starts it
+with an argv array, never a shell, in the folder the pane names. The argv
+turns on stream-json in both directions, partial messages, permission
+requests over stdio (`--permission-prompt-tool stdio`) and the chosen
+`--permission-mode`. A prompt reaches Claude only as a stream-json `user`
+message on stdin.
+
+The bridge never passes `bypassPermissions` or
+`--dangerously-skip-permissions`. It rewrites the destination of every
+permission suggestion to `session` and drops any suggestion that would switch
+to bypass mode, so "Allow for this session" never writes a settings file into
+the graph.
+
+It sets `CLAUDE_CODE_ENTRYPOINT=logseq-claudseq` on the sessions it starts.
+Without that, `-p` records the entrypoint `sdk-cli`, and the VS Code
+extension's history and `claude --resume` both hide such sessions.
+
+A child is sent SIGTERM, then SIGKILL three seconds later. That happens when
+its session closes, after 30 minutes with no pane attached, and when the
+bridge stops, including when Logseq quits. At most eight run at once. A
+bridge that started before `claude` was installed looks for it again when
+the pane asks, so Retry works without restarting Logseq.
+
+**Events.** The pane follows a session over one streaming `fetch` of NDJSON.
+The bridge numbers every event and keeps the last 5,000 for each session. At
+the end of each turn it drops that turn's partial chunks, because the complete
+messages repeat them. A pane that reconnects mid-turn therefore replays that
+turn from its first event, rather than reading half of it back from a
+transcript.
+
+**History.** History is Claude Code's own transcripts under
+`~/.claude/projects/`, which the bridge reads and never writes. A transcript
+belongs to a folder only when its records name that `cwd`; the encoded
+directory name only says where to look. The pane keeps its own state (fold,
+height, open session and defaults) in its plugin settings through
+`logseq.updateSettings`, never in the graph.
+
 ## Host-DOM annotation and cleanup
 
 Each runtime owns a namespace. Passage writes `data-passage-*`, element ids
 beginning `passage-`, and the `passage-dialog` style key. Anno writes
 `data-anno-*`, element ids beginning `anno-`, and the `anno-dialog` style key.
 Dark High Contrast writes `data-hc-*` and the `hc-hidden-properties` style key.
-None reads, clears, or reuses another's annotations.
+Able Table writes `data-able-*`, element ids beginning `able-table-`, and the
+`able-table` style key. Claudseq writes `data-claudseq-*`, element ids
+beginning `claudseq-`, and the `claudseq` style key; its pane is one `section`
+it inserts after the left sidebar's `.nav-contents-container` and puts back
+when Logseq redraws the sidebar. None reads, clears, or reuses another's annotations,
+with one deliberate, one-directional exception: Able Table's registered style
+detects the theme's own `data-hc-collapse` — in CSS alone, never from script —
+so its settings control steps left of the theme's collapse control instead of
+sitting over it, and it falls back to its own number when no theme declares
+`--hc-collapse-control-size`. Nothing of the theme's is written, measured, or
+required, and the theme reads nothing back. The hook is versioned in
+[Table controls v1](contracts/table-controls-v1.md), and pinned by a test on
+each side so it cannot drift silently.
 
-The theme and Passage perform an initial repaint and observe the host document
-with `MutationObserver` because Logseq replaces rendered nodes during normal
-editing and navigation, and settings changes repaint without reload. Anno
-annotates nothing there and so watches nothing: its prompt is built when a
-command asks for it and removed when it closes. On `beforeunload`, each package
-disconnects any observer it has, removes its own nodes and attributes, clears
-its own style, and settles any open prompt without writing. Tests cover initial
-paint, mutations, settings, malformed settings, and cleanup.
+Chrome that overhangs the block it belongs to is the one place a runtime styles
+a host element rather than its own. Logseq lays each block out in a
+`position: relative` box, and a theme may make that box a stacking context —
+Dark High Contrast isolates every row so the rail's line paints behind its
+bullets. Inside one, no `z-index` a panel or a menu gives itself can beat the
+block painted after it, so Able Table raises Logseq's own `.ls-block` while one
+is open, and only then. The raise is paint order alone: it declares no position,
+size or transform, so opening a menu never moves a reader's text, and the block
+returns to the host's own order the moment the menu closes.
+
+The theme, Passage and Able Table perform an initial repaint and observe the
+host document with `MutationObserver` because Logseq replaces rendered nodes
+during normal editing and navigation, and settings changes repaint without
+reload. Anno annotates nothing there and so watches nothing: its prompt is
+built when a command asks for it and removed when it closes. Able Table finds
+every table Logseq renders in the main editor —
+`#main-content-container div.table-wrapper > table` — and marks its wrapper
+`data-able-table`, keyed by the table's block UUID and its ordinal within that
+block. Each pass hangs one `data-able-settings` control inside the wrapper and,
+when the reader has opened them, a `data-able-panel` and a `data-able-search`
+field beside it: both are siblings of the wrapper rather than children, because
+the wrapper is an `overflow: auto` scroller that would clip the panel and carry
+the field sideways with the table. Behind the panel's second switch, each head cell of a
+table that renders one is marked `data-able-head` with its own column index and
+carries a `data-able-column-control`; that control opens a
+`data-able-column-menu`, a sibling of the wrapper like the panel and for the
+same reason, measured against the control and held inside the block. The menu
+hangs a `data-able-column-filter` field over the cell while that column is
+being searched, and a `data-able-column-term` line under its name once a filter
+is committed. The field is positioned over the cell rather than substituted for
+its content, so no markup Logseq rendered is moved and no column changes width
+as a field opens or closes; the column name itself is never claimed, and a
+click on it opens the block for editing as it always did. Whether the toggle is on, what the search field holds, what each
+column is filtered by and which column the table is sorted by are a `Map` in
+the runtime under the same key, so a re-render comes back searched, filtered
+and sorted, and a row that fails the search or any column filter takes
+`data-able-filtered` and is hidden by one declaration of the plugin's own
+style — never removed or rewritten. Sorting is the one thing any package here
+does that moves a node Logseq rendered: rows are reordered within the group
+they were rendered in, each one stamped `data-able-row` with the position it
+arrived in before the first move, so dropping the sort, turning the column
+switch off or unloading restores that order and takes the stamp off again. A
+table a pass no longer finds gives back its mark, its control, its fields,
+every attribute it wrote on a head cell, every row it was hiding, and the order
+it was rendered in.
+
+Able Table is also the one package that keeps state between sessions. What a
+table is set to — both switches, the search text, the sort and every committed
+filter — is mirrored at the end of every pass into the plugin's own settings
+object under one `tables` key, as a branch per graph and a record per table
+key, and written through `logseq.updateSettings` behind a short delay so a
+burst of keystrokes costs one write. Logseq keeps that object in its dotdir,
+`settings/logseq-able-table.json`, which is why this is not a graph write: no
+Markdown, block or property changes because a table was searched, sorted or
+filtered, and the store is deliberately not carried by a synced graph. The
+graph is read once, through `logseq.App.getCurrentGraph`, only to name the
+branch; nothing is written until it answers, and `onCurrentGraphChanged` moves
+the branch under a table rather than letting a record land in the wrong graph.
+The transient half of the state — the open panel, the field being edited, the
+open menu — is never stored. Reading is total: a malformed record, or a field
+of the wrong shape within one, is treated as absent rather than raised, and a
+stored sort or filter whose column the table no longer renders is dropped the
+way losing that column mid-session already drops it. A table left at its
+defaults writes no record, so the store stays about as long as the list of
+tables somebody has tuned. No package declares a settings schema, so none of
+this is a plugin-wide preference screen.
+
+On `beforeunload`,
+each package disconnects any observer it has, removes its own nodes and
+attributes, clears its own style, and settles any open prompt without writing.
+Able Table additionally flushes a pending settings write there, and leaves its
+store alone: an ordinary reload unloads and reloads the plugin, so clearing it
+would be the opposite of what it is for.
+Tests cover initial paint, mutations, settings, malformed settings, and
+cleanup.
 
 Dark High Contrast also replaces one host gesture rather than annotating it: a
 capture-phase `click` listener on the host document folds the block whose bullet

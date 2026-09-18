@@ -6,6 +6,8 @@ on:
       - "theme-v*"
       - "passage-v*"
       - "anno-v*"
+      - "able-table-v*"
+      - "claudseq-v*"
 
 permissions:
   contents: write

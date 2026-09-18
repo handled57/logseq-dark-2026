@@ -2,9 +2,9 @@
 
 ## Project
 
-This repository is an npm-workspace monorepo of Logseq packages. `packages/theme-dark-high-contrast/` holds **Dark High Contrast**, a Logseq theme for classic/file graphs on desktop. It targets Logseq 0.10.15 and adapts Visual Studio Code's Dark High Contrast palette. `packages/plugin-passage/` holds **Passage** and `packages/plugin-anno/` holds **Anno**, plugins for the same target.
+This repository is an npm-workspace monorepo of Logseq packages. `packages/theme-dark-high-contrast/` holds **Dark High Contrast**, a Logseq theme for classic/file graphs on desktop. It targets Logseq 0.10.15 and adapts Visual Studio Code's Dark High Contrast palette. `packages/plugin-passage/` holds **Passage**, `packages/plugin-anno/` holds **Anno**, `packages/plugin-able-table/` holds **Able Table**, and `packages/plugin-claudseq/` holds **Claudseq**, plugins for the same target.
 
-The root `package.json` is a private coordinator: it declares `workspaces: ["packages/*"]`, aggregates each package's scripts, and owns no sources and no dependencies. Every package is intentionally installable without dependency installation or compilation. Keep release artifacts self-contained and package-specific, and do not add runtime network access, tracking, or remote CSS imports.
+The root `package.json` is a private coordinator: it declares `workspaces: ["packages/*"]`, aggregates each package's scripts, and owns no sources and no dependencies. Every package is intentionally installable without dependency installation or compilation. Keep release artifacts self-contained and package-specific, and do not add runtime network access, tracking, or remote CSS imports. The one approved exception is Claudseq's pane talking to its own bridge on `127.0.0.1`, recorded in `docs/architecture.md`; it extends to no other package or destination. Likewise, Claudseq alone changes a Logseq setting, and only one: with the user's Allow, it adds Node to `:commands-allowlist` so that `runCli` can start its bridge.
 
 ## Source of truth
 
@@ -20,6 +20,8 @@ Paths below are relative to `packages/theme-dark-high-contrast/` unless noted.
 - `test/properties.test.mjs` behaviorally tests `index.js` against a stub host document.
 - `test/collapsible.test.mjs` drives the same entry over a stub page tree for the collapse control: which renders earn one, where it is hung, and that folding one touches nothing else.
 - `../plugin-anno/index.js` is Anno's canonical runtime: the **Anno: Import PDF** command, its prompt, and the asset-naming rule that decides which page Logseq collects a PDF's highlights on. `../plugin-anno/test/package.test.mjs` checks its structure and metadata; `../plugin-anno/test/anno.test.mjs` drives that runtime against a stub host document and file bridge.
+- `../plugin-able-table/index.js` is Able Table's canonical runtime: the plugin's lifecycle — load, observe, repaint, tear down — the `data-able-table` marking that keys every rendered table by its block UUID and ordinal, so a later render finds its own state again, and the settings control, panel and full-table-search field it hangs on that key. `../plugin-able-table/test/package.test.mjs` checks its structure and metadata; `../plugin-able-table/test/able-table.test.mjs` drives that runtime against a stub host document.
+- `../plugin-claudseq/index.js` is Claudseq's canonical runtime: the left-sidebar pane, its mounting and teardown, the bridge client, and sessions and history. `../plugin-claudseq/timeline.js` is the one model that both live stream-json events and transcripts feed, and `../plugin-claudseq/markdown.js` renders replies as DOM nodes, never as markup. `../plugin-claudseq/bridge/claudseq-bridge.mjs` is the loopback bridge that runs `claude`: its `serve`, which the pane starts through `runCli` and which stops when Logseq quits, and its `status`. `../plugin-claudseq/test/package.test.mjs` checks the package's structure and rules. `../plugin-claudseq/test/bridge.test.mjs` drives the bridge against `test/fixtures/fake-claude.mjs`, and starts it as `runCli` does. `../plugin-claudseq/test/pane.test.mjs` drives the pane against a stub host and a fake bridge that replays `test/fixtures/stream.ndjson`, which was recorded from `claude` 2.1.267.
 - Each package's `package.json#release.files` is its exact package-owned archive allowlist.
 - Root `scripts/build-release.mjs` creates extracted packages and Marketplace ZIPs in root `dist/`; aggregate builds clean once and targeted workspace builds remove only their own outputs.
 - Root `scripts/verify-release.mjs` verifies exact archive contents, metadata agreement, and byte parity with canonical sources.
@@ -32,7 +34,10 @@ Paths below are relative to `packages/theme-dark-high-contrast/` unless noted.
   `docs/adding-a-package.md` is the package-integration checklist; and
   `docs/migrating-theme-2.md` owns the 1.x-to-2.0.0 user migration.
 - `docs/contracts/passage-v1.md` is the normative cross-package content
-  contract. Package READMEs explain their own setup and behavior; do not make a
+  contract, and `docs/contracts/table-controls-v1.md` the normative
+  one-directional host-DOM hook Able Table reads to sit beside the theme's
+  table collapse control.
+- Package READMEs explain their own setup and behavior; do not make a
   root document the only source for package-specific use.
 
 Read the package's `README.md` and `CHANGELOG.md` before changing public behavior. Keep both synchronized with user-visible changes.
@@ -87,9 +92,9 @@ tag goes on the merge commit once the user approves. Semantic versioning
 decides the number — a bug fix is a patch, a feature is a minor, a breaking
 change is a major.
 
-Theme, Passage and Anno versions and release tags are independent, and each
-package is tagged in its own namespace: `theme-vX.Y.Z`, `passage-vX.Y.Z` and
-`anno-vX.Y.Z`. Pushing
+Theme, Passage, Anno, Able Table and Claudseq versions and release tags are
+independent, and each package is tagged in its own namespace: `theme-vX.Y.Z`,
+`passage-vX.Y.Z`, `anno-vX.Y.Z`, `able-table-vX.Y.Z` and `claudseq-vX.Y.Z`. Pushing
 such a tag runs `.github/workflows/publish.yml`, which calls
 `scripts/select-release.mjs` to select exactly one workspace, then builds and
 attaches only that package's archive. Selection asserts that the tag version,

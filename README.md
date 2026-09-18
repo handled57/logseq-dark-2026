@@ -1,8 +1,9 @@
 # logseq-dark-2026
 
-An npm-workspace monorepo for three independently installable Logseq packages.
+An npm-workspace monorepo for five independently installable Logseq packages.
 All ship as plain HTML, JavaScript, CSS, JSON, and SVG: no production
-dependencies, compilation, remote imports, or runtime network access.
+dependencies, compilation, remote imports, or runtime network access. The one
+exception is Claudseq's own bridge, which it reaches on `127.0.0.1` only.
 
 ## Packages
 
@@ -11,6 +12,8 @@ dependencies, compilation, remote imports, or runtime network access.
 | **Dark High Contrast** | [`packages/theme-dark-high-contrast`](packages/theme-dark-high-contrast) | `2.1.0` | A pure-black, accessible theme for Logseq classic/file graphs. |
 | **Passage** | [`packages/plugin-passage`](packages/plugin-passage) | `0.6.1` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
 | **Anno** | [`packages/plugin-anno`](packages/plugin-anno) | `0.2.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
+| **Able Table** | [`packages/plugin-able-table`](packages/plugin-able-table) | `0.2.0` | A settings control on every rendered Markdown table, a find-as-you-type field that searches it in place, and a menu on every column header that searches that column. |
+| **Claudseq** | [`packages/plugin-claudseq`](packages/plugin-claudseq) | `0.1.0` | A Claude Code pane in the left sidebar that works like the VS Code extension, with your past sessions a click away. |
 
 Install any one package by itself or install them together. None of them calls
 another. Dark High Contrast styles any
@@ -31,11 +34,36 @@ own highlights for that PDF on a page of the same name; see the
 select separate templates for new annotation pages and new PDF highlight
 blocks.
 
+Able Table hangs a settings control on every Markdown table rendered in the
+main editor, and behind it a **Full table search** toggle that puts a
+find-as-you-type field across the top of the table: typing hides the rows that
+do not match, and clearing restores them. A second toggle gives every column
+header a menu whose **Search column** narrows the table to the rows matching
+that one column, and whose **Sort A-Z** and **Sort Z-A** order the whole table
+by it; several columns and the search filter together. Rows are hidden rather
+than removed, a sort moves the rendered rows and is handed back on demand, and
+nothing is written to the graph; see the
+[Able Table guide](packages/plugin-able-table/README.md). Its control sits
+beside Dark High Contrast's collapse control rather than over it, through the
+[table controls v1 hook](docs/contracts/table-controls-v1.md), and needs no
+theme installed.
+
+Claudseq puts a Claude Code pane below Favorites and Recent. It works with
+the `claude` CLI already installed on your Mac, in your graph's folder, and
+asks before Claude edits anything. Claude runs through a small bridge on
+`127.0.0.1`, behind a private token. The pane starts it through Logseq's own
+`runCli` after asking once to add Node to Logseq's command allowlist, and it
+stops when Logseq quits; there is nothing to install from a terminal. Its sessions are ordinary
+Claude Code sessions, so they also appear in `claude --resume` and in the VS
+Code extension. See the [Claudseq guide](packages/plugin-claudseq/README.md).
+
 ## Install
 
 When the packages are available in the Logseq Marketplace, install each one
 separately under **Plugins → Marketplace**: Dark High Contrast is a theme,
-Passage and Anno are plugins. Selecting the theme does not install a command.
+Passage, Anno and Able Table are plugins. Selecting the theme does not install
+a command. Claudseq is not listed in the Marketplace. Install it from its
+release archive or unpacked folder, and allow Node when its pane asks.
 
 For development or pre-Marketplace testing, build the repository and load the
 package's extracted folder—not its source workspace—from Logseq's **Load
@@ -43,7 +71,8 @@ unpacked plugin** dialog:
 
 ```sh
 npm run build
-# load dist/logseq-dark-high-contrast-theme/, dist/logseq-passage/ and/or dist/logseq-anno/
+# load dist/logseq-dark-high-contrast-theme/, dist/logseq-passage/,
+# dist/logseq-anno/, dist/logseq-able-table/ and/or dist/logseq-claudseq/
 ```
 
 The extracted folder contains the shared license and vendored Logseq SDK that
@@ -83,6 +112,8 @@ byte parity with canonical source files.
 | `packages/theme-dark-high-contrast/` | Theme CSS, property/classification runtime, theme metadata, tests, screenshots, changelog, and package README. |
 | `packages/plugin-passage/` | Passage command, reference parser, per-translation book manifests, plugin metadata, tests, changelog, and package README. |
 | `packages/plugin-anno/` | Anno's PDF import command, its prompt, plugin metadata, tests, changelog, and package README. |
+| `packages/plugin-able-table/` | Able Table's runtime, plugin metadata, tests, changelog, and package README. |
+| `packages/plugin-claudseq/` | Claudseq's pane, Markdown renderer and timeline model, its loopback bridge, plugin metadata, tests, changelog, and package README. |
 | `docs/contracts/` | Versioned, runtime-neutral agreements that more than one package consumes. |
 | `test/support/` | Reusable test fixtures; package-specific assertions stay in their workspace. |
 | `scripts/` | Workspace discovery and release construction/verification shared by all packages. |
@@ -92,12 +123,16 @@ byte parity with canonical source files.
 - [Contributing](CONTRIBUTING.md) — prerequisites, commands, unpacked testing,
   releases, and manual acceptance.
 - [Architecture](docs/architecture.md) — runtime boundaries, host-DOM ownership,
-  palette and rail constraints, observers, the content contract, and packaging.
+  palette and rail constraints, observers, the content contract, the Claudseq
+  bridge's threat model, and packaging.
 - [Add a package](docs/adding-a-package.md) — the complete package checklist.
 - [Migrate Dark High Contrast 1.x to 2.0.0](docs/migrating-theme-2.md) — retained
   settings and content, the separate Passage install, and local text-index path.
 - [Passage v1 content contract](docs/contracts/passage-v1.md) — the stable block
   shape the theme and Passage test independently.
+- [Table controls v1 hook](docs/contracts/table-controls-v1.md) — the
+  one-directional, read-only hook Able Table reads to sit beside the theme's
+  collapse control rather than over it.
 
 GitHub Actions currently validates pushes and pull requests and creates GitHub
 release assets for configured tags. It does not submit packages to the Logseq
