@@ -73,6 +73,39 @@ Without `LOGSEQ_CSS`, tests use the pinned upstream declarations in
 `test/support/pinned-css.mjs`. This is useful regression coverage, not a claim
 that Logseq rendered correctly.
 
+## Watch loop
+
+`npm run dev` restages each package's `dist/` bundle whenever one of its release
+files changes and bumps `dist/.reload-stamp.json`. It skips archiving, so it is
+not a substitute for `npm run build`.
+
+The graph side is `dev/logseq-custom.js`, installed once per graph:
+
+```sh
+npm run dev:install -- "C:\path\to\graph"
+```
+
+That writes `<graph>/logseq/custom.js` with the stamp path filled in, and
+refuses to overwrite a `custom.js` it did not write. Logseq evaluates custom.js
+in the main renderer, which is the only place `LSPluginCore` is reachable --
+a plugin's own sandbox cannot reload anything. Restart Logseq afterwards and
+allow custom.js when asked; it re-asks weekly.
+
+From then on a save reloads only what changed:
+
+- A plugin edit calls `LSPluginCore.reload(id)`, the Plugins page button's own call.
+- A theme CSS edit is swapped in place instead. Logseq's `beforereload` handler
+  unregisters plugin themes with `effect=false`, which deliberately leaves the
+  injected `<link>` in the DOM, so a reload never re-reads `theme.css`. The
+  reloader reads the file itself, injects it as a trailing `<style>`, and
+  disables the original link so deleted rules stop applying.
+- A theme edit outside CSS does both.
+
+`window.lsDev` exposes `stop()`, `start()`, `tick()`, `reload(id)` and
+`css(pid)` in the devtools console. Reloading is not a substitute for the
+teardown checks below: it exercises the same unload path, but only a restart
+proves first-load behavior.
+
 ## Manual Logseq acceptance
 
 1. Run `npm run check`.

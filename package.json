@@ -17,6 +17,8 @@
   "scripts": {
     "test": "node --test test/*.test.mjs && npm run test --workspaces --if-present",
     "build": "node scripts/build-release.mjs --all",
+    "dev": "node scripts/dev-watch.mjs",
+    "dev:install": "node scripts/install-reloader.mjs",
     "verify:release": "node scripts/verify-release.mjs --all",
     "check": "npm test && npm run build && npm run verify:release"
   }
