@@ -9,12 +9,12 @@
  * Nothing here touches the real `~/.claudseq`, `~/.claude` or
  * `~/Library/LaunchAgents`: every directory the bridge reads or writes is a
  * temporary one handed to it, and `launchctl` is a script that records its
- * arguments.
+ * arguments and starts the installed bridge on a free port, as launchd would.
  */
 
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { access, chmod, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import { access, chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { request } from 'node:http'
 import { createServer } from 'node:net'
@@ -24,7 +24,7 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
   ALLOWED_ORIGIN, ENTRYPOINT, LABEL, claudeArgs, createBridge, install, listHistory,
-  projectDirName, readTranscript, sessionScoped, titleOf, uninstall
+  projectDirName, readTranscript, sessionScoped, status, titleOf, uninstall
 } from '../bridge/claudseq-bridge.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -686,12 +686,33 @@ test('history and transcripts are served over the authenticated API', async () =
 
 /* ----------------------------------------------------------------- install */
 
-test('install writes a private config and a login agent, and uninstall removes both', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'claudseq-install-'))
+/* A stand-in for `launchctl` that records its arguments. With `serve`, it
+ * also does what launchd does with the agent: `bootstrap` starts the
+ * installed bridge in the background, a moment later, and `bootout` stops it
+ * and waits for it to exit. Its output goes to a file, never to the pipes
+ * `install` reads, or `install` would wait on them for as long as it runs. */
+async function fakeLaunchctl(dir, { serve = false } = {}) {
   const launchctl = join(dir, 'launchctl')
   const calls = join(dir, 'launchctl.log')
-  await writeFile(launchctl, `#!/bin/sh\necho "$@" >> '${calls}'\n`)
+  const pidFile = join(dir, 'serve.pid')
+  const lines = ['#!/bin/sh', `echo "$@" >> '${calls}'`]
+  if (serve) {
+    lines.push(
+      'case "$1" in',
+      `  bootout) if [ -f '${pidFile}' ]; then pid="$(cat '${pidFile}')"; kill "$pid" 2>/dev/null; while kill -0 "$pid" 2>/dev/null; do sleep 0.05; done; rm -f '${pidFile}'; fi ;;`,
+      `  bootstrap) (sleep 0.3; exec env CLAUDSEQ_STATE_DIR='${join(dir, 'state')}' '${process.execPath}' '${join(dir, 'state', 'claudseq-bridge.mjs')}' serve) </dev/null >>'${join(dir, 'serve.log')}' 2>&1 & echo $! > '${pidFile}' ;;`,
+      'esac'
+    )
+  }
+  await writeFile(launchctl, lines.join('\n') + '\n')
   await chmod(launchctl, 0o755)
+  return { launchctl, calls, pidFile }
+}
+
+test('install writes a private config and a login agent, waits for the bridge to answer, and uninstall removes both', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-install-'))
+  const { launchctl, calls, pidFile } = await fakeLaunchctl(dir, { serve: true })
+  const port = await freePort()
   const env = {
     ...process.env,
     SHELL: '/bin/sh',
@@ -701,10 +722,22 @@ test('install writes a private config and a login agent, and uninstall removes b
     CLAUDSEQ_CLAUDE: fake
   }
   try {
-    const config = await install(['--port', '47999'], env, () => {})
+    const said = []
+    const config = await install(['--port', String(port)], env, (line) => said.push(line))
+    /* Answering means the bridge started from the agent is up with the token
+     * this install wrote. */
+    const running = said.find((line) => line.includes('running: pid'))
+    assert.ok(running, `install did not say the bridge is running:\n${said.join('\n')}`)
+    const health = await call(port, { token: config.token })
+    assert.equal(health.status, 200)
+    assert.equal(running.trim(), `running: pid ${health.json.pid}`)
+    const checked = []
+    assert.equal(await status(env, (line) => checked.push(line)), true)
+    assert.match(checked.join('\n'), /"ok":true/)
+
     const written = JSON.parse(await readFile(join(dir, 'state', 'bridge.json'), 'utf8'))
     assert.deepEqual(written, config)
-    assert.equal(written.port, 47999)
+    assert.equal(written.port, port)
     assert.equal(written.claudePath, fake)
     assert.match(written.token, /^[0-9a-f]{64}$/)
     assert.equal((await stat(join(dir, 'state', 'bridge.json'))).mode & 0o777, 0o600)
@@ -723,13 +756,78 @@ test('install writes a private config and a login agent, and uninstall removes b
       `bootstrap gui/${uid} ${join(dir, 'agents', `${LABEL}.plist`)}`
     ])
 
+    /* A reinstall replaces the running bridge: the old token stops working
+     * and the new one is answered before install returns. */
+    const firstPid = health.json.pid
     const second = await install([], env, () => {})
-    assert.equal(second.port, 47999, 'a reinstall moved the port')
+    assert.equal(second.port, port, 'a reinstall moved the port')
     assert.notEqual(second.token, config.token, 'a reinstall kept the old token')
+    assert.equal((await call(port, { token: second.token })).status, 200)
+    assert.equal((await call(port, { token: config.token })).status, 401)
+    assert.equal(alive(firstPid), false, 'the first bridge outlived its reinstall')
 
     await uninstall(env, () => {})
     await assert.rejects(access(join(dir, 'agents', `${LABEL}.plist`), constants.F_OK))
     await assert.rejects(access(join(dir, 'state'), constants.F_OK))
+    await assert.rejects(access(pidFile, constants.F_OK))
+    await assert.rejects(call(port, { token: second.token }), 'a bridge still answers after uninstall')
+  } finally {
+    const pid = Number(await readFile(pidFile, 'utf8').catch(() => ''))
+    if (pid && alive(pid)) process.kill(pid)
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('the bridge runs its command when it is started through a symlink', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-link-'))
+  const link = join(dir, 'linked', 'claudseq-bridge.mjs')
+  try {
+    await mkdir(join(dir, 'real'))
+    await writeFile(join(dir, 'real', 'claudseq-bridge.mjs'), await readFile(script))
+    await symlink(join(dir, 'real'), join(dir, 'linked'))
+    /* No command is a usage error: exiting quietly would mean nothing ran. */
+    const result = await new Promise((settle) => {
+      const child = spawn(process.execPath, [link], { stdio: ['ignore', 'pipe', 'pipe'] })
+      let stderr = ''
+      child.stderr.setEncoding('utf8')
+      child.stderr.on('data', (chunk) => { stderr += chunk })
+      child.on('close', (code) => settle({ code, stderr }))
+    })
+    assert.equal(result.code, 2)
+    assert.match(result.stderr, /^usage: claudseq-bridge\.mjs install/)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('install says so, and fails, when the bridge it loaded never answers', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-install-'))
+  const { launchctl } = await fakeLaunchctl(dir)
+  const port = await freePort()
+  const env = {
+    ...process.env,
+    SHELL: '/bin/sh',
+    CLAUDSEQ_STATE_DIR: join(dir, 'state'),
+    CLAUDSEQ_LAUNCH_AGENTS_DIR: join(dir, 'agents'),
+    CLAUDSEQ_LAUNCHCTL: launchctl,
+    CLAUDSEQ_CLAUDE: fake,
+    CLAUDSEQ_START_WAIT_MS: '400'
+  }
+  try {
+    const said = []
+    const started = Date.now()
+    await assert.rejects(install(['--port', String(port)], env, (line) => said.push(line)), (error) => {
+      assert.match(error.message, new RegExp(`did not answer on 127\\.0\\.0\\.1:${port} within 0\\.4 s \\(connect ECONNREFUSED`))
+      assert.ok(error.message.includes(join(dir, 'state', 'bridge.log')), 'the error does not point at the log')
+      return true
+    })
+    assert.ok(Date.now() - started >= 400, 'install gave up before its wait was over')
+    assert.ok(said.some((line) => line.includes(`listens: http://127.0.0.1:${port}`)), 'install did not say what it wrote')
+    assert.ok(!said.some((line) => line.includes('running:')), 'install said a silent bridge is running')
+
+    const checked = []
+    assert.equal(await status(env, (line) => checked.push(line)), false)
+    assert.match(checked.join('\n'), new RegExp(`not answering on 127\\.0\\.0\\.1:${port}: connect ECONNREFUSED.*bridge\\.log`))
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

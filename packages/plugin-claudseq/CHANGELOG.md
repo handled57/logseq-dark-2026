@@ -2,7 +2,7 @@
 
 All notable changes to this package are documented here.
 
-## 0.1.0 - 2026-09-17
+## 0.1.0 - 2026-09-18
 
 - **A Claude Code pane in the left sidebar.** Claudseq sits below Favorites
   and Recent and works like the Claude Code extension for VS Code. The header
@@ -40,7 +40,8 @@ All notable changes to this package are documented here.
   127.0.0.1 only, and every request needs a private token and the exact host.
   It starts `claude` without a shell and stops each one when its session
   closes, after 30 minutes unattended, or at shutdown. `install`, `uninstall`
-  and `status` manage it.
+  and `status` manage it. `install` returns only once the new bridge answers,
+  and fails with a pointer to its log if it never does.
 - **Nothing is written to the graph.** The pane's own state goes into its
   settings file under `~/.logseq/`, and history is read from Claude Code's
   transcripts, never written.

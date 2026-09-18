@@ -40,7 +40,7 @@
 
 import { execFile, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { constants } from 'node:fs'
+import { constants, realpathSync } from 'node:fs'
 import { access, chmod, copyFile, mkdir, open, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer, request as httpRequest } from 'node:http'
 import { homedir } from 'node:os'
@@ -1016,13 +1016,54 @@ export async function install(args = [], env = process.env, out = console.log) {
   await run(launchctl, ['bootout', `${domain}/${LABEL}`]).catch(() => {})
   await run(launchctl, ['bootstrap', domain, plist])
 
+  /* launchd starts the agent a moment after `bootstrap` returns, and a bridge
+   * from an earlier install can still be answering with its old token. The
+   * install is done when the new bridge answers with the new one. */
+  const wait = Number(env.CLAUDSEQ_START_WAIT_MS ?? 10_000)
+  const deadline = Date.now() + wait
+  let health = await askHealth(config, 1000)
+  while (health.status !== 200 && Date.now() < deadline) {
+    await new Promise((settle) => setTimeout(settle, 150))
+    health = await askHealth(config, 1000)
+  }
+
   out(`Claudseq bridge ${VERSION} installed.`)
   out(`  claude:  ${claudePath}`)
   out(`  listens: http://127.0.0.1:${port} (loopback only)`)
   out(`  config:  ${configPath}`)
   out(`  agent:   ${plist}`)
+  if (health.status !== 200) {
+    throw new Error(`the login agent is loaded, but the bridge did not answer on 127.0.0.1:${port} within ${wait / 1000} s (${health.error ?? `HTTP ${health.status}`}). See ${join(stateDir, 'bridge.log')}.`)
+  }
+  let pid = ''
+  try {
+    pid = JSON.parse(health.text).pid ?? ''
+  } catch {}
+  out(`  running: pid ${pid}`)
   out('Reload Claudseq in Logseq, or open its pane, to connect.')
   return config
+}
+
+/* One authenticated health request; a refused connection, a timeout and an
+ * HTTP error all come back as an answer rather than a rejection. */
+function askHealth(config, timeout) {
+  return new Promise((settle) => {
+    const req = httpRequest({
+      host: '127.0.0.1',
+      port: config.port,
+      path: '/v1/health',
+      headers: { Authorization: `Bearer ${config.token}` },
+      timeout
+    }, (res) => {
+      let text = ''
+      res.setEncoding('utf8')
+      res.on('data', (chunk) => { text += chunk })
+      res.on('end', () => settle({ status: res.statusCode, text }))
+    })
+    req.on('error', (error) => settle({ error: error.message }))
+    req.on('timeout', () => req.destroy(new Error('timed out')))
+    req.end()
+  })
 }
 
 export async function uninstall(env = process.env, out = console.log) {
@@ -1034,26 +1075,11 @@ export async function uninstall(env = process.env, out = console.log) {
 }
 
 export async function status(env = process.env, out = console.log) {
-  const config = await readConfig(stateDirectory(env))
-  const health = await new Promise((settle) => {
-    const req = httpRequest({
-      host: '127.0.0.1',
-      port: config.port,
-      path: '/v1/health',
-      headers: { Authorization: `Bearer ${config.token}` },
-      timeout: 3000
-    }, (res) => {
-      let text = ''
-      res.setEncoding('utf8')
-      res.on('data', (chunk) => { text += chunk })
-      res.on('end', () => settle({ status: res.statusCode, text }))
-    })
-    req.on('error', (error) => settle({ error: error.message }))
-    req.on('timeout', () => req.destroy(new Error('timed out')))
-    req.end()
-  })
-  if (health.error || health.status !== 200) {
-    out(`Claudseq bridge is not answering on 127.0.0.1:${config.port}: ${health.error ?? `HTTP ${health.status}`}`)
+  const stateDir = stateDirectory(env)
+  const config = await readConfig(stateDir)
+  const health = await askHealth(config, 3000)
+  if (health.status !== 200) {
+    out(`Claudseq bridge is not answering on 127.0.0.1:${config.port}: ${health.error ?? `HTTP ${health.status}`}. See ${join(stateDir, 'bridge.log')}.`)
     return false
   }
   out(health.text)
@@ -1085,7 +1111,20 @@ async function serve(env = process.env) {
   process.on('SIGINT', () => stop('SIGINT'))
 }
 
-const invoked = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
+/* Node names a module by its real path, but argv keeps the path as typed: run
+ * through a symlink — `/var` is one on macOS, and so may be a home folder —
+ * the two differ, and a bridge that compared them as given would exit without
+ * serving, over and over under launchd. */
+function runDirectly() {
+  if (!process.argv[1]) return false
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+  } catch {
+    return false
+  }
+}
+
+const invoked = runDirectly()
 if (invoked) {
   const [command, ...rest] = process.argv.slice(2)
   const commands = {

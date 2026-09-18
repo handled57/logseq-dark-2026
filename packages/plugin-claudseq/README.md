@@ -21,7 +21,10 @@ with your permission, edit them. Claudseq itself writes nothing to your graph.
 
 1. **Install the plugin.** Load the unpacked `logseq-claudseq` folder from
    **Settings → Plugins → Load unpacked plugin**, or unzip a release archive
-   into `~/.logseq/plugins/`.
+   into `~/.logseq/plugins/`. That folder is the one in the release archive,
+   or `dist/logseq-claudseq/` in a clone after `npm run build`. The source
+   folder, `packages/plugin-claudseq/`, lacks Logseq's SDK: loaded, it never
+   starts, and Logseq reports that it takes too long to load.
 2. **Install the bridge, once.** A Logseq plugin cannot start programs, so
    Claudseq runs `claude` through a small companion process called the bridge.
    Until the bridge is installed, the pane shows the exact command. It looks
@@ -35,7 +38,8 @@ with your permission, edit them. Claudseq itself writes nothing to your graph.
    `~/.claudseq/`. It writes `~/.claudseq/bridge.json`, readable only by you,
    with a random token and the port. Then it registers a login agent,
    `io.github.handled57.logseq-claudseq`, so the bridge starts now and at every
-   login.
+   login. It returns once the bridge answers; if it never does, it says so and
+   points at `~/.claudseq/bridge.log`.
 3. **Press Retry** in the pane, or reload the plugin.
 
 Run `install` again after updating Claudseq, if the pane says the bridge is
