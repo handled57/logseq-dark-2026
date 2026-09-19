@@ -13,7 +13,7 @@ exception is Claudseq's own bridge, which it reaches on `127.0.0.1` only.
 | **Passage** | [`packages/plugin-passage`](packages/plugin-passage) | `0.6.1` | The **Passage: Insert a passage** command writes canonical Bible passage blocks from a local text index. |
 | **Anno** | [`packages/plugin-anno`](packages/plugin-anno) | `0.2.0` | An **Anno: Import PDF** command that imports a PDF and opens the page its highlights are collected on. |
 | **Able Table** | [`packages/plugin-able-table`](packages/plugin-able-table) | `0.2.0` | A settings control on every rendered Markdown table, a find-as-you-type field that searches it in place, and a menu on every column header that searches that column. |
-| **Claudseq** | [`packages/plugin-claudseq`](packages/plugin-claudseq) | `0.1.0` | A Claude Code pane in the left sidebar that works like the VS Code extension, with your past sessions a click away. |
+| **Claudseq** | [`packages/plugin-claudseq`](packages/plugin-claudseq) | `0.1.1` | A Claude Code pane in the left sidebar that works like the VS Code extension, with your past sessions a click away. |
 
 Install any one package by itself or install them together. None of them calls
 another. Dark High Contrast styles any
@@ -49,8 +49,8 @@ beside Dark High Contrast's collapse control rather than over it, through the
 theme installed.
 
 Claudseq puts a Claude Code pane below Favorites and Recent. It works with
-the `claude` CLI already installed on your Mac, in your graph's folder, and
-asks before Claude edits anything. Claude runs through a small bridge on
+the `claude` CLI already installed on your computer — macOS, Windows or
+Linux — in your graph's folder, and asks before Claude edits anything. Claude runs through a small bridge on
 `127.0.0.1`, behind a private token. The pane starts it through Logseq's own
 `runCli` after asking once to add Node to Logseq's command allowlist, and it
 stops when Logseq quits; there is nothing to install from a terminal. Its sessions are ordinary

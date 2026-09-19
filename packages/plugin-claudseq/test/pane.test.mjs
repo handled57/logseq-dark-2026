@@ -34,6 +34,13 @@ const PLUGIN_URL = 'file:///Users/example/.logseq/plugins/logseq-claudseq/index.
 const CONFIG = JSON.stringify({ port: 47816, token: 'a'.repeat(64), claudePath: '/opt/homebrew/bin/claude' })
 const SESSION = '7c04bdb7-757e-4abc-b765-618665f1172c'
 const NODE = '/opt/homebrew/bin/node'
+const DOTDIR = '/Users/example/.logseq'
+/* What each platform's Logseq window says of itself. */
+const NAVIGATORS = {
+  mac: { platform: 'MacIntel', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Logseq/0.10.15 Chrome/124.0.0.0 Electron/30.0.0 Safari/537.36' },
+  windows: { platform: 'Win32', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Logseq/0.10.15 Chrome/124.0.0.0 Electron/30.0.0 Safari/537.36' },
+  linux: { platform: 'Linux x86_64', userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Logseq/0.10.15 Chrome/124.0.0.0 Electron/30.0.0 Safari/537.36' }
+}
 
 const delay = (ms) => new Promise((settle) => setTimeout(settle, ms))
 
@@ -94,7 +101,7 @@ function bridgeFake({
   const calls = []
   const streams = new Map()
   const encoder = new TextEncoder()
-  const state = { config, claudeFound, down, sessions, history, transcripts, created: 0, nodes, allowlist, launches, log, runs: [], allowlistWrites: [] }
+  const state = { config, claudeFound, down, sessions, history, transcripts, created: 0, nodes, allowlist, launches, log, runs: [], allowlistWrites: [], presence: [] }
 
   function launch(options) {
     state.runs.push(options)
@@ -135,6 +142,19 @@ function bridgeFake({
       init.signal?.addEventListener('abort', () => { try { controller.close() } catch {} })
       return new Response(stream, { status: 200 })
     }
+    /* A window's presence: held open, and let go of when the pane aborts. */
+    if (address.pathname === '/v1/presence') {
+      if (state.presenceMissing) return json(404, { error: 'not_found' })
+      let controller
+      const stream = new ReadableStream({ start(value) { controller = value } })
+      const held = { controller, open: true }
+      state.presence.push(held)
+      init.signal?.addEventListener('abort', () => {
+        held.open = false
+        try { controller.close() } catch {}
+      })
+      return new Response(stream, { status: 200 })
+    }
     if (method === 'POST' || method === 'DELETE') return json(202, { ok: true })
     return json(404, { error: 'not_found' })
   }
@@ -151,7 +171,7 @@ function bridgeFake({
   return { state, calls, fetch, emit, streams, launch }
 }
 
-async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH, url = PLUGIN_URL } = {}) {
+async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH, url = PLUGIN_URL, platform = 'mac', dotdir = DOTDIR, filePath } = {}) {
   const body = element('body')
   const head = element('head')
   const left = body.appendChild(element('div'))
@@ -225,7 +245,7 @@ async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH, url =
       exitEditingMode: async () => {},
       editBlock: async () => {}
     },
-    DB: { datascriptQuery: async () => [[`${graph}/pages/My Page.md`]] },
+    DB: { datascriptQuery: async () => [[filePath ?? `${graph}/pages/My Page.md`]] },
     UI: { showMsg(message) { plugin.messages.push(message) } }
   }
 
@@ -245,15 +265,15 @@ async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH, url =
       innerHeight: 1000,
       setTimeout,
       clearTimeout,
-      navigator: { clipboard: { writeText: async (text) => { copied.push(text) } } },
+      navigator: { ...NAVIGATORS[platform], clipboard: { writeText: async (text) => { copied.push(text) } } },
       apis: {
         async doAction(call) {
           actions.push(call)
           const [action, path, value] = call
-          if (action === 'getLogseqDotDirRoot') return '/Users/example/.logseq'
+          if (action === 'getLogseqDotDirRoot') return dotdir
           if (action === 'readFile') {
-            if (path === '/Users/example/.claudseq/bridge.json') return bridge.state.config
-            if (path === '/Users/example/.claudseq/bridge.log') return bridge.state.log || null
+            if (path === `${dotdir}/claudseq/bridge.json`) return bridge.state.config
+            if (path === `${dotdir}/claudseq/bridge.log`) return bridge.state.log || null
             return null
           }
           /* The host hands back a failed stat's error rather than rejecting. */
@@ -674,9 +694,14 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     effort: 'ultra',
     permissionMode: 'bypassPermissions',
     focusMode: 'off',
-    workingDirectory: 'relative/path',
-    nodePath: 'node'
+    workingDirectory: 'relative/path'
   }) }, defaults)
+  /* A Node path is kept as typed, so that one the pane cannot use says why
+   * rather than being passed over. */
+  assert.equal(context.readSettings({ nodePath: ' node ' }).nodePath, 'node')
+  for (const directory of ['C:\\Users\\Pat\\notes', 'C:/Users/Pat/notes', '\\\\server\\share\\notes']) {
+    assert.equal(context.readSettings({ workingDirectory: directory }).workingDirectory, directory)
+  }
   assert.deepEqual({ ...context.readSettings({
     paneCollapsed: true,
     paneHeight: 12,
@@ -741,9 +766,12 @@ test('without a bridge the pane starts one through runCli, with its path quoted 
     returnResult: false
   })
   /* Logseq runs `command + " " + args` through a shell; that shell reads the
-   * script's path as one word, spaces and quote and all. */
-  const words = execFileSync('/bin/sh', ['-c', `printf '%s\\n' ${run.args}`], { encoding: 'utf8' }).trimEnd().split('\n')
-  assert.deepEqual(words, ["/Users/example/My Plugins/it's claudseq/bridge/claudseq-bridge.mjs", 'serve', '--until-stdin-closes'])
+   * script's path as one word, spaces and quote and all. Windows has no sh:
+   * there the bridge's own tests start it through cmd.exe. */
+  if (process.platform !== 'win32') {
+    const words = execFileSync('/bin/sh', ['-c', `printf '%s\\n' ${run.args}`], { encoding: 'utf8' }).trimEnd().split('\n')
+    assert.deepEqual(words, ["/Users/example/My Plugins/it's claudseq/bridge/claudseq-bridge.mjs", 'serve', '--until-stdin-closes'])
+  }
   assert.deepEqual(bridge.state.allowlistWrites, [], 'the allowlist was written though Node was on it')
 })
 
@@ -1054,7 +1082,8 @@ test('⌘Esc is a command that moves focus to the composer and back', async () =
   const pane = await load()
   await ready(pane)
   assert.equal(pane.plugin.command.options.key, 'claudseq-focus')
-  assert.deepEqual(plain(pane.plugin.command.options.keybinding), { binding: 'mod+esc', mode: 'global' })
+  /* Logseq takes `mac` on the Mac and `binding` everywhere else. */
+  assert.deepEqual(plain(pane.plugin.command.options.keybinding), { binding: 'ctrl+shift+m', mac: 'mod+esc', mode: 'global' })
   await pane.plugin.command.handler()
   await until(() => pane.part('input').focused)
   pane.doc.activeElement = pane.part('input')
@@ -1072,4 +1101,157 @@ test('the header folds the pane, and the fold is remembered', async () => {
   pane.click(pane.part('header'))
   await pane.idle()
   assert.ok(!pane.pane.attributes.has('data-claudseq-collapsed'))
+})
+
+/* --------------------------------------------------------------- presence */
+
+test('a pane that follows no session holds one presence connection, and lets it go while a session streams', async () => {
+  const bridge = bridgeFake()
+  const pane = await load({ bridge })
+  await ready(pane)
+  await until(() => bridge.state.presence.length === 1)
+  assert.equal(bridge.calls.find((call) => call.path === '/v1/presence').authorization, `Bearer ${'a'.repeat(64)}`)
+
+  pane.part('input').value = 'hello'
+  pane.click(pane.action('send'))
+  await until(() => bridge.streams.get('live-1'))
+  await until(() => !bridge.state.presence[0].open)
+  assert.equal(bridge.state.presence.filter((held) => held.open).length, 0, 'a session stream and presence were both held')
+
+  pane.click(pane.action('new'))
+  await until(() => bridge.state.presence.filter((held) => held.open).length === 1)
+  await pane.plugin.unload()
+  assert.equal(bridge.state.presence.filter((held) => held.open).length, 0, 'unloading kept presence open')
+})
+
+test('a bridge that goes away while no session is open is started again', async () => {
+  const bridge = bridgeFake()
+  const pane = await load({ bridge })
+  await ready(pane)
+  await until(() => bridge.state.presence.length === 1)
+  bridge.state.down = true
+  bridge.state.config = null
+  bridge.state.presence[0].controller.error(new TypeError('network error'))
+  const status = await statusIn(pane, 'down')
+  pane.click(pane.action('retry', status))
+  await ready(pane)
+  assert.equal(bridge.state.runs.length, 1)
+  await until(() => bridge.state.presence.length === 2)
+})
+
+test('an older bridge without presence is used as it is', async () => {
+  const bridge = bridgeFake()
+  bridge.state.presenceMissing = true
+  const pane = await load({ bridge })
+  await ready(pane)
+  await until(() => bridge.calls.some((call) => call.path === '/v1/presence'))
+  await delay(200)
+  assert.ok(pane.part('status').attributes.has('data-claudseq-hidden'), 'the pane stopped working')
+  assert.equal(bridge.calls.filter((call) => call.path === '/v1/presence').length, 1, 'presence was asked for again and again')
+})
+
+/* -------------------------------------------------------------- platforms */
+
+const WINDOWS_DOTDIR = 'C:/Users/Pat Smith/.logseq'
+const WINDOWS_URL = 'file:///C:/Users/Pat%20Smith/.logseq/plugins/logseq-claudseq/index.html'
+
+test('on Windows the pane starts the bridge with the node on the PATH, its path double-quoted for cmd.exe, detached', async () => {
+  const bridge = bridgeFake({ config: null, allowlist: ['git'] })
+  const pane = await load({ bridge, platform: 'windows', dotdir: WINDOWS_DOTDIR, url: WINDOWS_URL, graph: 'C:/Users/Pat Smith/Documents/Logseq' })
+  const consent = await statusIn(pane, 'consent')
+  assert.equal(textOf(consent.querySelector('[data-claudseq-part="command"]')), 'node')
+  assert.match(textOf(consent), /Allow adds this command to :commands-allowlist/)
+  assert.deepEqual(hostCalls(pane, 'stat'), [], 'Node was looked for in a folder cmd.exe cannot name')
+
+  pane.click(pane.action('allow-node', consent))
+  await ready(pane)
+  assert.deepEqual(plain(bridge.state.allowlistWrites), [['git', 'node']])
+  assert.deepEqual(plain(bridge.state.runs), [{
+    command: 'node',
+    args: '"C:\\Users\\Pat Smith\\.logseq\\plugins\\logseq-claudseq\\bridge\\claudseq-bridge.mjs" serve --detach',
+    returnResult: false
+  }])
+  assert.ok(hostCalls(pane, 'readFile').some(([, path]) => path === 'C:/Users/Pat Smith/.logseq/claudseq/bridge.json'))
+  assert.equal(pane.part('input').getAttribute('placeholder'), 'Ctrl+Shift+M to focus or unfocus Claude')
+})
+
+test('on Windows a Node path with a space is refused with a way round it, and a short path or bare command is used', async () => {
+  const short = 'C:\\PROGRA~1\\nodejs\\node.exe'
+  const bridge = bridgeFake({ config: null, nodes: [short], allowlist: [short.toLowerCase(), 'node.exe'] })
+  const pane = await load({ bridge, platform: 'windows', dotdir: WINDOWS_DOTDIR, url: WINDOWS_URL, settings: { nodePath: 'C:\\Program Files\\nodejs\\node.exe' } })
+  const status = await until(() => pane.part('status').getAttribute('data-claudseq-failure') === 'node-unplain' && pane.part('status'))
+  assert.match(textOf(status), /through cmd\.exe and cannot quote it/)
+  assert.match(textOf(status), /C:\\PROGRA~1\\nodejs\\node\.exe/)
+
+  pane.plugin.settingsChanged({ nodePath: 'C:\\nodejs\\node.exe' })
+  await until(() => pane.part('status').getAttribute('data-claudseq-failure') === 'node-missing')
+
+  pane.plugin.settingsChanged({ nodePath: short })
+  await ready(pane)
+  assert.equal(bridge.state.runs.at(-1).command, short)
+
+  const bare = bridgeFake({ config: null, nodes: [], allowlist: ['node.exe'] })
+  const other = await load({ bridge: bare, platform: 'windows', dotdir: WINDOWS_DOTDIR, url: WINDOWS_URL, settings: { nodePath: 'node.exe' } })
+  await ready(other)
+  assert.equal(bare.state.runs[0].command, 'node.exe')
+  assert.deepEqual(hostCalls(other, 'stat'), [])
+})
+
+test('on Windows a node Logseq will not run says how to put it on the PATH, and the allowlist lives under %APPDATA%', async () => {
+  const refused = await load({ bridge: bridgeFake({ config: null, allowlist: ['node'], launches: 'refuse' }), platform: 'windows', dotdir: WINDOWS_DOTDIR, url: WINDOWS_URL })
+  const status = await statusIn(refused, 'failed')
+  assert.match(textOf(status), /Logseq did not start the Claudseq bridge with node\. If its notification says node does not exist, install Node\.js 20 or later/)
+  assert.match(textOf(status), /The bridge logs to %USERPROFILE%\\\.logseq\\claudseq\\bridge\.log/)
+
+  const stuck = await load({ bridge: bridgeFake({ config: null, allowlist: 'git' }), platform: 'windows', dotdir: WINDOWS_DOTDIR, url: WINDOWS_URL })
+  const consent = await statusIn(stuck, 'consent')
+  stuck.click(stuck.action('allow-node', consent))
+  const failed = await statusIn(stuck, 'failed')
+  assert.match(textOf(failed), /Add this command to :commands-allowlist in %APPDATA%\\Logseq\\configs\.edn/)
+})
+
+test('on Windows a page is mentioned relative to a graph folder written with either slash', async () => {
+  const pane = await load({
+    platform: 'windows',
+    dotdir: WINDOWS_DOTDIR,
+    url: WINDOWS_URL,
+    graph: 'C:\\Users\\Pat Smith\\Documents\\Logseq',
+    filePath: 'c:/Users/Pat Smith/Documents/Logseq/pages/My Page.md'
+  })
+  await ready(pane)
+  pane.part('input').value = 'Summarise'
+  pane.click(pane.action('mention'))
+  await until(() => pane.part('input').value !== 'Summarise')
+  assert.equal(pane.part('input').value, 'Summarise @"pages/My Page.md" ')
+})
+
+test('off the Mac, Ctrl+Shift+M in the composer moves focus back to the editor', async () => {
+  const pane = await load({ platform: 'linux' })
+  await ready(pane)
+  await pane.plugin.command.handler()
+  await until(() => pane.part('input').focused)
+  pane.doc.activeElement = pane.part('input')
+  pane.pane.dispatch('keydown', { target: pane.part('input'), key: 'M', code: 'KeyM', ctrlKey: true, shiftKey: true })
+  assert.equal(pane.part('input').focused, false)
+  assert.equal(pane.part('input').getAttribute('placeholder'), 'Ctrl+Shift+M to focus or unfocus Claude')
+})
+
+test('on Linux the pane looks where Linux keeps Node, refuses a Node path with capitals, and names Linux\'s configs.edn', async () => {
+  const dotdir = '/home/pat/.logseq'
+  const bridge = bridgeFake({ config: null, nodes: [], allowlist: 'git' })
+  const pane = await load({ bridge, platform: 'linux', dotdir, url: 'file:///home/pat/.logseq/plugins/logseq-claudseq/index.html', graph: '/home/pat/notes' })
+  let status = await statusIn(pane, 'failed')
+  assert.equal(status.getAttribute('data-claudseq-failure'), 'no-node')
+  assert.deepEqual(hostCalls(pane, 'stat').map(([, path]) => path), ['/usr/local/bin/node', '/usr/bin/node', '/home/pat/.volta/bin/node', '/home/linuxbrew/.linuxbrew/bin/node', '/snap/bin/node'])
+
+  pane.plugin.settingsChanged({ nodePath: '/home/pat/.nvm/versions/node/v22.1.0/bin/Node' })
+  status = await until(() => pane.part('status').getAttribute('data-claudseq-failure') === 'node-case' && pane.part('status'))
+  assert.match(textOf(status), /on Linux the Node path cannot contain capital letters/)
+
+  bridge.state.nodes = ['/usr/bin/node']
+  pane.plugin.settingsChanged({ nodePath: '' })
+  const consent = await statusIn(pane, 'consent')
+  pane.click(pane.action('allow-node', consent))
+  status = await statusIn(pane, 'failed')
+  assert.match(textOf(status), /Add this path to :commands-allowlist in ~\/\.config\/Logseq\/configs\.edn/)
 })

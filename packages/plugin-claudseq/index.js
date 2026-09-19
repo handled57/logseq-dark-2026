@@ -9,7 +9,7 @@
  * small Node process that this script starts through the host's `runCli` and
  * that stops when Logseq quits. `runCli` starts only commands on Logseq's
  * allowlist, so the pane asks once before it adds Node to that list. This
- * script finds the bridge's port and token in `~/.claudseq/bridge.json`
+ * script finds the bridge's port and token in `~/.logseq/claudseq/bridge.json`
  * through the host's own file IPC and talks to it over loopback HTTP; the
  * bridge runs `claude` and streams its events back. History is Claude Code's
  * own transcripts, which the bridge reads; Claudseq writes nothing to the
@@ -52,7 +52,29 @@ const COMMAND_KEY = 'claudseq-focus'
 const LOG_PREFIX = '[claudseq]'
 
 const NAV_SELECTOR = '.nav-contents-container'
-const PLACEHOLDER = '⌘ Esc to focus or unfocus Claude'
+
+/* Which desktop Logseq runs on, as the host window's navigator says: Logseq
+ * asks the same question to pick a command's `mac` keybinding. */
+function detectPlatform(navigator) {
+  const text = `${navigator?.userAgentData?.platform ?? ''} ${navigator?.platform ?? ''} ${navigator?.userAgent ?? ''}`
+  if (/Win/.test(text)) return 'windows'
+  if (/Mac/.test(text)) return 'mac'
+  return 'linux'
+}
+
+const PLATFORM = detectPlatform(parent.navigator)
+/* ⌘Esc everywhere would be Ctrl+Esc off the Mac, which opens the Start menu
+ * on Windows. Logseq itself binds neither of these. */
+const SHORTCUT = PLATFORM === 'mac' ? '⌘ Esc' : 'Ctrl+Shift+M'
+const KEYBINDING = { binding: 'ctrl+shift+m', mac: 'mod+esc', mode: 'global' }
+const PLACEHOLDER = `${SHORTCUT} to focus or unfocus Claude`
+/* Where Logseq keeps `:commands-allowlist`, and where the bridge logs. */
+const CONFIGS_EDN = {
+  mac: '~/Library/Application Support/Logseq/configs.edn',
+  windows: '%APPDATA%\\Logseq\\configs.edn',
+  linux: '~/.config/Logseq/configs.edn'
+}[PLATFORM]
+const LOG_PATH = PLATFORM === 'windows' ? '%USERPROFILE%\\.logseq\\claudseq\\bridge.log' : '~/.logseq/claudseq/bridge.log'
 
 const MIN_HEIGHT = 240
 const MAX_HEIGHT = 1600
@@ -120,10 +142,23 @@ function readSettings(raw) {
     effort: EFFORTS.includes(source.effort) ? source.effort : DEFAULTS.effort,
     permissionMode: MODES.includes(source.permissionMode) ? source.permissionMode : DEFAULTS.permissionMode,
     focusMode: source.focusMode !== false,
-    workingDirectory: directory.startsWith('/') ? directory : '',
-    nodePath: node.startsWith('/') ? node : ''
+    workingDirectory: absolutePath(directory) ? directory : '',
+    /* Kept as typed: a Node path the pane cannot use says why, where one
+     * dropped here would only leave the pane looking elsewhere. */
+    nodePath: node
   }
 }
+
+/* `/…` on macOS and Linux; `C:\…`, `C:/…` or `\\server\share` on Windows. */
+function absolutePath(path) {
+  return /^\/|^[A-Za-z]:[\\/]|^\\\\[^\\]/.test(path)
+}
+
+const NODE_PATH_HELP = {
+  mac: 'Leave empty to use Homebrew\'s, Volta\'s or MacPorts\'. With nvm, fnm or asdf, give the full path `which node` prints. It cannot contain spaces.',
+  linux: 'Leave empty to use the first found in /usr/local/bin, /usr/bin, Volta, Linuxbrew or snap. With nvm, fnm or asdf, give the full path `which node` prints. It cannot contain spaces or capital letters.',
+  windows: 'Leave empty to use the node on your PATH, where Node\'s installer puts it. Otherwise give a path to node.exe without spaces, such as C:\\nodejs\\node.exe, or its short form, such as C:\\PROGRA~1\\nodejs\\node.exe.'
+}[PLATFORM]
 
 function settingsSchema() {
   return [
@@ -172,7 +207,7 @@ function settingsSchema() {
       key: 'nodePath',
       type: 'string',
       title: 'Node path',
-      description: 'The Node.js, version 20 or later, that starts Claudseq\'s bridge. Leave empty to use Homebrew\'s, Volta\'s or MacPorts\'. With nvm, fnm or asdf, give the full path `which node` prints. It cannot contain spaces.',
+      description: `The Node.js, version 20 or later, that starts Claudseq's bridge. ${NODE_PATH_HELP}`,
       default: ''
     }
   ]
@@ -193,16 +228,39 @@ function saveSettings(patch) {
 
 const bridge = { config: null, state: 'connecting', claudePath: '', outdated: '', node: '', failure: null }
 
-/* Where Node is looked for when the Node path setting is empty: Homebrew on
- * Apple silicon and on Intel, Volta, and MacPorts. */
-const NODE_PLACES = ['/opt/homebrew/bin/node', '/usr/local/bin/node', '~/.volta/bin/node', '/opt/local/bin/node']
-/* `runCli` hands Logseq's shell the command as it is, unquoted, so a Node
- * path is used only when that shell would read it as one plain word. */
-const PLAIN_COMMAND = /^\/[\w.@+/-]+$/
+/* Where Node is looked for when the Node path setting is empty. On the Mac:
+ * Homebrew on Apple silicon and on Intel, Volta, and MacPorts. On Linux:
+ * nodejs.org's tarball and NodeSource, the distribution's package, Volta,
+ * Linuxbrew and snap. On Windows nothing is looked for: Node's installer puts
+ * it on the PATH that Logseq itself starts with, and its folder, Program
+ * Files, has a space no command can hold — see `commandProblem`. */
+const NODE_PLACES = {
+  mac: ['/opt/homebrew/bin/node', '/usr/local/bin/node', '~/.volta/bin/node', '/opt/local/bin/node'],
+  linux: ['/usr/local/bin/node', '/usr/bin/node', '~/.volta/bin/node', '/home/linuxbrew/.linuxbrew/bin/node', '/snap/bin/node'],
+  windows: []
+}[PLATFORM]
+const WINDOWS_NODE = 'node'
 const START_WAIT = 15000
 const START_POLL = 150
-const LOG_PATH = '~/.claudseq/bridge.log'
 const RETRY = ['retry', 'Retry']
+
+/* Why `runCli` could not start this command, or null when it can. Logseq
+ * hands its shell the command as it is, unquoted, so it must be one plain
+ * word there. Before that it lowercases the command and checks that it
+ * exists — on Linux, in a filesystem where case counts, a path with a
+ * capital letter never does. On Windows a bare name such as `node` is looked
+ * for on the PATH. */
+function commandProblem(command) {
+  if (PLATFORM === 'windows') {
+    return /^[\w-]+(?:\.exe)?$/i.test(command) || /^[A-Za-z]:[\\/][\w.@+~\\/-]*[\w@+~-]$/.test(command) ? null : 'unplain'
+  }
+  if (!/^\/[\w.@+/-]+$/.test(command)) return 'unplain'
+  return PLATFORM === 'linux' && command !== command.toLowerCase() ? 'case' : null
+}
+
+function bareCommand(command) {
+  return !/[\\/]/.test(command)
+}
 
 function bridgeError(kind, detail = '') {
   const error = new Error(detail || kind)
@@ -219,18 +277,28 @@ async function doAction(call) {
   return apis.doAction(call)
 }
 
-let home = ''
+let dotdir = ''
+
+/* Logseq's own folder, `~/.logseq`, which it names with forward slashes on
+ * every platform. The bridge keeps its files in `claudseq` inside it. */
+async function dotDirectory() {
+  if (dotdir) return dotdir
+  const found = await doAction(['getLogseqDotDirRoot'])
+  if (typeof found !== 'string' || !found) throw bridgeError('app', 'Logseq did not say where its dotdir is')
+  dotdir = found.replace(/[\\/]+$/, '')
+  return dotdir
+}
 
 async function homeDirectory() {
-  if (home) return home
-  const dotdir = await doAction(['getLogseqDotDirRoot'])
-  if (typeof dotdir !== 'string' || !dotdir) throw bridgeError('app', 'Logseq did not say where its dotdir is')
-  home = dotdir.replace(/[\\/]\.logseq[\\/]?$/, '')
-  return home
+  return (await dotDirectory()).replace(/[\\/]\.logseq$/, '')
+}
+
+async function stateFile(name) {
+  return `${await dotDirectory()}/claudseq/${name}`
 }
 
 async function loadConfig() {
-  const text = await doAction(['readFile', `${await homeDirectory()}/.claudseq/bridge.json`])
+  const text = await doAction(['readFile', await stateFile('bridge.json')])
   if (typeof text !== 'string' || !text.trim()) throw bridgeError('missing')
   let config
   try {
@@ -283,13 +351,14 @@ async function api(method, path, body, retry = true) {
   return json
 }
 
-/* The session's events, as NDJSON over one long response. */
-function openStream(liveId, after, onEntry, onEnd) {
+/* NDJSON over one long response: a session's events, or the window's
+ * presence, which carries only heartbeats. */
+function openStream(path, onEntry, onEnd) {
   const controller = new AbortController()
   ;(async () => {
     try {
       const config = bridge.config ?? await loadConfig()
-      const response = await fetch(`http://127.0.0.1:${config.port}/v1/sessions/${liveId}/events?after=${after}`, {
+      const response = await fetch(`http://127.0.0.1:${config.port}${path}`, {
         headers: { Authorization: `Bearer ${config.token}` },
         signal: controller.signal
       })
@@ -354,15 +423,20 @@ async function exists(path) {
   }
 }
 
+/* A bare command, `node` on Windows, is not looked for here: only Logseq
+ * knows its own PATH, and `runCli` says when the command is not on it. */
 async function findNode() {
   const root = await homeDirectory()
   if (settings.nodePath) {
-    if (!PLAIN_COMMAND.test(settings.nodePath)) return { problem: 'node-unplain', path: settings.nodePath }
+    const problem = commandProblem(settings.nodePath)
+    if (problem) return { problem: `node-${problem}`, path: settings.nodePath }
+    if (bareCommand(settings.nodePath)) return { node: settings.nodePath }
     return await exists(settings.nodePath) ? { node: settings.nodePath } : { problem: 'node-missing', path: settings.nodePath }
   }
+  if (PLATFORM === 'windows') return { node: WINDOWS_NODE }
   for (const place of NODE_PLACES) {
     const path = place.replace(/^~/, root)
-    if (PLAIN_COMMAND.test(path) && await exists(path)) return { node: path }
+    if (!commandProblem(path) && await exists(path)) return { node: path }
   }
   return { problem: 'no-node' }
 }
@@ -404,21 +478,37 @@ async function allowNode() {
   return connect()
 }
 
-function shellQuote(text) {
-  return `'${String(text).replace(/'/g, "'\\''")}'`
-}
-
+/* The bridge's path as its own platform writes it: a file URL's path is
+ * `/C:/…` on Windows, and `//server/…` for a network share. */
 function bridgeScriptPath() {
   const url = new URL('bridge/claudseq-bridge.mjs', location.href)
   if (url.protocol !== 'file:') throw bridgeError('app', `Claudseq is loaded from ${url.protocol}, not from a folder`)
-  return decodeURIComponent(url.pathname)
+  const path = decodeURIComponent(url.pathname)
+  if (PLATFORM !== 'windows') return path
+  const local = path.replace(/^\/(?=[A-Za-z]:)/, '').replace(/\//g, '\\')
+  return url.host ? `\\\\${url.host}${local}` : local
+}
+
+/* What follows the Node command on the line `runCli` hands its shell. On
+ * macOS and Linux that is sh, and the path is single-quoted; the bridge
+ * lives as long as the pipe Logseq holds to it. On Windows it is cmd.exe,
+ * which reads a double-quoted path as one word, spaces, `&` and all, but
+ * still expands `%NAME%` inside it; and whose console window would stay open
+ * as long as the bridge ran, so the bridge starts a copy of itself without
+ * one and exits. */
+function launchArgs(script) {
+  if (PLATFORM === 'windows') {
+    if (/["%]/.test(script)) throw bridgeError('error', `cmd.exe would change the path of Claudseq's folder: ${script}`)
+    return `"${script}" serve --detach`
+  }
+  return `'${script.replace(/'/g, "'\\''")}' serve --until-stdin-closes`
 }
 
 async function lastLogLine() {
   try {
-    const text = await doAction(['readFile', `${await homeDirectory()}/.claudseq/bridge.log`])
+    const text = await doAction(['readFile', await stateFile('bridge.log')])
     if (typeof text !== 'string') return ''
-    const lines = text.trim().split('\n')
+    const lines = text.trim().split(/\r?\n/)
     return oneLine((lines[lines.length - 1] ?? '').replace(/^\S+ \[claudseq\] /, ''), 300)
   } catch {
     return ''
@@ -426,18 +516,19 @@ async function lastLogLine() {
 }
 
 /* Start the bridge the one way a plugin can: through the host's `runCli`.
- * It runs the command line through Logseq's shell, so the script's path is
- * quoted, and resolves with the exit code once the command exits — for a
- * bridge that started, when Logseq quits. Until then the bridge's health is
- * asked for; an exit before it answers is a bridge that could not start,
- * unless it exited 0, having found another already answering. */
+ * It runs the command line through Logseq's shell, and resolves with the
+ * exit code once the command exits — for a bridge that started on macOS or
+ * Linux, when Logseq quits; on Windows, once the bridge it started answers.
+ * Until then the bridge's health is asked for; an exit before it answers is
+ * a bridge that could not start, unless it exited 0, having found another
+ * already answering or left its own running. */
 async function launch(node) {
   bridge.state = 'starting'
   renderNow()
   let exit
   doAction(['runCli', {
     command: node,
-    args: `${shellQuote(bridgeScriptPath())} serve --until-stdin-closes`,
+    args: launchArgs(bridgeScriptPath()),
     returnResult: false
   }]).then((code) => { exit = typeof code === 'number' ? code : null }, () => { exit = null })
   const deadline = Date.now() + START_WAIT
@@ -489,6 +580,7 @@ let notice = ''
 let savedEditingBlock = null
 let renderTimer = null
 let reconnectTimer = null
+let presence = null
 let stickToBottom = true
 let pane = null
 let parts = {}
@@ -725,6 +817,7 @@ function render() {
   }
   renderToolbar()
   renderMenu()
+  syncPresence()
 }
 
 function renderStatus() {
@@ -766,14 +859,14 @@ function statusContent() {
       return {
         lines: ['Claudseq runs Claude Code through a small bridge, which it starts with Node. Logseq starts only the programs on its allowlist, so Node needs adding to it, once:'],
         code: bridge.node,
-        after: ['Allow adds this path to :commands-allowlist in Logseq\'s configs.edn. Logseq then lets any plugin run Node, as it already lets them run Git.'],
+        after: [`Allow adds ${bareCommand(bridge.node) ? 'this command' : 'this path'} to :commands-allowlist in Logseq's configs.edn. Logseq then lets any plugin run Node, as it already lets them run Git.`],
         button: ['allow-node', 'Allow', true]
       }
     case 'down':
       return { lines: ['The Claudseq bridge stopped answering. Claudseq will start it again in a moment.'], button: RETRY }
     case 'noclaude':
       return {
-        lines: [`The bridge could not find claude${bridge.claudePath ? ` at ${bridge.claudePath}` : ' on your login shell\'s PATH'}. Install Claude Code, then press Retry.`],
+        lines: [`The bridge could not find claude${bridge.claudePath ? ` at ${bridge.claudePath}` : PLATFORM === 'windows' ? ' on your PATH' : ' on your login shell\'s PATH'}. Install Claude Code, then press Retry.`],
         button: RETRY
       }
     case 'nograph':
@@ -792,7 +885,7 @@ function statusContent() {
 function failureContent(failure) {
   switch (failure.kind) {
     case 'app':
-      return { lines: ['Claudseq needs the Logseq desktop app, loaded from a folder on this Mac.'] }
+      return { lines: ['Claudseq needs the Logseq desktop app, loaded from a folder on this computer.'] }
     case 'no-node':
       return {
         lines: ['Claudseq starts its bridge with Node.js 20 or later, and found none in:'],
@@ -808,25 +901,44 @@ function failureContent(failure) {
         button: RETRY
       }
     case 'node-unplain':
+      return PLATFORM === 'windows'
+        ? {
+            lines: ['Logseq starts Node through cmd.exe and cannot quote it, so the Node path cannot contain spaces or shell characters:'],
+            code: failure.path,
+            after: ['Clear it to use the node on your PATH, or give a path without them — the short form of a folder works, such as C:\\PROGRA~1\\nodejs\\node.exe — then press Retry.'],
+            button: RETRY
+          }
+        : {
+            lines: ['Logseq starts Node through a shell, so the Node path must be a full path without spaces or shell characters:'],
+            code: failure.path,
+            after: ['Set a path without them in Claudseq\'s settings — a symlink to Node works — then press Retry.'],
+            button: RETRY
+          }
+    case 'node-case':
       return {
-        lines: ['Logseq starts Node through a shell, so the Node path cannot contain spaces or shell characters:'],
+        lines: ['Logseq lowercases a command before it checks that the command exists, so on Linux the Node path cannot contain capital letters:'],
         code: failure.path,
         after: ['Set a path without them in Claudseq\'s settings — a symlink to Node works — then press Retry.'],
         button: RETRY
       }
     case 'allowlist':
       return {
-        lines: ['Claudseq could not add Node to Logseq\'s allowlist. Add this path to :commands-allowlist in ~/Library/Application Support/Logseq/configs.edn, then quit and reopen Logseq:'],
+        lines: [`Claudseq could not add Node to Logseq's allowlist. Add this ${bareCommand(failure.node ?? '') ? 'command' : 'path'} to :commands-allowlist in ${CONFIGS_EDN}, then quit and reopen Logseq:`],
         code: failure.node,
         button: RETRY
       }
     case 'error':
       return { lines: ['Claudseq could not start its bridge:'], code: failure.message, button: RETRY }
     default: {
+      /* Logseq says why it refused in a notification of its own: the command
+       * does not exist, or is not on its allowlist. */
+      const refused = PLATFORM === 'windows' && bareCommand(failure.node ?? '')
+        ? ` If its notification says ${failure.node} does not exist, install Node.js 20 or later from nodejs.org, then quit and reopen Logseq so that it finds Node on the PATH.`
+        : ' Quitting and reopening Logseq reloads its allowlist.'
       const why = typeof failure.exit === 'number' && failure.exit !== 0
         ? `The Claudseq bridge stopped as it started (exit code ${failure.exit}).`
         : failure.exit === null
-          ? `Logseq did not start the Claudseq bridge with ${failure.node}. Quitting and reopening Logseq reloads its allowlist.`
+          ? `Logseq did not start the Claudseq bridge with ${failure.node}.${refused}`
           : `The Claudseq bridge did not answer within ${START_WAIT / 1000} seconds.`
       return {
         lines: [failure.log ? `${why} Its log says:` : why],
@@ -1263,7 +1375,7 @@ function attach(liveId, after) {
   const session = current
   session.liveId = liveId
   session.lastSeq = after
-  session.stream = openStream(liveId, after, (entry) => {
+  session.stream = openStream(`/v1/sessions/${liveId}/events?after=${after}`, (entry) => {
     if (current !== session) return
     session.lastSeq = entry.seq
     session.timeline.apply(entry.event)
@@ -1293,14 +1405,41 @@ function attach(liveId, after) {
   })
 }
 
-/* The bridge went away mid-session — it crashed, or was stopped. The pane
- * starts it again in a moment; the session's transcript is still there, and
- * the next message resumes it. */
+/* The bridge went away — it crashed, or was stopped. The pane starts it
+ * again in a moment; a session's transcript is still there, and the next
+ * message resumes it. */
 function lost() {
   bridge.state = 'down'
   scheduleRender()
   parent.clearTimeout(reconnectTimer)
   reconnectTimer = parent.setTimeout(() => connect().catch(() => {}), 3000)
+}
+
+/* One connection that tells the bridge this window is here. A bridge started
+ * on Windows runs on its own and stops soon after the last window lets go of
+ * it, as when Logseq quits; a session's event stream says the same, so this
+ * is held only while no session is followed — Chromium allows six
+ * connections to one host across every window. Its end is also the first
+ * sign that a bridge went away while no session was open. */
+function syncPresence() {
+  const wanted = Boolean(pane) && ['ready', 'noclaude', 'nograph'].includes(bridge.state) && !current?.stream
+  if (wanted && !presence) {
+    const held = openStream('/v1/presence', () => {}, (error) => {
+      if (presence !== held) return
+      /* A bridge older than presence, still running after an update, lives
+       * as long as Logseq anyway. */
+      if (error?.kind === 'gone') {
+        presence = { abort() {} }
+        return
+      }
+      presence = null
+      lost()
+    })
+    presence = held
+  } else if (!wanted && presence) {
+    presence.abort()
+    presence = null
+  }
 }
 
 async function refreshTitle() {
@@ -1520,7 +1659,7 @@ async function mentionPage() {
       logseq.UI?.showMsg?.('This page has no file yet.', 'warning')
       return
     }
-    if (path.startsWith(`${cwd}/`)) path = path.slice(cwd.length + 1)
+    path = ClaudseqTimeline.relativePath(path, cwd)
     insertText(/\s/.test(path) ? `@"${path}" ` : `@${path} `)
   } catch (error) {
     console.warn(LOG_PREFIX, 'could not mention the page', error)
@@ -1666,10 +1805,18 @@ function onClick(event) {
   }
 }
 
+/* The focus command's keys, pressed in the composer: ⌘Esc, or Ctrl+Shift+M
+ * off the Mac. The pane answers them there and keeps them from Logseq. */
+function focusShortcut(event) {
+  if (event.key === 'Escape' && (event.metaKey || event.ctrlKey)) return true
+  return PLATFORM !== 'mac' && event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey &&
+    (event.code === 'KeyM' || event.key?.toLowerCase?.() === 'm')
+}
+
 function onKeyDown(event) {
   const part = event.target?.getAttribute?.(PART_ATTR)
   if (part === 'input') {
-    if (event.key === 'Escape' && (event.metaKey || event.ctrlKey)) {
+    if (focusShortcut(event)) {
       event.preventDefault()
       event.stopPropagation?.()
       unfocus()
@@ -1871,6 +2018,8 @@ function teardown() {
     current.stream?.abort()
     current.stream = null
   }
+  presence?.abort()
+  presence = null
   doc.removeEventListener('mousedown', onDocumentMouseDown, true)
   pane?.remove()
   pane = null
@@ -1899,7 +2048,7 @@ function main() {
   logseq.App.registerCommandPalette({
     key: COMMAND_KEY,
     label: 'Claudseq: Focus or unfocus Claude',
-    keybinding: { binding: 'mod+esc', mode: 'global' }
+    keybinding: KEYBINDING
   }, () => toggleFocus())
 
   logseq.App.onCurrentGraphChanged?.(() => {

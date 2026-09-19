@@ -2,6 +2,37 @@
 
 All notable changes to this package are documented here.
 
+## 0.1.1 - 2026-09-18
+
+- **Claudseq works on Windows and Linux** as well as macOS
+  ([#77](https://github.com/handled57/logseq-dark-2026/issues/77)). Installed
+  on Windows, 0.1.0 found no Node, so nothing worked.
+  - **Windows.** The pane starts the bridge with the `node` on your PATH,
+    where Node's installer puts it; Logseq's `runCli` cannot run a path with
+    a space, such as `C:\Program Files\nodejs\node.exe`. The bridge finds
+    `claude.exe` from Claude Code's installer and `claude.cmd` from npm.
+    Logseq starts it in a console window, which the bridge closes within a
+    second or two; it then runs without one. It stops about 20 seconds after
+    the last Logseq window lets go of it, as when Logseq quits, and stops
+    every `claude` it started with it. The focus shortcut is **Ctrl+Shift+M**,
+    because Ctrl+Esc opens the Start menu.
+  - **Linux.** The pane looks for Node in `/usr/local/bin`, `/usr/bin`,
+    Volta, Linuxbrew and snap. A Node path with a capital letter is refused
+    with the reason: Logseq lowercases a command before it checks that it
+    exists. The focus shortcut is **Ctrl+Shift+M**.
+  - The **Node path** and **Working directory** settings take a Windows path.
+    A Node path the pane cannot use now says why, rather than being ignored.
+  - History, resuming and the **+** mention match a folder however its path
+    is written: with either slash and any case of letter on Windows, and with
+    or without a separator at its end everywhere.
+  - Messages name each platform's own paths: Logseq's `configs.edn` and the
+    bridge's log.
+- **The bridge keeps its files in `~/.logseq/claudseq/`**, inside Logseq's
+  own folder, rather than `~/.claudseq/`. If you ran 0.1.0, quit and reopen
+  Logseq after updating, then delete `~/.claudseq/`.
+- A bridge that stops while no session is open is noticed and started again
+  at once, not at the next request.
+
 ## 0.1.0 - 2026-09-18
 
 - **A Claude Code pane in the left sidebar.** Claudseq sits below Favorites

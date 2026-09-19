@@ -6,32 +6,50 @@
  * `fetch`, because `fetch` will not send a `Host` header of the caller's
  * choosing and the Host check is one of the things under test.
  *
- * Nothing here touches the real `~/.claudseq` or `~/.claude`: every
+ * Nothing here touches the real `~/.logseq` or `~/.claude`: every
  * directory the bridge reads or writes is a temporary one handed to it. A
  * bridge that runs as a process of its own is started the way Logseq's
  * `runCli` starts it — its command line through a shell, with its stdin a
  * pipe that the test holds, as Logseq does, and closes, as quitting does.
+ *
+ * On Windows the same suite runs with the fake behind a `claude.cmd`, as
+ * npm installs Claude Code there, in a folder whose name has a space; and
+ * the bridge started as `runCli` starts it there is the detached one, which
+ * lives as long as a pane holds a connection to it.
  */
 
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { access, mkdir, mkdtemp, readFile, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { request } from 'node:http'
 import { createServer } from 'node:net'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
-  ALLOWED_ORIGIN, ENTRYPOINT, VERSION, claudeArgs, createBridge, listHistory,
-  projectDirName, readTranscript, sessionScoped, status, titleOf
+  ALLOWED_ORIGIN, ENTRYPOINT, VERSION, claudeArgs, claudeCandidates, cmdLine, createBridge, listHistory,
+  projectDirName, readTranscript, samePath, sessionScoped, status, stateDirectory, titleOf
 } from '../bridge/claudseq-bridge.mjs'
 
+const WINDOWS = process.platform === 'win32'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const script = resolve(root, 'bridge/claudseq-bridge.mjs')
-const fake = resolve(root, 'test/fixtures/fake-claude.mjs')
+const fakeScript = resolve(root, 'test/fixtures/fake-claude.mjs')
 const TOKEN = 'test-token-0123456789abcdef0123456789'
+
+/* The `claude` the bridge is given. On Windows a script cannot be started
+ * by itself, so the fake sits behind a batch file, as npm's `claude.cmd`
+ * does. */
+async function fakeClaude() {
+  if (!WINDOWS) return fakeScript
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq fake '))
+  const shim = join(dir, 'claude.cmd')
+  await writeFile(shim, `@"${process.execPath}" "${fakeScript}" %*\r\n`)
+  return shim
+}
+const fake = await fakeClaude()
 
 const delay = (ms) => new Promise((settle) => setTimeout(settle, ms))
 
@@ -86,14 +104,14 @@ function call(port, { method = 'GET', path = '/v1/health', token = TOKEN, host =
 }
 
 /* An NDJSON event stream, collected as it arrives. */
-function stream(port, id, after = 0) {
+function stream(port, id, after = 0, token = TOKEN) {
   const events = []
   let res = null
   const req = request({
     host: '127.0.0.1',
     port,
     path: `/v1/sessions/${id}/events?after=${after}`,
-    headers: { Authorization: `Bearer ${TOKEN}` }
+    headers: { Authorization: `Bearer ${token}` }
   }, (response) => {
     res = response
     let buffer = ''
@@ -246,7 +264,7 @@ test('a prompt reaches claude on stdin unchanged, and never through a shell', as
       await assert.rejects(access(join(bridge.cwd, name), constants.F_OK), `${name} was created`)
       await assert.rejects(access(join(root, name), constants.F_OK), `${name} was created`)
     }
-    assert.equal(log[0].cwd, await import('node:fs/promises').then(({ realpath }) => realpath(bridge.cwd)))
+    assert.equal(await realpath(log[0].cwd), await realpath(bridge.cwd))
   } finally {
     await bridge.close()
   }
@@ -476,9 +494,13 @@ test('a closed session kills its claude', async () => {
   try {
     const session = await bridge.open()
     assert.ok(alive(session.pid))
+    /* On Windows the child is cmd.exe running `claude.cmd`, and Claude is
+     * the process beneath it. */
+    const claudePid = (await until(async () => (await bridge.fakeLog()).find((entry) => entry.pid))).pid
     const closed = await call(bridge.port, { method: 'DELETE', path: `/v1/sessions/${session.id}` })
     assert.equal(closed.status, 200)
     await until(() => !alive(session.pid))
+    await until(() => !alive(claudePid))
     assert.equal((await call(bridge.port, { path: `/v1/sessions/${session.id}/events` })).status, 404)
   } finally {
     await bridge.close()
@@ -660,12 +682,96 @@ test('history and transcripts are served over the authenticated API', async () =
   }
 })
 
+test('a folder is the same folder with a separator at its end, and on Windows with either slash and any case', async () => {
+  assert.ok(samePath('/Users/example/notes/', '/Users/example/notes', false))
+  assert.ok(!samePath('/Users/example/Notes', '/Users/example/notes', false))
+  assert.ok(!samePath('/Users/example/notes\\', '/Users/example/notes', false))
+  assert.ok(samePath('/', '/', false))
+  assert.ok(samePath('C:/Users/Pat Smith/Documents/Logseq', 'c:\\users\\pat smith\\documents\\logseq\\', true))
+  assert.ok(samePath('C:\\', 'c:/', true))
+  assert.ok(!samePath('C:\\Users\\Pat', 'C:\\Users\\Pat Smith', true))
+  assert.ok(!samePath(undefined, '/x', false))
+
+  /* Logseq names a graph's folder with forward slashes; Claude Code records
+   * its working directory with backslashes, and names its project folder
+   * after either the same way. */
+  const projects = await mkdtemp(join(tmpdir(), 'claudseq-projects-'))
+  const recorded = 'C:\\Users\\Pat Smith\\Documents\\Logseq'
+  const id = 'abababab-abab-4bab-8bab-abababababab'
+  try {
+    assert.equal(projectDirName(recorded), 'C--Users-Pat-Smith-Documents-Logseq')
+    await writeSession(projects, projectDirName(recorded), id, [user(recorded, 'from Windows', { uuid: 'w1' })])
+    for (const cwd of ['C:/Users/Pat Smith/Documents/Logseq', 'c:\\users\\pat smith\\documents\\logseq\\']) {
+      assert.deepEqual((await listHistory(projects, cwd, { windows: true })).map((entry) => entry.title), ['from Windows'], cwd)
+      assert.deepEqual((await readTranscript(projects, cwd, id, { windows: true })).records.map((record) => record.uuid), ['w1'], cwd)
+    }
+    assert.deepEqual(await listHistory(projects, 'c:/users/pat smith/documents/logseq', { windows: false }), [])
+
+    const posix = '/Users/example/notes'
+    await writeSession(projects, projectDirName(posix), id, [user(posix, 'from the Mac')])
+    assert.deepEqual((await listHistory(projects, `${posix}/`, { windows: false })).map((entry) => entry.title), ['from the Mac'])
+  } finally {
+    await rm(projects, { recursive: true, force: true })
+  }
+})
+
+/* ------------------------------------------------------------- on Windows */
+
+test('on Windows claude is looked for as claude.exe and claude.cmd, on the PATH and where its installers put it', () => {
+  assert.deepEqual(claudeCandidates({
+    windows: true,
+    pathValue: 'C:\\Windows\\system32;"C:\\Program Files\\Tools";;C:\\Users\\Pat\\AppData\\Roaming\\npm',
+    home: 'C:\\Users\\Pat',
+    appData: 'C:\\Users\\Pat\\AppData\\Roaming'
+  }), [
+    'C:\\Windows\\system32\\claude.exe',
+    'C:\\Windows\\system32\\claude.cmd',
+    'C:\\Program Files\\Tools\\claude.exe',
+    'C:\\Program Files\\Tools\\claude.cmd',
+    'C:\\Users\\Pat\\AppData\\Roaming\\npm\\claude.exe',
+    'C:\\Users\\Pat\\AppData\\Roaming\\npm\\claude.cmd',
+    'C:\\Users\\Pat\\.local\\bin\\claude.exe',
+    'C:\\Users\\Pat\\AppData\\Roaming\\npm\\claude.cmd'
+  ])
+  assert.deepEqual(claudeCandidates({ windows: false, named: '/opt/homebrew/bin/claude', pathValue: '/usr/bin:/bin', home: '/Users/pat' }), [
+    '/opt/homebrew/bin/claude',
+    '/usr/bin/claude',
+    '/bin/claude',
+    '/Users/pat/.claude/local/claude',
+    '/Users/pat/.local/bin/claude',
+    '/opt/homebrew/bin/claude',
+    '/usr/local/bin/claude'
+  ])
+})
+
+test('a claude.cmd is run through cmd.exe with a command line of its path and the bridge\'s own flags only', () => {
+  const args = claudeArgs({ sessionId: '11111111-1111-4111-8111-111111111111', model: 'claude-opus-5[1m]', effort: 'high', mode: 'acceptEdits' })
+  const line = cmdLine('C:\\Users\\Pat Smith & Co\\AppData\\Roaming\\npm\\claude.cmd', args)
+  assert.equal(line, `""C:\\Users\\Pat Smith & Co\\AppData\\Roaming\\npm\\claude.cmd" ${args.join(' ')}"`)
+  /* cmd.exe expands %NAME% even inside quotes, and nothing can hold a
+   * quote of its own: such a word is refused, never escaped. */
+  assert.throws(() => cmdLine('C:\\100%\\claude.cmd', args), /cmd\.exe would change/)
+  assert.throws(() => cmdLine('C:\\npm\\claude.cmd', ['--model', 'a"b']), /cmd\.exe would change/)
+  assert.equal(cmdLine('C:\\npm\\claude.cmd', ['']), '"C:\\npm\\claude.cmd """')
+})
+
+test('the bridge keeps its files in Logseq\'s own folder', () => {
+  assert.equal(stateDirectory({}), join(homedir(), '.logseq', 'claudseq'))
+  assert.equal(stateDirectory({ CLAUDSEQ_STATE_DIR: '/tmp/elsewhere' }), '/tmp/elsewhere')
+})
 
 /* ---------------------------------------------------------------- starting */
 
-/* The command line the pane hands Logseq's `runCli`. */
-function commandLine(args = '') {
-  return `'${process.execPath}' '${script}' serve --until-stdin-closes ${args}`.trim()
+/* Logseq's `runCli` hands its shell `command + " " + args`. The pane's
+ * arguments are the script's path, quoted for that shell, then `serve` and
+ * how long to live: on macOS and Linux, single quotes and as long as the
+ * pipe on stdin; on Windows, cmd.exe's double quotes and `--detach`. */
+function commandLine(path = script, args = '', mode = WINDOWS ? '--detach' : '--until-stdin-closes') {
+  if (WINDOWS) {
+    const node = /\s/.test(process.execPath) ? 'node' : process.execPath
+    return `${node} "${path}" serve ${mode} ${args}`.trim()
+  }
+  return `'${process.execPath}' '${path.replace(/'/g, "'\\''")}' serve ${mode} ${args}`.trim()
 }
 
 function serveEnv(dir, env = {}) {
@@ -682,14 +788,15 @@ function serveEnv(dir, env = {}) {
 /* A bridge started as Logseq's `runCli` starts one: the command line through
  * a shell, every stdio a pipe, stdout and stderr read and dropped, and stdin
  * held open and never written to. Ending `stdin` is what Logseq quitting
- * does to it. */
-function launch(dir, { args = '', env = {} } = {}) {
-  const child = spawn(commandLine(args), [], { shell: true, detached: false, env: serveEnv(dir, env) })
+ * does to it on macOS and Linux. */
+function launch(dir, { args = '', env = {}, path = script, mode } = {}) {
+  const child = spawn(commandLine(path, args, mode), [], { shell: true, detached: false, env: serveEnv(dir, env) })
   child.stdout.on('data', () => {})
   child.stderr.on('data', () => {})
+  child.stdin.on('error', () => {})
   const closed = new Promise((settle) => child.on('close', (code) => settle(code)))
   /* A bridge that never exits fails the test rather than hanging it. */
-  const exited = Promise.race([closed, delay(8000).then(() => { throw new Error('the bridge did not exit') })])
+  const exited = Promise.race([closed, delay(15000).then(() => { throw new Error('the bridge did not exit') })])
   exited.catch(() => {})
   return { child, exited, stdin: child.stdin }
 }
@@ -713,7 +820,30 @@ function stopProcess(pid) {
   if (pid && alive(pid)) process.kill(pid, 'SIGKILL')
 }
 
-test('a bridge started as runCli starts it writes a private config once it listens, and stops with Logseq, taking every claude with it', async () => {
+/* Stop a bridge `launch` started as Logseq quitting would: its stdin closes
+ * on macOS and Linux; on Windows, where it runs on its own, it is ended. */
+async function quit(launched, config) {
+  if (WINDOWS) {
+    assert.equal(await launched.exited, 0)
+    stopProcess(config?.pid)
+  } else {
+    launched.stdin.end()
+    assert.equal(await launched.exited, 0)
+  }
+  if (config?.pid) await until(() => !alive(config.pid))
+}
+
+/* A window's presence, held until it is let go. */
+function presence(port, token) {
+  const req = request({ host: '127.0.0.1', port, path: '/v1/presence', headers: { Authorization: `Bearer ${token}` } }, (res) => {
+    res.on('data', () => {})
+  })
+  req.on('error', () => {})
+  req.end()
+  return { close: () => req.destroy() }
+}
+
+test('a bridge started as runCli starts it writes a private config once it listens, and stops with Logseq, taking every claude with it', { skip: WINDOWS && 'on Windows the bridge runs on its own; see --detach' }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'claudseq-serve-'))
   const port = await freePort()
   const bridge = launch(dir, { args: `--port ${port}` })
@@ -751,7 +881,7 @@ test('a bridge started as runCli starts it writes a private config once it liste
   }
 })
 
-test('a Logseq killed outright takes its bridge and every claude with it', async () => {
+test('a Logseq killed outright takes its bridge and every claude with it', { skip: WINDOWS && 'on Windows the bridge runs on its own; see --detach' }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'claudseq-kill-'))
   const port = await freePort()
   /* A stand-in for Logseq's main process, doing what its `runCli` does. */
@@ -761,7 +891,7 @@ test('a Logseq killed outright takes its bridge and every claude with it', async
     job.stdout.on('data', () => {})
     job.stderr.on('data', () => {})
     setInterval(() => {}, 1000)
-  `, commandLine(`--port ${port}`)], { env: serveEnv(dir), stdio: 'ignore' })
+  `, commandLine(script, `--port ${port}`)], { env: serveEnv(dir), stdio: 'ignore' })
   let config = null
   let pid = null
   try {
@@ -782,7 +912,7 @@ test('a Logseq killed outright takes its bridge and every claude with it', async
   }
 })
 
-test('a bridge asked to stop kills every claude it started', async () => {
+test('a bridge asked to stop kills every claude it started', { skip: WINDOWS && 'Windows has no signal that asks a process to stop' }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'claudseq-term-'))
   const port = await freePort()
   const bridge = launch(dir, { args: `--port ${port}` })
@@ -802,6 +932,79 @@ test('a bridge asked to stop kills every claude it started', async () => {
   }
 })
 
+test('a bridge started with --detach outlives its launcher, and stops once every pane has let go, taking every claude with it', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-detach-'))
+  /* Where the plugin lives is where Logseq keeps plugins, in a home folder
+   * whose name may hold a space, an ampersand or an apostrophe. */
+  const home = join(dir, "Pat O'Neil & Co")
+  const copy = join(home, '.logseq', 'plugins', 'logseq-claudseq', 'bridge', 'claudseq-bridge.mjs')
+  await mkdir(dirname(copy), { recursive: true })
+  await writeFile(copy, await readFile(script))
+  const port = await freePort()
+  const launcher = launch(dir, { args: `--port ${port}`, path: copy, mode: '--detach', env: { CLAUDSEQ_PANE_GRACE_MS: '600' } })
+  let config = null
+  let pid = null
+  try {
+    assert.equal(await launcher.exited, 0)
+    config = (await until(() => answering(dir))).config
+    assert.equal(config.port, port)
+    assert.notEqual(config.pid, launcher.child.pid)
+    if (!WINDOWS) assert.equal((await stat(join(dir, 'state', 'bridge.json'))).mode & 0o777, 0o600)
+    assert.match(await logOf(dir), new RegExp(`started a bridge of its own, pid ${config.pid}, which answers on 127\\.0\\.0\\.1:${port}`))
+
+    const window = presence(port, config.token)
+    await delay(1200)
+    assert.ok(alive(config.pid), 'a bridge with a pane stopped')
+
+    const created = await call(port, { method: 'POST', path: '/v1/sessions', token: config.token, body: { cwd: dir } })
+    assert.equal(created.status, 201, created.text)
+    pid = created.json.pid
+    const events = stream(port, created.json.id, 0, config.token)
+    window.close()
+    await delay(1200)
+    assert.ok(alive(config.pid), 'a bridge a session stream held stopped')
+
+    events.close()
+    await until(() => !alive(config.pid), { timeout: 8000 })
+    await until(() => !alive(pid))
+    assert.match(await logOf(dir), /every pane has left: closing 1 session\(s\)/)
+  } finally {
+    stopProcess(config?.pid)
+    stopProcess(pid)
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a bridge started with --detach that no pane reaches stops by itself', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'claudseq-alone-'))
+  const port = await freePort()
+  const launcher = launch(dir, { args: `--port ${port}`, mode: '--detach', env: { CLAUDSEQ_PANE_GRACE_MS: '300' } })
+  let config = null
+  try {
+    assert.equal(await launcher.exited, 0)
+    config = (await until(() => answering(dir))).config
+    await until(() => !alive(config.pid), { timeout: 8000 })
+    assert.match(await logOf(dir), /no pane connected: closing 0 session\(s\)/)
+  } finally {
+    stopProcess(config?.pid)
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('presence needs the token like everything else', async () => {
+  const bridge = await start()
+  try {
+    assert.equal((await call(bridge.port, { path: '/v1/presence', token: null })).status, 401)
+    assert.equal(bridge.bridge.panes, 0)
+    const window = presence(bridge.port, TOKEN)
+    await until(() => bridge.bridge.panes === 1)
+    window.close()
+    await until(() => bridge.bridge.panes === 0)
+  } finally {
+    await bridge.close()
+  }
+})
+
 test('a second start finds the running bridge and leaves it be', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'claudseq-again-'))
   const port = await freePort()
@@ -809,14 +1012,16 @@ test('a second start finds the running bridge and leaves it be', async () => {
   let config = null
   try {
     config = (await until(() => answering(dir))).config
+    const window = WINDOWS ? presence(port, config.token) : null
     const second = launch(dir)
     assert.equal(await second.exited, 0)
     assert.deepEqual(await written(dir), config, 'a second start rewrote the config')
     assert.equal((await call(port, { token: config.token })).status, 200)
     assert.match(await logOf(dir), new RegExp(`a bridge already answers on 127\\.0\\.0\\.1:${port}; this one is not needed`))
+    window?.close()
+    await quit(first, config)
   } finally {
-    first.stdin.end()
-    await first.exited
+    first.child.kill('SIGKILL')
     stopProcess(config?.pid)
     await rm(dir, { recursive: true, force: true })
   }
@@ -833,9 +1038,15 @@ test('two windows starting a bridge at once end up with one', async () => {
     config = (await until(() => answering(dir))).config
     assert.equal(config.port, port)
     const survivor = both[1 - firstOut.index]
-    assert.equal(survivor.child.exitCode, null, 'neither bridge kept running')
-    survivor.stdin.end()
-    assert.equal(await survivor.exited, 0)
+    if (WINDOWS) {
+      /* Both launchers leave once a bridge answers; one bridge is left. */
+      assert.equal(await survivor.exited, 0)
+      assert.match(await logOf(dir), /this one is not needed/)
+      assert.equal((await call(port, { token: config.token })).status, 200)
+    } else {
+      assert.equal(survivor.child.exitCode, null, 'neither bridge kept running')
+    }
+    await quit(survivor, config)
   } finally {
     for (const entry of both) entry.child.kill('SIGKILL')
     stopProcess(config?.pid)
@@ -853,8 +1064,7 @@ test('a port another program holds moves the bridge to a free one', async () => 
     config = (await until(() => answering(dir), { timeout: 8000 })).config
     assert.notEqual(config.port, port)
     assert.match(await logOf(dir), new RegExp(`127\\.0\\.0\\.1:${port} is taken by another program`))
-    bridge.stdin.end()
-    assert.equal(await bridge.exited, 0)
+    await quit(bridge, config)
   } finally {
     squatter.close()
     stopProcess(config?.pid)
@@ -868,7 +1078,7 @@ test('a bridge that cannot start says why in its log and exits with an error', a
   try {
     const bridge = launch(dir, { args: '--port 80' })
     assert.equal(await bridge.exited, 1)
-    assert.match(await logOf(dir), /could not start: --port must be between 1024 and 65535, not 80\n$/)
+    assert.match(await logOf(dir), /could not start: --port must be between 1024 and 65535, not 80\r?\n$/)
     assert.equal(await written(dir), null)
   } finally {
     await rm(dir, { recursive: true, force: true })
@@ -896,7 +1106,8 @@ test('the bridge runs its command when it is started through a symlink', async (
   try {
     await mkdir(join(dir, 'real'))
     await writeFile(join(dir, 'real', 'claudseq-bridge.mjs'), await readFile(script))
-    await symlink(join(dir, 'real'), join(dir, 'linked'))
+    /* A junction on Windows, which needs no administrator. */
+    await symlink(join(dir, 'real'), join(dir, 'linked'), 'junction')
     /* No command is a usage error: exiting quietly would mean nothing ran. */
     const result = await new Promise((settle) => {
       const child = spawn(process.execPath, [link], { stdio: ['ignore', 'pipe', 'pipe'] })

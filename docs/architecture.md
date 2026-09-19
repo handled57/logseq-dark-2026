@@ -268,18 +268,33 @@ returnResult}])`. In Logseq 0.10.15 it:
 
 - accepts the command only when it exists and is on the allowlist, after
   trimming and lowercasing both sides. The allowlist is Git, Pandoc, ag, grep
-  and alda, plus `:commands-allowlist` in the app's `configs.edn`;
-- spawns `command + " " + args` with `shell: true`, every stdio a pipe;
+  and alda, plus `:commands-allowlist` in the app's `configs.edn`. The
+  existence check uses the lowercased command, so on Linux, where case
+  counts, a path with a capital letter never passes; on Windows it runs
+  `where`, and a bare name is looked for on Logseq's own PATH;
+- spawns the command as it was given, unlowercased,
+  `command + " " + args` with `shell: true` — sh on macOS and Linux, cmd.exe
+  on Windows — every stdio a pipe. The command cannot be quoted, because a
+  quote fails the existence check;
 - reads stdout and stderr, and sends them to a toast only when
   `returnResult` is set;
 - resolves with the exit code when the process closes, or with nothing, after
   an error toast, when it refuses the command.
 
 When no bridge answers, the pane finds Node in its Node path setting, or else
-in `/opt/homebrew/bin`, `/usr/local/bin`, `~/.volta/bin` or `/opt/local/bin`.
-It uses a path only if it is a plain word to the shell, because the command
-reaches the shell unquoted. If that path is not on the allowlist, the pane
-shows it and asks. **Allow** reads `:commands-allowlist` through
+in `/opt/homebrew/bin`, `/usr/local/bin`, `~/.volta/bin` or `/opt/local/bin`
+on macOS, and in `/usr/local/bin`, `/usr/bin`, `~/.volta/bin`, Linuxbrew or
+`/snap/bin` on Linux. It uses a path only if it is a plain word to the shell,
+because the command reaches the shell unquoted, and on Linux only if it has
+no capital letter. On Windows it looks for nothing: Node's installer puts
+`C:\Program Files\nodejs` on the PATH, a folder no unquoted command can
+name, so the pane uses the bare command `node`, and `runCli`'s own check
+finds it on Logseq's PATH or refuses it with a notification. The Node path
+setting there takes `node`, a path without spaces, or a folder's 8.3 short
+form. A setting the pane cannot use is kept as typed, and the pane says why.
+The platform comes from the host window's `navigator`, as Logseq's own choice
+of a command's `mac` keybinding does. If that command is not on the
+allowlist, the pane shows it and asks. **Allow** reads `:commands-allowlist` through
 `userAppCfgs`, appends the path and writes the whole list back, because the
 setter replaces the value. The setter's reply can fail to cross the IPC after
 the write succeeds, so the pane then reads the entry back. It leaves a value
@@ -287,17 +302,35 @@ that is not a list of strings alone and says so. The consequence belongs to
 Logseq, and the pane says it in the prompt: any plugin may then run that Node
 through `runCli`, as any plugin may already run Git.
 
-The pane then calls `runCli` with that Node and
-`'<plugin folder>/bridge/claudseq-bridge.mjs' serve --until-stdin-closes`,
-with the path single-quoted for the shell and `returnResult` off. It asks for
-health every 150 ms for up to 15 s. An exit before an answer means the bridge
-could not start, unless the code is 0, which means it found another bridge
-already answering. In that case the pane shows the exit code and the last
-line of `~/.claudseq/bridge.log`.
+The pane then calls `runCli` with that Node, `returnResult` off, and:
 
-**Lifecycle.** `serve` yields to a bridge that already answers with the
-token in `bridge.json`. Otherwise it asks the login shell once for its `PATH`
-and for `claude`, because Logseq started from the Dock has neither. It
+- on macOS and Linux,
+  `'<plugin folder>/bridge/claudseq-bridge.mjs' serve --until-stdin-closes`,
+  the path single-quoted for sh;
+- on Windows, `"<plugin folder>\bridge\claudseq-bridge.mjs" serve --detach`,
+  the path double-quoted for cmd.exe, which inside double quotes takes
+  spaces, `&`, `|`, `<`, `>` and `^` literally but still expands `%NAME%`.
+  A plugin folder whose path holds `%` is refused rather than escaped. The
+  path comes from the entry's file URL, whose `/C:/…` becomes `C:\…`.
+
+It asks for health every 150 ms for up to 15 s. An exit before an answer
+means the bridge could not start, unless the code is 0, which means it found
+another bridge already answering, or, on Windows, left its own running. In
+that case the pane shows the exit code and the last line of
+`~/.logseq/claudseq/bridge.log`. When Logseq refuses the command, `runCli`
+resolves with nothing after a notification that says why, and the pane points
+to it.
+
+**Lifecycle.** The bridge keeps `bridge.json` and `bridge.log` in
+`~/.logseq/claudseq/`: Logseq's own folder, which the pane finds through
+`getLogseqDotDirRoot` on every platform, and not the plugin's, which Logseq
+replaces when the plugin is updated while a bridge may be running. `serve`
+yields to a bridge that already answers with the token in `bridge.json`.
+Otherwise, on macOS and Linux, it asks the login shell once for its `PATH`
+and for `claude`, because Logseq started from the Dock has neither. Windows
+has no login shell, and an app there starts with the user's whole PATH, so
+it looks for `claude.exe` and `claude.cmd` on that PATH, then at
+`%USERPROFILE%\.local\bin\claude.exe` and `%APPDATA%\npm\claude.cmd`. It
 listens on the port it last used, 47816 at first. When that port is held by a
 bridge that another window started at the same moment, it yields to that
 bridge. When another program holds it, it listens on a free port instead.
@@ -311,6 +344,22 @@ when it is killed. The bridge then stops every `claude` it started. It logs to
 a file and never to stdout or stderr, because once Logseq is gone a write to
 either pipe fails while the bridge is still stopping its children.
 
+On Windows that pipe is not used. Logseq is a windowed app, so cmd.exe, which
+`runCli` starts, gets a console window of its own that would stay open, and
+end the bridge if closed, for as long as the bridge ran. With `--detach` the
+script starts a copy of itself, `--until-panes-leave`, detached, hidden and
+with no stdio, waits up to 12 s for it to answer, and exits; the window
+closes with it. A copy that cannot start logs why, and that line is the one
+the pane shows. The copy lives by the connections panes hold: each window
+keeps a presence stream (`GET /v1/presence`, heartbeats only) open while it
+follows no session, and a session's event stream counts the same. It stops
+20 s after the last one closes, and 60 s after starting if none arrives. A
+window that quits or is killed closes its connections with it, so the bridge
+stops with Logseq here too, 20 s later. The pane holds presence only while it
+follows no session, because Chromium allows six connections to one host
+across all of Logseq's windows. On every platform, presence ending is also
+how the pane learns that a bridge went away while no session was open.
+
 A bridge that stops while Logseq runs is started again by the pane, and one
 bridge serves every window. A plugin updated while Logseq runs finds the older
 bridge still answering; the pane keeps using it and says to reopen Logseq.
@@ -323,26 +372,36 @@ a file in the user's home:
 - Every request carries `Authorization: Bearer <token>`. The token is 32
   random bytes, new each time the bridge starts. It is stored in
   `bridge.json`, which is mode 0600 in a 0700 folder, and compared in constant
-  time over SHA-256 digests. On a 401 the pane reads the file again once.
+  time over SHA-256 digests. Windows has no such modes; there the file is
+  private because it is in the user's profile folder. On a 401 the pane reads
+  the file again once.
 - The `Host` header must be exactly `127.0.0.1:<port>`. This defeats DNS
   rebinding: a page that points its own name at 127.0.0.1 still sends that
   name as the host.
 - CORS admits one origin, `file://`. The plugin's `effect: true` entry shares
   it with Logseq's window. Any refused origin or host is logged to
-  `~/.claudseq/bridge.log`.
+  `~/.logseq/claudseq/bridge.log`.
 
 A web page can reach the port, but it has no token and cannot read the file
 that holds it. The pane reads that file through
-`parent.apis.doAction(['readFile', …])`, and finds home as the parent of
+`parent.apis.doAction(['readFile', …])`, in the `claudseq` folder inside
 `getLogseqDotDirRoot`.
 
 The one command line the pane builds contains nothing but the Node path,
 which is checked to be a plain word, and the plugin folder's path, which is
-single-quoted. No prompt, setting other than Node path, or model output is
-part of it.
+quoted for the platform's shell. No prompt, setting other than Node path, or
+model output is part of it.
 
 **Processes.** Each open session is one `claude` child. The bridge starts it
-with an argv array, never a shell, in the folder the pane names. The argv
+with an argv array, never a shell, in the folder the pane names. The one
+exception is npm's `claude.cmd` on Windows: Node refuses to start a batch
+file without a shell, so the bridge runs `cmd.exe /d /s /c "…"` itself. That
+command line is the shim's path and the argv below, and nothing else: every
+value in it is checked against a fixed list or pattern first, the working
+directory is `spawn`'s option and not a word on the line, and a word holding
+`%` or `"` is refused rather than escaped. On Windows a `claude` without
+`.exe`, `.cmd`, `.bat` or `.com` is not used: npm puts a shell script by
+that name beside `claude.cmd`, which Windows cannot start. The argv
 turns on stream-json in both directions, partial messages, permission
 requests over stdio (`--permission-prompt-tool stdio`) and the chosen
 `--permission-mode`. A prompt reaches Claude only as a stream-json `user`
@@ -358,9 +417,11 @@ It sets `CLAUDE_CODE_ENTRYPOINT=logseq-claudseq` on the sessions it starts.
 Without that, `-p` records the entrypoint `sdk-cli`, and the VS Code
 extension's history and `claude --resume` both hide such sessions.
 
-A child is sent SIGTERM, then SIGKILL three seconds later. That happens when
-its session closes, after 30 minutes with no pane attached, and when the
-bridge stops, including when Logseq quits. At most eight run at once. A
+A child is sent SIGTERM, then SIGKILL three seconds later; on Windows, which
+has no signal that asks a process to stop, `taskkill /T /F` ends it and every
+process beneath it, Claude under cmd.exe included. That happens when its
+session closes, after 30 minutes with no pane attached, and when the bridge
+stops, including when Logseq quits. At most eight run at once. A
 bridge that started before `claude` was installed looks for it again when
 the pane asks, so Retry works without restarting Logseq.
 
@@ -374,7 +435,10 @@ transcript.
 **History.** History is Claude Code's own transcripts under
 `~/.claude/projects/`, which the bridge reads and never writes. A transcript
 belongs to a folder only when its records name that `cwd`; the encoded
-directory name only says where to look. The pane keeps its own state (fold,
+directory name only says where to look. Two paths name the same folder with
+or without a separator at the end, and on Windows with either slash and any
+case of letter, because Logseq writes a graph's path with forward slashes and
+Claude Code records its working directory with backslashes. The pane keeps its own state (fold,
 height, open session and defaults) in its plugin settings through
 `logseq.updateSettings`, never in the graph.
 
