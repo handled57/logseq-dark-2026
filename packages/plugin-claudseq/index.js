@@ -47,11 +47,16 @@ const HIDDEN_ATTR = 'data-claudseq-hidden'
 const SELECTED_ATTR = 'data-claudseq-selected'
 const ERROR_ATTR = 'data-claudseq-error'
 const FAILURE_ATTR = 'data-claudseq-failure'
+const CHOOSE_ATTR = 'data-claudseq-choose'
 const HEIGHT_PROPERTY = '--claudseq-height'
 const COMMAND_KEY = 'claudseq-focus'
 const LOG_PREFIX = '[claudseq]'
 
 const NAV_SELECTOR = '.nav-contents-container'
+/* The form Logseq draws for a plugin's settings, one `.desc-item` per
+ * setting, marked with the setting's key. */
+const SETTINGS_SELECTOR = '.cp__plugins-settings-inner'
+const SETTING_ROW_SELECTOR = '.desc-item'
 
 /* Which desktop Logseq runs on, as the host window's navigator says: Logseq
  * asks the same question to pick a command's `mac` keybinding. */
@@ -122,7 +127,8 @@ const DEFAULTS = {
   permissionMode: 'default',
   focusMode: true,
   workingDirectory: '',
-  nodePath: ''
+  nodePath: '',
+  claudePath: ''
 }
 
 /* ---------------------------------------------------------------- settings */
@@ -134,6 +140,7 @@ function readSettings(raw) {
   const height = typeof source.paneHeight === 'number' ? source.paneHeight : Number.NaN
   const directory = typeof source.workingDirectory === 'string' ? source.workingDirectory.trim() : ''
   const node = typeof source.nodePath === 'string' ? source.nodePath.trim() : ''
+  const claude = typeof source.claudePath === 'string' ? source.claudePath.trim() : ''
   return {
     paneCollapsed: source.paneCollapsed === true,
     paneHeight: Number.isFinite(height) ? Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(height))) : DEFAULTS.paneHeight,
@@ -143,9 +150,11 @@ function readSettings(raw) {
     permissionMode: MODES.includes(source.permissionMode) ? source.permissionMode : DEFAULTS.permissionMode,
     focusMode: source.focusMode !== false,
     workingDirectory: absolutePath(directory) ? directory : '',
-    /* Kept as typed: a Node path the pane cannot use says why, where one
-     * dropped here would only leave the pane looking elsewhere. */
-    nodePath: node
+    /* Kept as typed: a Node or Claude Code path the pane cannot use says
+     * why, where one dropped here would only leave the pane looking
+     * elsewhere. */
+    nodePath: node,
+    claudePath: claude
   }
 }
 
@@ -159,6 +168,25 @@ const NODE_PATH_HELP = {
   linux: 'Leave empty to use the first found in /usr/local/bin, /usr/bin, Volta, Linuxbrew or snap. With nvm, fnm or asdf, give the full path `which node` prints. It cannot contain spaces or capital letters.',
   windows: 'Leave empty to use the node on your PATH, where Node\'s installer puts it. Otherwise give a path to node.exe without spaces, such as C:\\nodejs\\node.exe, or its short form, such as C:\\PROGRA~1\\nodejs\\node.exe.'
 }[PLATFORM]
+
+const CLAUDE_PATH_HELP = PLATFORM === 'windows'
+  ? 'Leave empty to use the claude.exe or claude.cmd on your PATH, or where Claude Code\'s installer or npm puts it. It must be a file named claude.exe or claude.cmd.'
+  : 'Leave empty to use the claude on your login shell\'s PATH, or where Claude Code\'s installer puts it. It must be a file named claude.'
+
+/* What each chooser looks for in the folder it is given: Logseq offers a
+ * plugin a folder picker, and no file picker. */
+const CHOOSERS = {
+  nodePath: { title: 'Node path', files: PLATFORM === 'windows' ? ['node.exe'] : ['node'] },
+  claudePath: { title: 'Claude Code path', files: PLATFORM === 'windows' ? ['claude.exe', 'claude.cmd'] : ['claude'] }
+}
+
+/* A setting's chooser, at the end of its description. Logseq renders a
+ * description as Markdown and sanitizes the HTML, which keeps this link and
+ * its attributes. It has no href, so nothing but Claudseq's own handler acts
+ * on it. */
+function chooserLink(key) {
+  return `<a ${CHOOSE_ATTR}="${key}" role="button" tabindex="0">Choose the folder with ${CHOOSERS[key].files.join(' or ')}…</a>`
+}
 
 function settingsSchema() {
   return [
@@ -207,7 +235,14 @@ function settingsSchema() {
       key: 'nodePath',
       type: 'string',
       title: 'Node path',
-      description: `The Node.js, version 20 or later, that starts Claudseq's bridge. ${NODE_PATH_HELP}`,
+      description: `The Node.js, version 20 or later, that starts Claudseq's bridge. ${NODE_PATH_HELP} ${chooserLink('nodePath')}`,
+      default: ''
+    },
+    {
+      key: 'claudePath',
+      type: 'string',
+      title: 'Claude Code path',
+      description: `The \`claude\` that Claudseq's bridge runs. ${CLAUDE_PATH_HELP} ${chooserLink('claudePath')}`,
       default: ''
     }
   ]
@@ -393,10 +428,11 @@ function openStream(path, onEntry, onEnd) {
 }
 
 /* Whether the bridge answers, with the token its file holds now: a bridge
- * that has just started has written a new one. */
+ * that has just started has written a new one. It also says whether it can
+ * run the `claude` the Claude Code path setting names. */
 async function health() {
   bridge.config = null
-  return api('GET', '/v1/health')
+  return api('GET', settings.claudePath ? `/v1/health?claude=${encodeURIComponent(settings.claudePath)}` : '/v1/health')
 }
 
 function pause(ms) {
@@ -865,10 +901,18 @@ function statusContent() {
     case 'down':
       return { lines: ['The Claudseq bridge stopped answering. Claudseq will start it again in a moment.'], button: RETRY }
     case 'noclaude':
-      return {
-        lines: [`The bridge could not find claude${bridge.claudePath ? ` at ${bridge.claudePath}` : PLATFORM === 'windows' ? ' on your PATH' : ' on your login shell\'s PATH'}. Install Claude Code, then press Retry.`],
-        button: RETRY
-      }
+      /* An older bridge answers for its own claude, whatever the setting. */
+      return settings.claudePath && bridge.claudePath === settings.claudePath
+        ? {
+            lines: ['The bridge cannot run the Claude Code path in Claudseq\'s settings:'],
+            code: settings.claudePath,
+            after: [`It must be the full path of a file named ${CHOOSERS.claudePath.files.join(' or ')}. Choose another in Claudseq's settings, or clear it to let the bridge look for claude, then press Retry.`],
+            button: RETRY
+          }
+        : {
+            lines: [`The bridge could not find claude${bridge.claudePath ? ` at ${bridge.claudePath}` : PLATFORM === 'windows' ? ' on your PATH' : ' on your login shell\'s PATH'}. Install Claude Code, or choose it under Claude Code path in Claudseq's settings, then press Retry.`],
+            button: RETRY
+          }
     case 'nograph':
       return { lines: ['Open a graph, or set a working directory in Claudseq\'s settings, to start a session.'], button: RETRY }
     case 'ready':
@@ -1499,7 +1543,8 @@ async function ensureLive() {
     resume: session.claudeSessionId ?? undefined,
     model: settings.model === 'default' ? undefined : settings.model,
     effort: settings.effort === 'default' ? undefined : settings.effort,
-    mode: settings.permissionMode
+    mode: settings.permissionMode,
+    claude: settings.claudePath || undefined
   })
   if (current !== session) return null
   session.claudeSessionId = created.claudeSessionId
@@ -1926,6 +1971,100 @@ function toggleFocus() {
   else focusComposer()
 }
 
+/* --------------------------------------------------------------- choosers */
+
+let choosing = false
+
+/* The chooser an event landed on: one of Claudseq's links in the form Logseq
+ * draws for its settings, on the row of the setting it names. A page's own
+ * HTML can carry the same attribute, and is never acted on. */
+function chooserAt(target) {
+  const link = typeof target?.closest === 'function' ? target.closest(`[${CHOOSE_ATTR}]`) : null
+  const key = link?.getAttribute(CHOOSE_ATTR)
+  if (!key || !Object.hasOwn(CHOOSERS, key) || !link.closest(SETTINGS_SELECTOR)) return null
+  const row = link.closest(SETTING_ROW_SELECTOR)
+  return row?.getAttribute('data-key') === key ? { key, row } : null
+}
+
+function onChooserClick(event) {
+  const found = chooserAt(event.target)
+  if (!found) return
+  /* The link is inside the setting's label, which would pass the click on
+   * to the field. */
+  event.preventDefault()
+  choose(found)
+}
+
+function onChooserKey(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  const found = chooserAt(event.target)
+  if (!found) return
+  event.preventDefault()
+  choose(found)
+}
+
+function inFolder(folder, file) {
+  return PLATFORM === 'windows'
+    ? `${folder.replace(/[\\/]+$/, '')}\\${file}`
+    : `${folder.replace(/\/+$/, '')}/${file}`
+}
+
+/* Logseq's stat does not say what it found. `path/.` is a folder's own
+ * entry, and no file has one; Windows reads it as `path` itself, but no
+ * folder there is named like the files looked for. */
+async function fileAt(path) {
+  if (!(await exists(path))) return false
+  return PLATFORM === 'windows' || !(await exists(`${path}/.`))
+}
+
+/* Why a Node path a chooser found cannot be used, in the words the pane's
+ * own messages use. */
+function nodeRefusal(problem, path) {
+  if (problem === 'case') return `Logseq lowercases a command before it checks that the command exists, so on Linux the Node path cannot contain capital letters, as ${path} does. A symlink to Node works.`
+  return PLATFORM === 'windows'
+    ? `Logseq starts Node through cmd.exe and cannot quote it, so the Node path cannot contain spaces, as ${path} does. Leave Node path empty to use the node on your PATH, or type the folder's short form, such as C:\\PROGRA~1\\nodejs\\node.exe.`
+    : `Logseq starts Node through a shell, so the Node path cannot contain spaces or shell characters, as ${path} does. A symlink to Node in a folder without them works.`
+}
+
+/* Logseq offers a plugin a folder picker and no file picker, so a chooser
+ * asks for the folder and looks in it for the file. What it finds is saved
+ * as a typed path would be, and written into the field as well: the field
+ * shows the value the form opened with until it is opened again. */
+async function choose({ key, row }) {
+  if (choosing) return
+  choosing = true
+  const { title, files } = CHOOSERS[key]
+  try {
+    const folder = await doAction(['openDialog'])
+    if (typeof folder !== 'string' || !folder) return
+    let found = null
+    for (const file of files) {
+      if (await fileAt(inFolder(folder, file))) {
+        found = inFolder(folder, file)
+        break
+      }
+    }
+    if (!found) {
+      logseq.UI?.showMsg?.(`There is no ${files.join(' or ')} in ${folder}.`, 'warning', { timeout: 8000 })
+      return
+    }
+    const problem = key === 'nodePath' ? commandProblem(found) : null
+    if (problem) {
+      logseq.UI?.showMsg?.(nodeRefusal(problem, found), 'warning', { timeout: 15000 })
+      return
+    }
+    logseq.updateSettings({ [key]: found })
+    const field = row.querySelector('input')
+    if (field) field.value = found
+    logseq.UI?.showMsg?.(`${title}: ${found}`)
+  } catch (error) {
+    console.warn(LOG_PREFIX, 'could not choose a folder', error)
+    logseq.UI?.showMsg?.(`Claudseq could not open a folder picker: ${error?.message ?? error}`, 'error')
+  } finally {
+    choosing = false
+  }
+}
+
 /* ------------------------------------------------------------- connection */
 
 async function resolveCwd() {
@@ -2021,6 +2160,8 @@ function teardown() {
   presence?.abort()
   presence = null
   doc.removeEventListener('mousedown', onDocumentMouseDown, true)
+  doc.removeEventListener('click', onChooserClick, true)
+  doc.removeEventListener('keydown', onChooserKey, true)
   pane?.remove()
   pane = null
   rowCache.clear()
@@ -2042,6 +2183,8 @@ function main() {
   render()
 
   doc.addEventListener('mousedown', onDocumentMouseDown, true)
+  doc.addEventListener('click', onChooserClick, true)
+  doc.addEventListener('keydown', onChooserKey, true)
   observer = new MutationObserver(() => mount())
   observer.observe(doc.body, { childList: true, subtree: true })
 
@@ -2058,7 +2201,7 @@ function main() {
     const before = settings
     settings = readSettings(next)
     if (settings.workingDirectory !== before.workingDirectory) switchDirectory().catch((error) => console.warn(LOG_PREFIX, error))
-    else if (settings.nodePath !== before.nodePath && bridge.state !== 'ready') connect().catch(() => {})
+    else if ((settings.nodePath !== before.nodePath || settings.claudePath !== before.claudePath) && bridge.state !== 'ready') connect().catch(() => {})
     else scheduleRender()
   })
 

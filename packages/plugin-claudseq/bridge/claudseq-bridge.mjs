@@ -36,7 +36,10 @@
  * - CORS admits one origin, `file://`: an `effect: true` plugin shares the
  *   Logseq window's origin, and that window is loaded from a file URL.
  * - `claude` is started from an argv array in the working directory the pane
- *   names, never through a shell — save npm's `claude.cmd` on Windows, which
+ *   names, never through a shell. The pane may name which `claude`, from
+ *   its Claude Code path setting, but only a file called `claude` —
+ *   `claude.exe` or `claude.cmd` on Windows — so the bridge runs Claude Code
+ *   and nothing else — save npm's `claude.cmd` on Windows, which
  *   only cmd.exe can run: its command line is the shim's path and the
  *   bridge's own checked flags, and nothing a request carries. Prompt text
  *   reaches Claude only as a stream-json message on stdin, and
@@ -62,7 +65,7 @@ import { homedir } from 'node:os'
 import { isAbsolute, join, posix, win32 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const VERSION = '0.1.1'
+export const VERSION = '0.2.0'
 export const ALLOWED_ORIGIN = 'file://'
 export const ENTRYPOINT = 'logseq-claudseq'
 export const DEFAULT_PORT = 47816
@@ -205,7 +208,7 @@ function killTree(pid) {
 }
 
 class Session {
-  constructor(bridge, { cwd, resume, model, effort, mode }) {
+  constructor(bridge, { cwd, resume, model, effort, mode, claudePath }) {
     this.bridge = bridge
     this.id = randomUUID()
     this.claudeSessionId = resume ?? randomUUID()
@@ -227,7 +230,7 @@ class Session {
     this.idleTimer = null
     this.args = claudeArgs({ sessionId: this.claudeSessionId, resume, model, effort, mode })
 
-    this.child = spawnClaude(bridge.claudePath, this.args, {
+    this.child = spawnClaude(claudePath, this.args, {
       cwd,
       env: childEnv(bridge.env),
       stdio: ['pipe', 'pipe', 'pipe']
@@ -737,11 +740,30 @@ function checkEffort(effort) {
 
 /* Windows runs a file by its extension, and has no execute bit to check. A
  * `claude` with none there is the shell script npm puts beside `claude.cmd`
- * for Git Bash, which Windows cannot start. */
+ * for Git Bash, which Windows cannot start. A folder passes the execute
+ * check too, so only a file counts. */
 async function executable(path, windows = WINDOWS) {
   if (typeof path !== 'string' || !isAbsolute(path)) return false
   if (windows && (!/\.(?:exe|cmd|bat|com)$/i.test(path) || (batchFile(path) && /["%]/.test(path)))) return false
+  if (!(await stat(path).then((info) => info.isFile(), () => false))) return false
   return access(path, constants.X_OK).then(() => true, () => false)
+}
+
+/* Whether a path the pane names is Claude Code's by its name: `claude`, or
+ * on Windows `claude.exe` from the native installer or `claude.cmd` from
+ * npm. */
+export function claudeFile(path, windows = WINDOWS) {
+  if (typeof path !== 'string') return false
+  const name = (windows ? win32 : posix).basename(path)
+  return windows ? /^claude\.(?:exe|cmd)$/i.test(name) : name === 'claude'
+}
+
+/* The `claude` a request names from the pane's Claude Code path setting:
+ * null when it names none, and the bridge looks for its own. */
+function checkClaude(path) {
+  if (path === undefined || path === null || path === '') return null
+  if (typeof path !== 'string' || path.length > 4096) throw new HttpError(400, 'bad_claude_path')
+  return path
 }
 
 export function createBridge({
@@ -815,8 +837,10 @@ export function createBridge({
 
   /* A bridge that started before Claude Code was installed, or before it
    * moved, looks for it again when asked, rather than waiting for Logseq to
-   * restart it. */
-  async function claudeReady() {
+   * restart it. A `claude` the pane names is used as named, or not at all:
+   * the user chose it. */
+  async function claudeReady(chosen = null) {
+    if (chosen !== null) return claudeFile(chosen) && executable(chosen)
     if (await executable(bridge.claudePath)) return true
     if (!locateClaude) return false
     const found = await locateClaude().catch(() => null)
@@ -830,13 +854,14 @@ export function createBridge({
     if (parts[0] !== 'v1') throw new HttpError(404, 'not_found')
 
     if (parts.length === 2 && parts[1] === 'health' && method === 'GET') {
-      const claudeFound = await claudeReady()
+      const chosen = checkClaude(url.searchParams.get('claude'))
+      const claudeFound = await claudeReady(chosen)
       return sendJson(res, 200, {
         ok: true,
         version: VERSION,
         pid: process.pid,
         sessions: bridge.sessions.size,
-        claudePath: bridge.claudePath,
+        claudePath: chosen ?? bridge.claudePath,
         claudeFound
       }, cors)
     }
@@ -873,6 +898,7 @@ export function createBridge({
       const mode = checkMode(body.mode)
       const model = checkModel(body.model)
       const effort = checkEffort(body.effort)
+      const chosen = checkClaude(body.claude)
       const resume = body.resume === undefined || body.resume === null || body.resume === '' ? null : body.resume
       if (resume !== null && (typeof resume !== 'string' || !UUID.test(resume))) throw new HttpError(400, 'bad_session_id')
 
@@ -882,12 +908,13 @@ export function createBridge({
         const running = [...bridge.sessions.values()].find((entry) => entry.claudeSessionId === resume && !entry.closed)
         if (running) return sendJson(res, 200, running.summary(), cors)
       }
-      if (!(await claudeReady())) throw new HttpError(424, 'claude_not_found', { claudePath: bridge.claudePath })
+      if (!(await claudeReady(chosen))) throw new HttpError(424, 'claude_not_found', { claudePath: chosen ?? bridge.claudePath })
       if (bridge.sessions.size >= maxSessions) throw new HttpError(429, 'too_many_sessions')
 
-      const created = new Session(bridge, { cwd, resume, model, effort, mode })
+      const claudePath = chosen ?? bridge.claudePath
+      const created = new Session(bridge, { cwd, resume, model, effort, mode, claudePath })
       bridge.sessions.set(created.id, created)
-      log(`session ${created.id} started claude pid ${created.pid} (${resume ? `resume ${resume}` : `new ${created.claudeSessionId}`})`)
+      log(`session ${created.id} started claude pid ${created.pid} (${resume ? `resume ${resume}` : `new ${created.claudeSessionId}`}${chosen ? `, ${chosen}` : ''})`)
       return sendJson(res, 201, created.summary(), cors)
     }
 

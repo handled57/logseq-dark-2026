@@ -292,6 +292,23 @@ name, so the pane uses the bare command `node`, and `runCli`'s own check
 finds it on Logseq's PATH or refuses it with a notification. The Node path
 setting there takes `node`, a path without spaces, or a folder's 8.3 short
 form. A setting the pane cannot use is kept as typed, and the pane says why.
+
+Node path and Claude Code path each end with a chooser. Logseq 0.10.15 runs
+Electron 38, which no longer gives a page the path behind a file input, and
+the one picker its IPC offers a plugin, `openDialog`, picks a folder. So the
+chooser asks for a folder and looks in it for `node` or `claude` (`node.exe`,
+then `claude.exe` or `claude.cmd`, on Windows). Logseq's `stat` does not say
+whether it found a file, so on macOS and Linux the pane also stats `path/.`,
+which exists only for a folder. The settings form has no button type, but
+Logseq renders each description as Markdown through DOMPurify, which keeps a
+link with `data-claudseq-choose`, `role` and `tabindex` and no `href`. The
+pane listens for a click, Enter or Space on the host document. It acts only
+on such a link inside `.cp__plugins-settings-inner` whose row's `data-key` is
+the setting the link names; the same attribute in a page's own HTML does
+nothing. A Node found this way is checked as a typed one is, and refused with
+the reason rather than saved. The form's fields keep the value they opened
+with, so the pane writes the path it saved into the field as well: that
+field's value is all it writes into the form.
 The platform comes from the host window's `navigator`, as Logseq's own choice
 of a command's `mac` keybinding does. If that command is not on the
 allowlist, the pane shows it and asks. **Allow** reads `:commands-allowlist` through
@@ -330,7 +347,12 @@ Otherwise, on macOS and Linux, it asks the login shell once for its `PATH`
 and for `claude`, because Logseq started from the Dock has neither. Windows
 has no login shell, and an app there starts with the user's whole PATH, so
 it looks for `claude.exe` and `claude.cmd` on that PATH, then at
-`%USERPROFILE%\.local\bin\claude.exe` and `%APPDATA%\npm\claude.cmd`. It
+`%USERPROFILE%\.local\bin\claude.exe` and `%APPDATA%\npm\claude.cmd`. The
+pane can name a `claude` instead, from its Claude Code path setting, on the
+health request and on each new session. The bridge runs it only when it is
+an absolute path to a file called `claude`, or `claude.exe` or `claude.cmd`
+on Windows, that can run; a request that names one never falls back to the
+bridge's own. The pane can choose which Claude Code runs, and nothing else. It
 listens on the port it last used, 47816 at first. When that port is held by a
 bridge that another window started at the same moment, it yields to that
 bridge. When another program holds it, it listens on a free port instead.

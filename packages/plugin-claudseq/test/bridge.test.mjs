@@ -20,7 +20,7 @@
 
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { access, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
+import { access, chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { request } from 'node:http'
 import { createServer } from 'node:net'
@@ -29,7 +29,7 @@ import { dirname, join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
-  ALLOWED_ORIGIN, ENTRYPOINT, VERSION, claudeArgs, claudeCandidates, cmdLine, createBridge, listHistory,
+  ALLOWED_ORIGIN, ENTRYPOINT, VERSION, claudeArgs, claudeCandidates, claudeFile, cmdLine, createBridge, listHistory,
   projectDirName, readTranscript, samePath, sessionScoped, status, stateDirectory, titleOf
 } from '../bridge/claudseq-bridge.mjs'
 
@@ -521,6 +521,57 @@ test('a session no pane is attached to is closed after the idle timeout', async 
   } finally {
     await bridge.close()
   }
+})
+
+/* The fake as a user's own install names it, in a folder of its own:
+ * `claude`, or on Windows `claude.cmd`. */
+async function namedClaude(folder) {
+  await mkdir(folder, { recursive: true })
+  if (WINDOWS) {
+    const shim = join(folder, 'claude.cmd')
+    await writeFile(shim, `@"${process.execPath}" "${fakeScript}" %*\r\n`)
+    return shim
+  }
+  const wrapper = join(folder, 'claude')
+  await writeFile(wrapper, `#!/bin/sh\nexec '${process.execPath}' '${fakeScript}' "$@"\n`)
+  await chmod(wrapper, 0o755)
+  return wrapper
+}
+
+test('a claude the pane names is run in place of the bridge\'s own, but only a file named claude', async () => {
+  const bridge = await start({ claudePath: WINDOWS ? 'C:\\nonexistent\\claude.exe' : '/nonexistent/claude' })
+  const health = async (claude) => (await call(bridge.port, { path: `/v1/health?claude=${encodeURIComponent(claude)}` })).json
+  try {
+    assert.equal((await call(bridge.port)).json.claudeFound, false)
+    const named = await namedClaude(join(bridge.dir, 'my tools'))
+    assert.deepEqual([(await health(named)).claudeFound, (await health(named)).claudePath], [true, named])
+    /* The bridge's own claude does not exist, so whatever runs is the one
+     * named. */
+    await bridge.open({ claude: named })
+    await until(async () => (await bridge.fakeLog()).length === 1)
+
+    /* A file by another name, and a folder by this one, are not run. */
+    const folder = join(bridge.dir, 'versions', WINDOWS ? 'claude.exe' : 'claude')
+    await mkdir(folder, { recursive: true })
+    for (const other of [WINDOWS ? process.execPath : fakeScript, folder]) {
+      assert.equal((await health(other)).claudeFound, false, other)
+      const refused = await call(bridge.port, { method: 'POST', path: '/v1/sessions', body: { cwd: bridge.cwd, claude: other } })
+      assert.equal(refused.status, 424, other)
+      assert.deepEqual(refused.json, { error: 'claude_not_found', claudePath: other })
+    }
+    assert.equal((await bridge.fakeLog()).length, 1)
+    const malformed = await call(bridge.port, { method: 'POST', path: '/v1/sessions', body: { cwd: bridge.cwd, claude: ['claude'] } })
+    assert.deepEqual([malformed.status, malformed.json.error], [400, 'bad_claude_path'])
+  } finally {
+    await bridge.close()
+  }
+})
+
+test('Claude Code\'s file is claude, or claude.exe or claude.cmd on Windows', () => {
+  for (const path of ['/usr/local/bin/claude', '/Users/pat/.claude/local/claude']) assert.ok(claudeFile(path, false), path)
+  for (const path of ['/usr/local/bin/claude-code', '/bin/sh', '/usr/local/bin/Claude', '/usr/local/bin/claude.exe', '', 7]) assert.ok(!claudeFile(path, false), path)
+  for (const path of ['C:\\Users\\Pat\\.local\\bin\\claude.exe', 'C:/npm/CLAUDE.CMD']) assert.ok(claudeFile(path, true), path)
+  for (const path of ['C:\\npm\\claude', 'C:\\npm\\claude.bat', 'C:\\nodejs\\node.exe', 'C:\\npm\\claude.cmd.exe']) assert.ok(!claudeFile(path, true), path)
 })
 
 test('a missing claude is reported rather than spawned', async () => {

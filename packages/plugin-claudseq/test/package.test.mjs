@@ -109,8 +109,10 @@ test('no runtime script turns a string into markup or code', () => {
 test('everything written into the host document is namespaced to Claudseq', () => {
   for (const [name, source] of Object.entries(runtime)) {
     for (const attribute of source.match(/'data-[\w-]+'/g) ?? []) {
-      /* Logseq's own marker on the style it injects, read to remove it. */
-      if (attribute === "'data-injected-style'") continue
+      /* Logseq's own markers, read and never written: on the style it
+       * injects, to remove it, and on each row of a plugin's settings form,
+       * to find the setting a chooser belongs to. */
+      if (attribute === "'data-injected-style'" || attribute === "'data-key'") continue
       assert.match(attribute, /^'data-claudseq-/, `${name}: ${attribute} is not namespaced to Claudseq`)
     }
     assert.doesNotMatch(source, /data-hc-|data-passage-|data-anno-|data-able-/, `${name} touches another package's attribute`)

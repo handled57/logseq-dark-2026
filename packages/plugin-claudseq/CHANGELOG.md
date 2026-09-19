@@ -2,6 +2,21 @@
 
 All notable changes to this package are documented here.
 
+## 0.2.0 - 2026-09-18
+
+- **Choose Node and Claude Code in Claudseq's settings**
+  ([#78](https://github.com/handled57/logseq-dark-2026/issues/78)).
+  **Node path** ends with a **Choose the folder with node…** link. It opens
+  your system's folder picker and fills in the `node` in the folder you pick:
+  Logseq gives plugins a folder picker but no file picker. A Node that
+  Logseq can't run, such as one in a folder with a space, is refused with the
+  reason.
+- **New setting: Claude Code path**, for a `claude` the bridge doesn't find
+  by itself. It has a chooser too. It must be a file named `claude`, or
+  `claude.exe` or `claude.cmd` on Windows; the bridge runs nothing else.
+  Leave it empty to let the bridge look, as before. After updating, quit and
+  reopen Logseq: a bridge started by an earlier version ignores this setting.
+
 ## 0.1.1 - 2026-09-18
 
 - **Claudseq works on Windows and Linux** as well as macOS

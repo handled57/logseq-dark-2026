@@ -15,7 +15,8 @@ with your permission, edit them. Claudseq itself writes nothing to your graph.
   graph. DB graphs, the web build and mobile are not supported.
 - [Claude Code](https://code.claude.com/docs/en/overview) installed and signed
   in, so that `claude` runs in your terminal. On Windows either installer
-  works: the native one's `claude.exe` or npm's `claude.cmd`.
+  works: the native one's `claude.exe` or npm's `claude.cmd`. If the bridge
+  can't find it, set **Claude Code path** in Claudseq's settings.
 - Node.js 20 or later. Where Claudseq looks for it:
   - **macOS:** `/opt/homebrew/bin`, `/usr/local/bin`, `~/.volta/bin` and
     `/opt/local/bin`.
@@ -26,7 +27,7 @@ with your permission, edit them. Claudseq itself writes nothing to your graph.
     sees the new PATH.
 
   If yours is elsewhere, as with nvm, fnm or asdf, set **Node path** in
-  Claudseq's settings.
+  Claudseq's settings, or choose its folder there.
 
 ## Install
 
@@ -146,6 +147,17 @@ Sessions Claudseq starts are ordinary Claude Code sessions. They appear in
 | Permission mode for new sessions | default | `default` is Manual. The pane's mode button changes it too. |
 | Focus mode | on | Folds Claude's thinking and tool calls between its messages into one line each. `/focus` in the pane changes it too. |
 | Node path | empty | The Node.js, version 20 or later, that starts the bridge. Empty means the first one found in the places listed under Requirements. Logseq runs it through a shell, so it cannot contain spaces; a symlink to Node works. On Linux it cannot contain capital letters either, because Logseq lowercases a command before it checks that it exists. On Windows it can also be a command on your PATH, such as `node`, or a folder's short form, such as `C:\PROGRA~1\nodejs\node.exe`. |
+| Claude Code path | empty | The `claude` the bridge runs. Empty means the one on your login shell's PATH, or where Claude Code's installer puts it; on Windows, `claude.exe` or `claude.cmd` on your PATH, or where the installer or npm puts it. It must be a file named `claude`, or `claude.exe` or `claude.cmd` on Windows. |
+
+**Node path** and **Claude Code path** each end with a **Choose the folder
+with…** link. Logseq gives plugins a folder picker but no file picker, so
+the link opens your system's folder picker, and Claudseq looks in the folder
+you pick for `node` or `claude` (`node.exe`, then `claude.exe` or
+`claude.cmd` on Windows). The field then shows the path it found. If there is
+no such file, or the Node found is one Logseq can't run, such as one in a
+folder with a space, a message says why and the setting stays as it was. To
+reach a hidden folder, such as `~/.nvm`, type its path: ⌘⇧G on macOS, Ctrl+L
+on Linux, or the address bar on Windows, for example `%APPDATA%\npm`.
 
 Whether the pane is folded, its height and which session was open are kept
 with these settings, in Claudseq's own settings file under `~/.logseq/`.
@@ -160,6 +172,9 @@ Nothing goes into your graph.
 - The pane starts the bridge through Logseq's `runCli`, which goes through a
   shell: sh on macOS and Linux, cmd.exe on Windows. The bridge's path is
   quoted for it, and nothing you type is ever part of that command.
+- The bridge runs only Claude Code. A **Claude Code path** you set is used
+  only if it names a file called `claude`, or `claude.exe` or `claude.cmd` on
+  Windows.
 - The bridge starts `claude` directly, never through a shell. The one
   exception is npm's `claude.cmd` on Windows, which only cmd.exe can run:
   its command line holds the file's path and the bridge's own fixed options,
@@ -194,7 +209,9 @@ Your Claude Code sessions stay in `~/.claude/projects/`.
   Node.js, then quit and reopen Logseq.
 - To ask a running bridge for its health, run
   `node <plugin folder>/bridge/claudseq-bridge.mjs status`.
-- If the pane cannot find `claude`, install Claude Code and press **Retry**.
+- If the pane cannot find `claude`, install Claude Code and press **Retry**,
+  or choose it under **Claude Code path** in Claudseq's settings. If it says
+  it cannot run the Claude Code path you set, choose another or clear it.
 - If the pane says the bridge is an older version, which happens after
   Claudseq is updated while Logseq is open, quit and reopen Logseq.
 

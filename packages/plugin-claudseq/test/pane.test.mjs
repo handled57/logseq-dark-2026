@@ -89,19 +89,21 @@ function sidebar() {
   return { wrap, nav, footer }
 }
 
-/* The bridge behind `fetch`, and what the host knows of it: which Node
- * binaries exist, what Logseq's command allowlist holds, and what starting
+/* The bridge behind `fetch`, and what the host knows of it: which files
+ * and folders exist, what Logseq's command allowlist holds, what its folder
+ * picker answers, in turn — a path, or null for Cancel — and what starting
  * the bridge through `runCli` does — `start` brings it up and never resolves,
  * as a bridge that runs until Logseq quits; a number is a bridge that exits
- * at once with that code; `refuse` is Logseq declining to run the command. */
+ * at once with that code; `refuse` is Logseq declining to run the command.
+ * The bridge runs its own claude unless it is named one of `claudes`. */
 function bridgeFake({
-  config = CONFIG, claudeFound = true, down = false, sessions = [], history = [], transcripts = {},
-  nodes = [NODE], allowlist = [NODE], launches = 'start', log = ''
+  config = CONFIG, claudeFound = true, claudes = [], down = false, sessions = [], history = [], transcripts = {},
+  nodes = [NODE], folders = [], dialog = [], allowlist = [NODE], launches = 'start', log = ''
 } = {}) {
   const calls = []
   const streams = new Map()
   const encoder = new TextEncoder()
-  const state = { config, claudeFound, down, sessions, history, transcripts, created: 0, nodes, allowlist, launches, log, runs: [], allowlistWrites: [], presence: [] }
+  const state = { config, claudeFound, claudes, down, sessions, history, transcripts, created: 0, nodes, folders, dialog, allowlist, launches, log, runs: [], allowlistWrites: [], presence: [] }
 
   function launch(options) {
     state.runs.push(options)
@@ -122,7 +124,10 @@ function bridgeFake({
     calls.push({ method, path: address.pathname, query: Object.fromEntries(address.searchParams), body, authorization: init.headers?.Authorization })
     if (state.down) throw new TypeError('Failed to fetch')
     const parts = address.pathname.split('/').filter(Boolean)
-    if (address.pathname === '/v1/health') return json(200, { ok: true, version: '0.1.0', claudeFound: state.claudeFound, claudePath: '/opt/homebrew/bin/claude' })
+    if (address.pathname === '/v1/health') {
+      const chosen = address.searchParams.get('claude')
+      return json(200, { ok: true, version: '0.1.0', claudeFound: chosen ? state.claudes.includes(chosen) : state.claudeFound, claudePath: chosen ?? '/opt/homebrew/bin/claude' })
+    }
     if (address.pathname === '/v1/history') return json(200, { cwd: address.searchParams.get('cwd'), sessions: state.history })
     if (address.pathname === '/v1/transcript') {
       const found = state.transcripts[address.searchParams.get('id')]
@@ -217,6 +222,7 @@ async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH, url =
     updates: [],
     opened: [],
     messages: [],
+    statuses: [],
     currentGraph: { path: graph, name: 'notes' },
     updateSettings(patch) {
       this.updates.push(patch)
@@ -246,7 +252,7 @@ async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH, url =
       editBlock: async () => {}
     },
     DB: { datascriptQuery: async () => [[filePath ?? `${graph}/pages/My Page.md`]] },
-    UI: { showMsg(message) { plugin.messages.push(message) } }
+    UI: { showMsg(message, status = 'success', options = {}) { plugin.messages.push(message); plugin.statuses.push([status, options.timeout ?? null]) } }
   }
 
   const context = {
@@ -276,8 +282,15 @@ async function load({ settings = {}, bridge = bridgeFake(), graph = GRAPH, url =
             if (path === `${dotdir}/claudseq/bridge.log`) return bridge.state.log || null
             return null
           }
-          /* The host hands back a failed stat's error rather than rejecting. */
-          if (action === 'stat') return bridge.state.nodes.includes(path) ? { size: 1, mtime: new Date(), ctime: new Date() } : new Error(`ENOENT: no such file or directory, stat '${path}'`)
+          /* The host hands back a failed stat's error rather than rejecting.
+           * A folder has an entry `.` of its own; a file does not. */
+          if (action === 'stat') {
+            const { nodes, folders } = bridge.state
+            return nodes.includes(path) || folders.includes(path) || folders.includes(path.replace(/\/\.$/, ''))
+              ? { size: 1, mtime: new Date(), ctime: new Date() }
+              : new Error(`${nodes.includes(path.replace(/\/\.$/, '')) ? 'ENOTDIR: not a directory' : 'ENOENT: no such file or directory'}, stat '${path}'`)
+          }
+          if (action === 'openDialog') return bridge.state.dialog.shift() ?? null
           if (action === 'userAppCfgs') {
             if (path !== 'commands-allowlist') return null
             if (value === undefined) return bridge.state.allowlist
@@ -681,7 +694,8 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     permissionMode: 'default',
     focusMode: true,
     workingDirectory: '',
-    nodePath: ''
+    nodePath: '',
+    claudePath: ''
   }
   for (const raw of [null, undefined, 'nonsense', 42, [], {}]) {
     assert.deepEqual({ ...context.readSettings(raw) }, defaults, JSON.stringify(raw))
@@ -694,11 +708,14 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     effort: 'ultra',
     permissionMode: 'bypassPermissions',
     focusMode: 'off',
-    workingDirectory: 'relative/path'
+    workingDirectory: 'relative/path',
+    nodePath: 7,
+    claudePath: ['claude']
   }) }, defaults)
-  /* A Node path is kept as typed, so that one the pane cannot use says why
-   * rather than being passed over. */
+  /* A Node or Claude Code path is kept as typed, so that one the pane cannot
+   * use says why rather than being passed over. */
   assert.equal(context.readSettings({ nodePath: ' node ' }).nodePath, 'node')
+  assert.equal(context.readSettings({ claudePath: ' ~/bin/claude ' }).claudePath, '~/bin/claude')
   for (const directory of ['C:\\Users\\Pat\\notes', 'C:/Users/Pat/notes', '\\\\server\\share\\notes']) {
     assert.equal(context.readSettings({ workingDirectory: directory }).workingDirectory, directory)
   }
@@ -711,7 +728,8 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     permissionMode: 'plan',
     focusMode: false,
     workingDirectory: ' /Users/example/code ',
-    nodePath: ' /Users/example/.volta/bin/node '
+    nodePath: ' /Users/example/.volta/bin/node ',
+    claudePath: ' /Users/example/.claude/local/claude '
   }) }, {
     paneCollapsed: true,
     paneHeight: 240,
@@ -721,7 +739,8 @@ test('settings that are missing, mistyped or hand-edited fall back to the defaul
     permissionMode: 'plan',
     focusMode: false,
     workingDirectory: '/Users/example/code',
-    nodePath: '/Users/example/.volta/bin/node'
+    nodePath: '/Users/example/.volta/bin/node',
+    claudePath: '/Users/example/.claude/local/claude'
   })
 })
 
@@ -886,7 +905,208 @@ test('an older bridge keeps working, and the pane says how to start the new one'
 test('a bridge that cannot find claude says so', async () => {
   const missing = await load({ bridge: bridgeFake({ claudeFound: false }) })
   await statusIn(missing, 'noclaude')
-  assert.match(textOf(missing.part('status')), /could not find claude at \/opt\/homebrew\/bin\/claude\. Install Claude Code, then press Retry\./)
+  assert.match(textOf(missing.part('status')), /could not find claude at \/opt\/homebrew\/bin\/claude\. Install Claude Code, or choose it under Claude Code path in Claudseq's settings, then press Retry\./)
+})
+
+/* --------------------------------------------------------------- choosers */
+
+/* The form Logseq 0.10.15 draws for a plugin's settings: a row per setting,
+ * marked with its key, whose label holds the description — rendered from
+ * Markdown, its one link included — and then the field. */
+function settingsForm(pane) {
+  const container = element('div')
+  container.classList.add('cp__plugins-settings')
+  const inner = container.appendChild(element('div'))
+  inner.classList.add('cp__plugins-settings-inner')
+  const rows = {}
+  for (const setting of pane.plugin.schema) {
+    const row = inner.appendChild(element('div'))
+    row.classList.add('desc-item')
+    row.classList.add('as-input')
+    row.setAttribute('data-key', setting.key)
+    const label = row.appendChild(element('label'))
+    label.classList.add('form-control')
+    const description = label.appendChild(element('div'))
+    description.classList.add('html-content')
+    const [, attributes, text] = setting.description.match(/<a ([^>]*)>([^<]*)<\/a>/) ?? []
+    let link = null
+    if (attributes) {
+      link = description.appendChild(element('a'))
+      for (const [, name, value] of attributes.matchAll(/([\w-]+)="([^"]*)"/g)) link.setAttribute(name, value)
+      link.textContent = text
+    }
+    const field = label.appendChild(element('input'))
+    field.value = String(pane.plugin.settings[setting.key] ?? '')
+    rows[setting.key] = { row, link, field }
+  }
+  pane.body.appendChild(container)
+  return rows
+}
+
+/* An event on the host document, as its capturing listeners receive it. */
+function documentEvent(pane, type, event) {
+  const delivered = { prevented: false, preventDefault() { delivered.prevented = true }, stopPropagation() {}, ...event }
+  for (const entry of pane.documentListeners.filter((listener) => listener.type === type)) entry.handler(delivered)
+  return delivered
+}
+
+/* What choosing did once it has settled: the settings it wrote, and the
+ * messages it showed. */
+async function chosen(pane, link, event = { type: 'click' }) {
+  const before = { updates: pane.plugin.updates.length, messages: pane.plugin.messages.length, dialogs: hostCalls(pane, 'openDialog').length }
+  const delivered = documentEvent(pane, event.type, { target: link, ...event })
+  await pane.idle()
+  return {
+    prevented: delivered.prevented,
+    dialogs: hostCalls(pane, 'openDialog').length - before.dialogs,
+    updates: plain(pane.plugin.updates.slice(before.updates)),
+    messages: pane.plugin.messages.slice(before.messages)
+  }
+}
+
+test('Node path and Claude Code path each end in a chooser link, the only markup in the settings', async () => {
+  for (const [platform, node, claude] of [['mac', 'node', 'claude'], ['linux', 'node', 'claude'], ['windows', 'node.exe', 'claude.exe or claude.cmd']]) {
+    const pane = await load({ platform })
+    const descriptions = Object.fromEntries(pane.plugin.schema.map((setting) => [setting.key, setting.description]))
+    assert.match(descriptions.nodePath, new RegExp(` <a data-claudseq-choose="nodePath" role="button" tabindex="0">Choose the folder with ${node}…</a>$`), platform)
+    assert.match(descriptions.claudePath, new RegExp(` <a data-claudseq-choose="claudePath" role="button" tabindex="0">Choose the folder with ${claude}…</a>$`), platform)
+    assert.deepEqual(plain(pane.plugin.schema.map((setting) => setting.key)), ['workingDirectory', 'model', 'effort', 'permissionMode', 'focusMode', 'nodePath', 'claudePath'])
+    for (const setting of pane.plugin.schema) {
+      assert.doesNotMatch(setting.description.replace(/ <a [^>]*>[^<]*<\/a>$/, ''), /[<>]/, `${platform}: ${setting.key} holds markup other than its chooser`)
+    }
+    await pane.plugin.unload()
+  }
+})
+
+test('choosing a folder with node in it sets Node path, shows it in the field, and starts the bridge', async () => {
+  const bin = '/Users/example/.nvm/versions/node/v22.1.0/bin'
+  const bridge = bridgeFake({ config: null, nodes: [], allowlist: [`${bin}/node`], dialog: [`${bin}/`] })
+  const pane = await load({ bridge })
+  await statusIn(pane, 'failed')
+  const form = settingsForm(pane)
+
+  bridge.state.nodes = [`${bin}/node`]
+  const done = await chosen(pane, form.nodePath.link)
+  assert.ok(done.prevented, 'the click went on to the field')
+  assert.equal(done.dialogs, 1)
+  assert.deepEqual(done.updates, [{ nodePath: `${bin}/node` }])
+  assert.equal(form.nodePath.field.value, `${bin}/node`)
+  assert.deepEqual(done.messages, [`Node path: ${bin}/node`])
+  /* A folder's own entry was looked for too, so that a folder named node is
+   * not taken for Node. */
+  assert.ok(hostCalls(pane, 'stat').some(([, path]) => path === `${bin}/node/.`))
+
+  /* Logseq tells the plugin its settings changed. */
+  pane.plugin.settingsChanged({ ...pane.plugin.settings })
+  await ready(pane)
+  assert.deepEqual(plain(bridge.state.runs).map((run) => run.command), [`${bin}/node`])
+})
+
+test('a cancelled chooser, a folder without the file, a folder named like it and a Node path Logseq cannot run change nothing', async () => {
+  const bridge = bridgeFake({
+    dialog: [null, '/Users/example/empty', '/Users/example/.nvm/versions', '/Users/example/My Tools'],
+    nodes: [NODE, '/Users/example/My Tools/node'],
+    folders: ['/Users/example/empty', '/Users/example/.nvm/versions', '/Users/example/.nvm/versions/node']
+  })
+  const pane = await load({ bridge })
+  await ready(pane)
+  const form = settingsForm(pane)
+
+  const cancelled = await chosen(pane, form.nodePath.link)
+  assert.deepEqual([cancelled.dialogs, cancelled.updates, cancelled.messages], [1, [], []])
+
+  assert.deepEqual((await chosen(pane, form.nodePath.link)).messages, ['There is no node in /Users/example/empty.'])
+  assert.deepEqual((await chosen(pane, form.nodePath.link)).messages, ['There is no node in /Users/example/.nvm/versions.'])
+  const spaced = await chosen(pane, form.nodePath.link)
+  assert.deepEqual(spaced.updates, [])
+  assert.match(spaced.messages[0], /^Logseq starts Node through a shell, so the Node path cannot contain spaces or shell characters, as \/Users\/example\/My Tools\/node does\./)
+  assert.deepEqual(pane.plugin.statuses.at(-1), ['warning', 15000])
+  assert.equal(form.nodePath.field.value, '')
+  assert.deepEqual(pane.plugin.updates.filter((patch) => 'nodePath' in patch), [])
+})
+
+test('choosing a folder with claude in it sets Claude Code path, which the bridge is asked about and runs', async () => {
+  const local = '/Users/example/.claude/local'
+  const bridge = bridgeFake({ claudeFound: false, claudes: [`${local}/claude`], nodes: [NODE, `${local}/claude`], dialog: [local] })
+  const pane = await load({ bridge })
+  await statusIn(pane, 'noclaude')
+  const form = settingsForm(pane)
+
+  /* A path the bridge will not run says so, and how to change it. */
+  pane.plugin.settingsChanged({ claudePath: '/usr/local/bin/claude-code' })
+  let status = await until(() => pane.bridge.calls.some((call) => call.query.claude === '/usr/local/bin/claude-code') && textOf(pane.part('status')).includes('cannot run') && pane.part('status'))
+  assert.equal(textOf(status.querySelector('[data-claudseq-part="command"]')), '/usr/local/bin/claude-code')
+  assert.match(textOf(status), /It must be the full path of a file named claude\. Choose another in Claudseq's settings, or clear it to let the bridge look for claude, then press Retry\./)
+
+  const done = await chosen(pane, form.claudePath.link, { type: 'keydown', key: 'Enter' })
+  assert.ok(done.prevented)
+  assert.deepEqual(done.updates, [{ claudePath: `${local}/claude` }])
+  assert.equal(form.claudePath.field.value, `${local}/claude`)
+  pane.plugin.settingsChanged({ ...pane.plugin.settings })
+  await ready(pane)
+  assert.equal(pane.bridge.calls.filter((call) => call.path === '/v1/health').at(-1).query.claude, `${local}/claude`)
+
+  const input = pane.part('input')
+  input.value = 'hello'
+  pane.pane.dispatch('keydown', { target: input, key: 'Enter' })
+  await until(() => pane.bridge.calls.some((call) => call.path === '/v1/sessions' && call.method === 'POST'))
+  assert.equal(pane.bridge.calls.find((call) => call.path === '/v1/sessions' && call.method === 'POST').body.claude, `${local}/claude`)
+})
+
+test('a chooser acts only on Enter, Space or a click, and only in Claudseq\'s settings form', async () => {
+  const bridge = bridgeFake({ dialog: ['/opt/homebrew/bin', '/opt/homebrew/bin'], nodes: [NODE, '/opt/homebrew/bin/claude'] })
+  const pane = await load({ bridge })
+  await ready(pane)
+  const form = settingsForm(pane)
+
+  /* A page's own HTML can carry the same attribute. */
+  const page = pane.body.appendChild(element('div'))
+  const forged = page.appendChild(element('a'))
+  forged.setAttribute('data-claudseq-choose', 'nodePath')
+  assert.deepEqual(await chosen(pane, forged), { prevented: false, dialogs: 0, updates: [], messages: [] })
+  /* So can another row of the form. */
+  form.workingDirectory.row.querySelector('.html-content').appendChild(forged)
+  assert.equal((await chosen(pane, forged)).dialogs, 0)
+  forged.setAttribute('data-claudseq-choose', 'toString')
+  form.nodePath.row.querySelector('.html-content').appendChild(forged)
+  assert.equal((await chosen(pane, forged)).dialogs, 0)
+
+  assert.equal((await chosen(pane, form.nodePath.link, { type: 'keydown', key: 'a' })).dialogs, 0)
+  assert.equal((await chosen(pane, form.nodePath.field)).dialogs, 0, 'the field opened a chooser')
+  assert.deepEqual((await chosen(pane, form.nodePath.link, { type: 'keydown', key: ' ' })).updates, [{ nodePath: NODE }])
+  assert.deepEqual((await chosen(pane, form.claudePath.link)).updates, [{ claudePath: '/opt/homebrew/bin/claude' }])
+
+  await pane.plugin.unload()
+  assert.equal((await chosen(pane, form.nodePath.link)).dialogs, 0, 'a chooser outlived the plugin')
+})
+
+test('on Windows the choosers look for node.exe, and for claude.exe before claude.cmd', async () => {
+  const bridge = bridgeFake({
+    dialog: ['C:\\Program Files\\nodejs', 'C:\\nodejs\\', 'C:\\Users\\Pat O\'Neil\\.local\\bin', 'C:\\Users\\Pat O\'Neil\\AppData\\Roaming\\npm'],
+    nodes: ['C:\\Program Files\\nodejs\\node.exe', 'C:\\nodejs\\node.exe', 'C:\\Users\\Pat O\'Neil\\.local\\bin\\claude.exe', 'C:\\Users\\Pat O\'Neil\\.local\\bin\\claude.cmd', 'C:\\Users\\Pat O\'Neil\\AppData\\Roaming\\npm\\claude.cmd'],
+    allowlist: ['node']
+  })
+  const pane = await load({ bridge, platform: 'windows', dotdir: 'C:/Users/Pat O\'Neil/.logseq', url: 'file:///C:/Users/Pat%20O\'Neil/.logseq/plugins/logseq-claudseq/index.html', graph: 'C:/Users/Pat O\'Neil/notes' })
+  await ready(pane)
+  const form = settingsForm(pane)
+
+  const spaced = await chosen(pane, form.nodePath.link)
+  assert.deepEqual(spaced.updates, [])
+  assert.match(spaced.messages[0], /cannot contain spaces, as C:\\Program Files\\nodejs\\node\.exe does\. Leave Node path empty to use the node on your PATH, or type the folder's short form, such as C:\\PROGRA~1\\nodejs\\node\.exe\./)
+  assert.deepEqual((await chosen(pane, form.nodePath.link)).updates, [{ nodePath: 'C:\\nodejs\\node.exe' }])
+  assert.deepEqual((await chosen(pane, form.claudePath.link)).updates, [{ claudePath: 'C:\\Users\\Pat O\'Neil\\.local\\bin\\claude.exe' }])
+  assert.deepEqual((await chosen(pane, form.claudePath.link)).updates, [{ claudePath: 'C:\\Users\\Pat O\'Neil\\AppData\\Roaming\\npm\\claude.cmd' }])
+  /* Windows reads `path\.` as the path itself, so it is not asked. */
+  assert.ok(!hostCalls(pane, 'stat').some(([, path]) => path.endsWith('.')))
+})
+
+test('on Linux the Node path chooser refuses a path with capitals', async () => {
+  const bridge = bridgeFake({ nodes: [NODE, '/home/pat/Tools/node'], dialog: ['/home/pat/Tools'] })
+  const pane = await load({ bridge, platform: 'linux', dotdir: '/home/pat/.logseq', url: 'file:///home/pat/.logseq/plugins/logseq-claudseq/index.html', graph: '/home/pat/notes' })
+  const form = settingsForm(pane)
+  const done = await chosen(pane, form.nodePath.link)
+  assert.deepEqual(done.updates, [])
+  assert.match(done.messages[0], /on Linux the Node path cannot contain capital letters, as \/home\/pat\/Tools\/node does\./)
 })
 
 /* ---------------------------------------------------------------- session */
