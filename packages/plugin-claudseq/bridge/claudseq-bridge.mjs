@@ -1271,8 +1271,12 @@ export async function serve(args = [], env = process.env) {
     const outcome = await Promise.race([answered.then((config) => ({ config })), ended])
     given.up = true
     child.unref()
+    /* Another window's launcher may have started the bridge that answers;
+     * the copy started here then finds it and stops. */
     if (outcome.config) {
-      log(`started a bridge of its own, pid ${child.pid}, which answers on 127.0.0.1:${outcome.config.port}`)
+      log(outcome.config.pid === child.pid
+        ? `started a bridge of its own, pid ${child.pid}, which answers on 127.0.0.1:${outcome.config.port}`
+        : `a bridge started alongside, pid ${outcome.config.pid}, answers on 127.0.0.1:${outcome.config.port}; the one started here, pid ${child.pid}, yields to it`)
       return null
     }
     const error = new Error(outcome.problem ?? (outcome.code === undefined
