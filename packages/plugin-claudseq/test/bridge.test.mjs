@@ -517,7 +517,9 @@ test('a session no pane is attached to is closed after the idle timeout', async 
     assert.ok(alive(watched.pid), 'an attached session was closed')
     events.close()
     await until(() => !alive(watched.pid))
-    assert.equal(bridge.bridge.sessions.size, 0)
+    /* The bridge forgets a session when it hears its child exit, which on
+     * Windows comes after taskkill has ended the cmd.exe whose pid it holds. */
+    await until(() => bridge.bridge.sessions.size === 0)
   } finally {
     await bridge.close()
   }
