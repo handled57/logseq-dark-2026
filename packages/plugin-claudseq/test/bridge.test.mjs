@@ -1090,9 +1090,11 @@ test('two windows starting a bridge at once end up with one', async () => {
     assert.equal(config.port, port)
     const survivor = both[1 - firstOut.index]
     if (WINDOWS) {
-      /* Both launchers leave once a bridge answers; one bridge is left. */
+      /* Both launchers leave once a bridge answers, and one says it started
+       * it. The other's copy may still be on its way to finding it. */
       assert.equal(await survivor.exited, 0)
-      assert.match(await logOf(dir), /this one is not needed/)
+      const log = await until(async () => { const text = await logOf(dir); return /this one is not needed/.test(text) && text }, { timeout: 15_000 })
+      assert.equal(log.match(/started a bridge of its own/g)?.length, 1, log)
       assert.equal((await call(port, { token: config.token })).status, 200)
     } else {
       assert.equal(survivor.child.exitCode, null, 'neither bridge kept running')
