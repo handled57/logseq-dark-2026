@@ -18,13 +18,25 @@
 var ClaudseqTimeline = (function () {
   const INTERRUPTED = /^\[Request interrupted/
 
+  /* A path inside the working directory, relative to it; any other path as
+   * it is. On Windows one folder is written with either slash and any case
+   * of letter: Logseq names a graph's folder with forward slashes, and
+   * Claude Code writes the paths it works on with backslashes. */
+  function relativePath(path, cwd) {
+    if (typeof path !== 'string' || typeof cwd !== 'string' || !cwd) return path
+    const windows = /^[A-Za-z]:[\\/]|^\\\\/.test(cwd)
+    const base = cwd.replace(windows ? /(?<=[^\\/:])[\\/]+$/ : /(?<=[^/])\/+$/, '')
+    const fold = (text) => windows ? text.replace(/\//g, '\\').toLowerCase() : text
+    const separator = path.charAt(base.length)
+    if (fold(path.slice(0, base.length)) !== fold(base)) return path
+    if (separator !== '/' && !(windows && separator === '\\')) return path
+    return path.slice(base.length + 1)
+  }
+
   /* The part of a tool's input worth a line in the timeline. */
   function summarize(name, input, cwd) {
     const value = input && typeof input === 'object' ? input : {}
-    const relative = (path) => {
-      if (typeof path !== 'string') return ''
-      return cwd && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path
-    }
+    const relative = (path) => typeof path === 'string' ? relativePath(path, cwd) : ''
     const first = (text) => String(text ?? '').split('\n')[0]
     switch (name) {
       case 'Agent':
@@ -445,5 +457,5 @@ var ClaudseqTimeline = (function () {
     return { rows, state, apply, loadTranscript }
   }
 
-  return { create, summarize, describeInput, promptText }
+  return { create, summarize, describeInput, promptText, relativePath }
 })()

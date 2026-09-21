@@ -26,9 +26,9 @@ test('package tags select one version-matched release archive', async () => {
     release_name: 'Able Table 0.4.0',
     workspace: 'packages/plugin-able-table'
   })
-  assert.deepEqual(await selectRelease('claudseq-v0.1.0'), {
-    archive: 'dist/logseq-claudseq-0.1.0.zip',
-    release_name: 'Claudseq 0.1.0',
+  assert.deepEqual(await selectRelease('claudseq-v0.2.0'), {
+    archive: 'dist/logseq-claudseq-0.2.0.zip',
+    release_name: 'Claudseq 0.2.0',
     workspace: 'packages/plugin-claudseq'
   })
 })

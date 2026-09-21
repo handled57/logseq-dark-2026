@@ -133,7 +133,16 @@ proves first-load behavior.
    4. stop a turn;
    5. reopen a session from History;
    6. open a fold of Claude's activity, then turn Focus mode off and on
-      with `/focus`.
+      with `/focus`;
+   7. in Claudseq's settings, use **Choose the folder with node…** and
+      **Choose the folder with claude…**: each opens a folder picker, and the
+      field then shows the file found there. Pick a folder without the file
+      too, and see the setting stay as it was;
+   8. on Windows, also: the pane offers `node`, the console window Logseq
+      opens closes within a second or two, sessions work with both
+      `claude.exe` and npm's `claude.cmd`, **Ctrl+Shift+M** moves focus,
+      and the bridge and every `claude` stop within about 20 seconds of
+      quitting Logseq. CI runs the tests on Windows but cannot run Logseq.
 5. Restart or reload the package and check teardown/reload behavior. Exercise
    hover, focus, selection, narrow desktop layouts, and settings affected by the
    change.

@@ -1,6 +1,6 @@
 {
   "name": "logseq-claudseq",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A Claude Code pane in Logseq's left sidebar: chat with your local claude CLI, approve what it does, and reopen past sessions, through a small loopback bridge that writes nothing to your graph.",
   "author": "Peter Cole",
   "license": "MIT",

@@ -10,10 +10,18 @@
  * over HTTP, and this script talks to `claude` over its headless stream-json
  * protocol — the same one the Claude Agent SDK and the VS Code extension use.
  *
- * Started that way, the bridge lives as long as Logseq does. `runCli` leaves
- * the child's stdin a pipe whose other end Logseq holds and never writes to,
- * so with `--until-stdin-closes` the bridge stops when that pipe closes: when
- * Logseq quits, however it quits.
+ * Started that way on macOS and Linux, the bridge lives as long as Logseq
+ * does. `runCli` leaves the child's stdin a pipe whose other end Logseq holds
+ * and never writes to, so with `--until-stdin-closes` the bridge stops when
+ * that pipe closes: when Logseq quits, however it quits.
+ *
+ * On Windows `runCli`'s shell is cmd.exe, and Logseq gives it a console
+ * window of its own that would stay open for as long as the bridge ran. So
+ * there the pane asks for `--detach`: this script starts a copy of itself
+ * with no console, waits until it answers, and exits, and the window closes
+ * with it. That copy, `--until-panes-leave`, stops once no pane has been
+ * connected to it for a few seconds — as when Logseq quits, however it quits,
+ * because every connection a window held closes with it.
  *
  * What keeps that safe is narrow on purpose:
  *
@@ -22,14 +30,20 @@
  *   loopback gets nothing.
  * - Every request other than a CORS preflight carries `Authorization: Bearer
  *   <token>`. The token is 32 random bytes, new each time the bridge starts,
- *   in `~/.claudseq/bridge.json`, which is mode 0600; the pane reads it
- *   through the host's own file IPC, and a web page cannot read it at all. It
- *   is compared in constant time.
+ *   in `~/.logseq/claudseq/bridge.json`, which is mode 0600 in a folder of
+ *   the user's own; the pane reads it through the host's own file IPC, and a
+ *   web page cannot read it at all. It is compared in constant time.
  * - CORS admits one origin, `file://`: an `effect: true` plugin shares the
  *   Logseq window's origin, and that window is loaded from a file URL.
- * - `claude` is started from an argv array, never a shell, in the working
- *   directory the pane names. Prompt text reaches it only as a stream-json
- *   message on stdin, and `bypassPermissions` is never passed or granted.
+ * - `claude` is started from an argv array in the working directory the pane
+ *   names, never through a shell. The pane may name which `claude`, from
+ *   its Claude Code path setting, but only a file called `claude` —
+ *   `claude.exe` or `claude.cmd` on Windows — so the bridge runs Claude Code
+ *   and nothing else — save npm's `claude.cmd` on Windows, which
+ *   only cmd.exe can run: its command line is the shim's path and the
+ *   bridge's own checked flags, and nothing a request carries. Prompt text
+ *   reaches Claude only as a stream-json message on stdin, and
+ *   `bypassPermissions` is never passed or granted.
  * - Children die when their session closes, when no pane has been attached
  *   for the idle timeout, and when this process shuts down.
  *
@@ -38,7 +52,7 @@
  * that `claude --resume` and the VS Code extension list too.
  *
  * Usage:
- *   node claudseq-bridge.mjs serve [--port <n>] [--until-stdin-closes]
+ *   node claudseq-bridge.mjs serve [--port <n>] [--until-stdin-closes | --detach]
  *   node claudseq-bridge.mjs status
  */
 
@@ -48,16 +62,24 @@ import { appendFileSync, constants, realpathSync } from 'node:fs'
 import { access, chmod, mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { createServer, request as httpRequest } from 'node:http'
 import { homedir } from 'node:os'
-import { delimiter, isAbsolute, join } from 'node:path'
+import { isAbsolute, join, posix, win32 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const VERSION = '0.1.0'
+export const VERSION = '0.2.0'
 export const ALLOWED_ORIGIN = 'file://'
 export const ENTRYPOINT = 'logseq-claudseq'
 export const DEFAULT_PORT = 47816
 export const CONFIG_FILE = 'bridge.json'
 export const LOG_FILE = 'bridge.log'
 const MAX_LOG = 1024 * 1024
+const WINDOWS = process.platform === 'win32'
+/* How long a bridge that runs on its own waits for a pane to come back after
+ * the last one left, and three times that for the first to arrive. A window
+ * that reloads reconnects well within it. */
+const PANE_GRACE_MS = 20_000
+/* How long `--detach` waits for the copy it started to answer. The pane
+ * waits 15 seconds for either. */
+const DETACH_WAIT_MS = 12_000
 
 /* Manual goes by two names. `--permission-mode` accepts `manual` and not
  * `default`, yet every answer the CLI gives — init, status and the reply to
@@ -145,8 +167,48 @@ export function sessionScoped(suggestions) {
     .map((entry) => ({ ...entry, destination: 'session' }))
 }
 
+/* The one command line the bridge ever hands cmd.exe, for npm's
+ * `claude.cmd` on Windows: Node refuses to run a batch file without a shell.
+ * With `/d /s /c "…"` cmd.exe runs what is between the outer quotes as
+ * written. Inside double quotes it takes `&`, `|`, `<`, `>`, `^` and spaces
+ * literally, but still expands `%NAME%`, and no argument can carry a quote
+ * of its own; so a word holding either is refused rather than escaped. The
+ * words are the shim's path and `claudeArgs`, whose values are all checked
+ * against fixed lists and patterns first. */
+export function cmdLine(file, args) {
+  const words = [file, ...args].map((word) => {
+    const text = String(word)
+    if (/["%\r\n]/.test(text)) throw new Error(`cmd.exe would change ${JSON.stringify(text)}`)
+    return text && /^[\w.:@+\\/[\]-]+$/.test(text) ? text : `"${text}"`
+  })
+  return `"${words.join(' ')}"`
+}
+
+function batchFile(path) {
+  return /\.(?:cmd|bat)$/i.test(path)
+}
+
+function spawnClaude(file, args, options, windows = WINDOWS) {
+  if (windows && batchFile(file)) {
+    return spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', cmdLine(file, args)], {
+      ...options,
+      windowsHide: true,
+      windowsVerbatimArguments: true
+    })
+  }
+  return spawn(file, args, { ...options, windowsHide: true })
+}
+
+/* Windows has no signals to ask a process to stop, and a `claude.cmd` is a
+ * cmd.exe with Claude beneath it. taskkill ends the whole tree. */
+function killTree(pid) {
+  return new Promise((settle) => {
+    execFile('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true, timeout: 10_000 }, () => settle())
+  })
+}
+
 class Session {
-  constructor(bridge, { cwd, resume, model, effort, mode }) {
+  constructor(bridge, { cwd, resume, model, effort, mode, claudePath }) {
     this.bridge = bridge
     this.id = randomUUID()
     this.claudeSessionId = resume ?? randomUUID()
@@ -168,7 +230,7 @@ class Session {
     this.idleTimer = null
     this.args = claudeArgs({ sessionId: this.claudeSessionId, resume, model, effort, mode })
 
-    this.child = spawn(bridge.claudePath, this.args, {
+    this.child = spawnClaude(claudePath, this.args, {
       cwd,
       env: childEnv(bridge.env),
       stdio: ['pipe', 'pipe', 'pipe']
@@ -329,8 +391,10 @@ class Session {
     if (this.closed) return res.end()
     this.streams.add(res)
     clearTimeout(this.idleTimer)
+    const left = this.bridge.paneJoined()
     res.on('close', () => {
       this.streams.delete(res)
+      left()
       this.armIdle()
     })
   }
@@ -356,7 +420,8 @@ class Session {
       this.closed = true
       clearTimeout(this.idleTimer)
       try { this.child.stdin.end() } catch {}
-      this.child.kill('SIGTERM')
+      if (WINDOWS && this.pid) killTree(this.pid)
+      else this.child.kill('SIGTERM')
       const kill = setTimeout(() => this.child.kill('SIGKILL'), this.bridge.killGraceMs)
       kill.unref?.()
       this.exited.then(() => clearTimeout(kill))
@@ -376,12 +441,29 @@ export function projectDirName(cwd) {
   return cwd.replace(/[^A-Za-z0-9]/g, '-')
 }
 
-async function projectDirs(projectsDir, cwd) {
-  const name = projectDirName(cwd)
+/* A folder named with a separator at its end is the same folder. A root —
+ * `/`, `C:\` — keeps its own. */
+function trimSeparators(path, windows) {
+  return path.replace(windows ? /(?<=[^\\/:])[\\/]+$/ : /(?<=[^/])\/+$/, '')
+}
+
+/* Whether two paths name the same folder. On Windows the same folder is
+ * written with either slash and any case of letter: Logseq writes a graph's
+ * path with forward slashes, and Claude Code records its working directory
+ * with backslashes. */
+export function samePath(one, other, windows = WINDOWS) {
+  if (typeof one !== 'string' || typeof other !== 'string') return false
+  const fold = (path) => windows ? trimSeparators(path.replace(/\//g, '\\'), true).toLowerCase() : trimSeparators(path, false)
+  return fold(one) === fold(other)
+}
+
+async function projectDirs(projectsDir, cwd, windows) {
+  const fold = (name) => windows ? name.toLowerCase() : name
+  const name = fold(projectDirName(trimSeparators(cwd, windows)))
   const entries = await readdir(projectsDir, { withFileTypes: true }).catch(() => [])
   return entries
     .filter((entry) => entry.isDirectory())
-    .filter((entry) => entry.name === name || (name.length > 200 && entry.name.startsWith(name.slice(0, 200))))
+    .filter((entry) => fold(entry.name) === name || (name.length > 200 && fold(entry.name).startsWith(name.slice(0, 200))))
     .map((entry) => join(projectsDir, entry.name))
 }
 
@@ -469,13 +551,13 @@ async function readEnds(path, size) {
   }
 }
 
-async function summarize(path, id, cwd) {
+async function summarize(path, id, cwd, windows) {
   const info = await stat(path)
   const { head, tail } = await readEnds(path, info.size)
   const first = head[0]
   if (!first || first.isSidechain === true) return null
   const recordedCwd = head.find((record) => typeof record.cwd === 'string')?.cwd
-  if (recordedCwd !== cwd) return null
+  if (!samePath(recordedCwd, cwd, windows)) return null
   const records = [...head, ...tail]
   const title = titleOf(records)
   if (!title) return null
@@ -487,12 +569,12 @@ async function summarize(path, id, cwd) {
   }
 }
 
-export async function listHistory(projectsDir, cwd) {
+export async function listHistory(projectsDir, cwd, { windows = WINDOWS } = {}) {
   const found = []
-  for (const dir of await projectDirs(projectsDir, cwd)) {
+  for (const dir of await projectDirs(projectsDir, cwd, windows)) {
     const names = (await readdir(dir).catch(() => [])).filter((name) => UUID.test(name.replace(/\.jsonl$/, '')) && name.endsWith('.jsonl'))
     for (const name of names) {
-      const summary = await summarize(join(dir, name), name.slice(0, -6), cwd).catch(() => null)
+      const summary = await summarize(join(dir, name), name.slice(0, -6), cwd, windows).catch(() => null)
       if (summary) found.push(summary)
     }
   }
@@ -552,16 +634,16 @@ function slimRecords(records) {
   return kept
 }
 
-export async function readTranscript(projectsDir, cwd, id) {
+export async function readTranscript(projectsDir, cwd, id, { windows = WINDOWS } = {}) {
   if (!UUID.test(id)) throw new HttpError(400, 'bad_session_id')
-  for (const dir of await projectDirs(projectsDir, cwd)) {
+  for (const dir of await projectDirs(projectsDir, cwd, windows)) {
     const path = join(dir, `${id}.jsonl`)
     const info = await stat(path).catch(() => null)
     if (!info) continue
     if (info.size > MAX_TRANSCRIPT) throw new HttpError(413, 'transcript_too_large')
     const all = parseLines(await readFile(path, 'utf8'))
     const recordedCwd = all.find((record) => typeof record.cwd === 'string')?.cwd
-    if (recordedCwd !== cwd) continue
+    if (!samePath(recordedCwd, cwd, windows)) continue
 
     /* Subagents keep their own transcripts beside the session's, each with a
      * small meta file naming the Agent call that started it. */
@@ -656,9 +738,32 @@ function checkEffort(effort) {
   return effort
 }
 
-async function executable(path) {
+/* Windows runs a file by its extension, and has no execute bit to check. A
+ * `claude` with none there is the shell script npm puts beside `claude.cmd`
+ * for Git Bash, which Windows cannot start. A folder passes the execute
+ * check too, so only a file counts. */
+async function executable(path, windows = WINDOWS) {
   if (typeof path !== 'string' || !isAbsolute(path)) return false
+  if (windows && (!/\.(?:exe|cmd|bat|com)$/i.test(path) || (batchFile(path) && /["%]/.test(path)))) return false
+  if (!(await stat(path).then((info) => info.isFile(), () => false))) return false
   return access(path, constants.X_OK).then(() => true, () => false)
+}
+
+/* Whether a path the pane names is Claude Code's by its name: `claude`, or
+ * on Windows `claude.exe` from the native installer or `claude.cmd` from
+ * npm. */
+export function claudeFile(path, windows = WINDOWS) {
+  if (typeof path !== 'string') return false
+  const name = (windows ? win32 : posix).basename(path)
+  return windows ? /^claude\.(?:exe|cmd)$/i.test(name) : name === 'claude'
+}
+
+/* The `claude` a request names from the pane's Claude Code path setting:
+ * null when it names none, and the bridge looks for its own. */
+function checkClaude(path) {
+  if (path === undefined || path === null || path === '') return null
+  if (typeof path !== 'string' || path.length > 4096) throw new HttpError(400, 'bad_claude_path')
+  return path
 }
 
 export function createBridge({
@@ -687,8 +792,41 @@ export function createBridge({
     sessions: new Map(),
     expectedHost: null,
     server: null,
+    panes: 0,
+    onPanes: null,
+    paneJoined,
     listen,
     close
+  }
+
+  /* How many connections panes hold open — a session's events or a window's
+   * presence. A bridge that runs on its own lives by this count. The
+   * function returned lets go of the one taken, once. */
+  function paneJoined() {
+    bridge.panes += 1
+    bridge.onPanes?.(bridge.panes)
+    let held = true
+    return () => {
+      if (!held) return
+      held = false
+      bridge.panes -= 1
+      bridge.onPanes?.(bridge.panes)
+    }
+  }
+
+  /* An NDJSON response held open, with a heartbeat so that nothing between
+   * here and the pane takes it for idle. */
+  function holdOpen(res, cors) {
+    res.writeHead(200, {
+      ...cors,
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    })
+    res.flushHeaders?.()
+    const heartbeat = setInterval(() => res.write('{"heartbeat":true}\n'), heartbeatMs)
+    heartbeat.unref?.()
+    res.on('close', () => clearInterval(heartbeat))
   }
 
   const session = (id) => {
@@ -699,8 +837,10 @@ export function createBridge({
 
   /* A bridge that started before Claude Code was installed, or before it
    * moved, looks for it again when asked, rather than waiting for Logseq to
-   * restart it. */
-  async function claudeReady() {
+   * restart it. A `claude` the pane names is used as named, or not at all:
+   * the user chose it. */
+  async function claudeReady(chosen = null) {
+    if (chosen !== null) return claudeFile(chosen) && executable(chosen)
     if (await executable(bridge.claudePath)) return true
     if (!locateClaude) return false
     const found = await locateClaude().catch(() => null)
@@ -714,15 +854,24 @@ export function createBridge({
     if (parts[0] !== 'v1') throw new HttpError(404, 'not_found')
 
     if (parts.length === 2 && parts[1] === 'health' && method === 'GET') {
-      const claudeFound = await claudeReady()
+      const chosen = checkClaude(url.searchParams.get('claude'))
+      const claudeFound = await claudeReady(chosen)
       return sendJson(res, 200, {
         ok: true,
         version: VERSION,
         pid: process.pid,
         sessions: bridge.sessions.size,
-        claudePath: bridge.claudePath,
+        claudePath: chosen ?? bridge.claudePath,
         claudeFound
       }, cors)
+    }
+
+    /* A window that is here. The pane holds this open while it follows no
+     * session; a session's event stream says the same. */
+    if (parts.length === 2 && parts[1] === 'presence' && method === 'GET') {
+      holdOpen(res, cors)
+      res.on('close', paneJoined())
+      return
     }
 
     if (parts.length === 2 && parts[1] === 'history' && method === 'GET') {
@@ -749,6 +898,7 @@ export function createBridge({
       const mode = checkMode(body.mode)
       const model = checkModel(body.model)
       const effort = checkEffort(body.effort)
+      const chosen = checkClaude(body.claude)
       const resume = body.resume === undefined || body.resume === null || body.resume === '' ? null : body.resume
       if (resume !== null && (typeof resume !== 'string' || !UUID.test(resume))) throw new HttpError(400, 'bad_session_id')
 
@@ -758,12 +908,13 @@ export function createBridge({
         const running = [...bridge.sessions.values()].find((entry) => entry.claudeSessionId === resume && !entry.closed)
         if (running) return sendJson(res, 200, running.summary(), cors)
       }
-      if (!(await claudeReady())) throw new HttpError(424, 'claude_not_found', { claudePath: bridge.claudePath })
+      if (!(await claudeReady(chosen))) throw new HttpError(424, 'claude_not_found', { claudePath: chosen ?? bridge.claudePath })
       if (bridge.sessions.size >= maxSessions) throw new HttpError(429, 'too_many_sessions')
 
-      const created = new Session(bridge, { cwd, resume, model, effort, mode })
+      const claudePath = chosen ?? bridge.claudePath
+      const created = new Session(bridge, { cwd, resume, model, effort, mode, claudePath })
       bridge.sessions.set(created.id, created)
-      log(`session ${created.id} started claude pid ${created.pid} (${resume ? `resume ${resume}` : `new ${created.claudeSessionId}`})`)
+      log(`session ${created.id} started claude pid ${created.pid} (${resume ? `resume ${resume}` : `new ${created.claudeSessionId}`}${chosen ? `, ${chosen}` : ''})`)
       return sendJson(res, 201, created.summary(), cors)
     }
 
@@ -776,16 +927,7 @@ export function createBridge({
 
     if (parts.length === 4 && parts[3] === 'events' && method === 'GET') {
       const after = Number.parseInt(url.searchParams.get('after') ?? '0', 10)
-      res.writeHead(200, {
-        ...cors,
-        'Content-Type': 'application/x-ndjson; charset=utf-8',
-        'Cache-Control': 'no-store',
-        'X-Content-Type-Options': 'nosniff'
-      })
-      res.flushHeaders?.()
-      const heartbeat = setInterval(() => res.write('{"heartbeat":true}\n'), heartbeatMs)
-      heartbeat.unref?.()
-      res.on('close', () => clearInterval(heartbeat))
+      holdOpen(res, cors)
       return target.attach(res, Number.isFinite(after) ? after : 0)
     }
 
@@ -883,8 +1025,11 @@ export function createBridge({
 
 /* --------------------------------------------------------------- commands */
 
+/* Inside Logseq's own folder, which the pane finds through the host on every
+ * platform, and not inside the plugin's: Logseq replaces that one whenever
+ * the plugin is updated, while a bridge may still be running. */
 export function stateDirectory(env = process.env) {
-  return env.CLAUDSEQ_STATE_DIR ?? join(homedir(), '.claudseq')
+  return env.CLAUDSEQ_STATE_DIR ?? join(homedir(), '.logseq', 'claudseq')
 }
 
 export function projectsDirectory(env = process.env) {
@@ -900,18 +1045,26 @@ export async function readConfig(stateDir) {
 }
 
 /* Written whole or not at all: the pane reads this file over and over while
- * the bridge starts, and must never read half of it. */
+ * the bridge starts, and must never read half of it. Windows can refuse a
+ * rename for a moment while another process has the file open. */
 async function writeConfig(stateDir, config) {
   const path = join(stateDir, CONFIG_FILE)
   const temporary = join(stateDir, `.${CONFIG_FILE}.${process.pid}`)
   await writeFile(temporary, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 })
   await chmod(temporary, 0o600)
-  await rename(temporary, path)
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await rename(temporary, path)
+    } catch (error) {
+      if (!WINDOWS || attempt === 5 || !['EPERM', 'EACCES', 'EBUSY'].includes(error.code)) throw error
+      await new Promise((settle) => setTimeout(settle, 50 * attempt))
+    }
+  }
 }
 
 function run(file, args, options = {}) {
   return new Promise((settle, fail) => {
-    execFile(file, args, { timeout: 15_000, ...options }, (error, stdout, stderr) => {
+    execFile(file, args, { timeout: 15_000, windowsHide: true, ...options }, (error, stdout, stderr) => {
       if (error) fail(Object.assign(error, { stdout, stderr }))
       else settle(String(stdout))
     })
@@ -920,23 +1073,45 @@ function run(file, args, options = {}) {
 
 /* Logseq started from the Dock hands its children launchd's PATH, which has
  * neither Homebrew nor `claude` on it. The login shell is asked for its own,
- * once, when the bridge starts; every `claude` is given that one. */
+ * once, when the bridge starts; every `claude` is given that one. Windows
+ * has no login shell: an app there starts with the user's whole PATH. */
 async function loginShell(shell, command) {
   return (await run(shell, ['-lc', command]).catch(() => '')).trim()
 }
 
-async function findClaude(shell, loginPath) {
-  const named = (await loginShell(shell, 'command -v claude')).split('\n').pop()?.trim()
-  const candidates = [
+/* Windows spells the variable `Path`, and a copy of the environment is no
+ * longer blind to case the way `process.env` is. */
+function pathKey(env) {
+  return Object.keys(env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH'
+}
+
+/* Where `claude` may be, in order: where the login shell finds it, then each
+ * folder on the PATH, then where Claude Code's installers put it. On Windows
+ * the native installer's is `claude.exe` and npm's is `claude.cmd`. */
+export function claudeCandidates({ windows = WINDOWS, named = '', pathValue = '', home = homedir(), appData = '' } = {}) {
+  const path = windows ? win32 : posix
+  const folders = pathValue.split(windows ? ';' : ':').map((dir) => dir.trim().replace(/^"(.*)"$/, '$1')).filter(Boolean)
+  if (windows) {
+    return [
+      ...folders.flatMap((dir) => [path.join(dir, 'claude.exe'), path.join(dir, 'claude.cmd')]),
+      path.join(home, '.local', 'bin', 'claude.exe'),
+      path.join(appData || path.join(home, 'AppData', 'Roaming'), 'npm', 'claude.cmd')
+    ]
+  }
+  return [
     named,
-    ...loginPath.split(delimiter).filter(Boolean).map((dir) => join(dir, 'claude')),
-    join(homedir(), '.claude', 'local', 'claude'),
-    join(homedir(), '.local', 'bin', 'claude'),
+    ...folders.map((dir) => path.join(dir, 'claude')),
+    path.join(home, '.claude', 'local', 'claude'),
+    path.join(home, '.local', 'bin', 'claude'),
     '/opt/homebrew/bin/claude',
     '/usr/local/bin/claude'
-  ]
-  for (const candidate of candidates) {
-    if (candidate && await executable(candidate)) return candidate
+  ].filter(Boolean)
+}
+
+async function findClaude(shell, pathValue, env) {
+  const named = WINDOWS ? '' : (await loginShell(shell, 'command -v claude')).split('\n').pop()?.trim()
+  for (const candidate of claudeCandidates({ named, pathValue, appData: env.APPDATA })) {
+    if (await executable(candidate)) return candidate
   }
   return null
 }
@@ -969,15 +1144,15 @@ function askHealth(config, timeout) {
 }
 
 /* The bridge `bridge.json` names, when it answers with the token written
- * there. With a wait, it is asked again until the wait runs out: a bridge
- * that a second Logseq window started a moment earlier has the port before
- * it has written the file. */
-async function answeringBridge(stateDir, wait = 0) {
+ * there. With a wait, it is asked again until the wait runs out, or until
+ * `given.up` says to stop: a bridge that a second Logseq window started a
+ * moment earlier has the port before it has written the file. */
+async function answeringBridge(stateDir, wait = 0, given = { up: false }) {
   const deadline = Date.now() + wait
   for (;;) {
     const config = await readConfig(stateDir).catch(() => null)
     if (config && (await askHealth(config, 1000)).status === 200) return config
-    if (Date.now() >= deadline) return null
+    if (given.up || Date.now() >= deadline) return null
     await new Promise((settle) => setTimeout(settle, 150))
   }
 }
@@ -1012,13 +1187,15 @@ function fileLog(path) {
 export async function serve(args = [], env = process.env) {
   const stateDir = stateDirectory(env)
   await mkdir(stateDir, { recursive: true, mode: 0o700 })
-  await chmod(stateDir, 0o700)
+  /* Windows keeps only a read-only flag here; the folder is private because
+   * it is in the user's profile. */
+  await chmod(stateDir, 0o700).catch((error) => { if (!WINDOWS) throw error })
   const logPath = join(stateDir, LOG_FILE)
   const log = fileLog(logPath)
   try {
     return await start()
   } catch (error) {
-    log(`could not start: ${error.message}`)
+    if (!error.logged) log(`could not start: ${error.message}`)
     throw error
   }
 
@@ -1036,17 +1213,19 @@ export async function serve(args = [], env = process.env) {
     const requested = option(args, '--port')
     const port = requested === undefined ? previous?.port ?? DEFAULT_PORT : Number.parseInt(requested, 10)
     if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`--port must be between 1024 and 65535, not ${requested}`)
+    if (args.includes('--detach')) return detach(requested)
 
     const shell = env.SHELL || '/bin/zsh'
-    const loginPath = (await loginShell(shell, 'printf %s "$PATH"')) || env.PATH || '/usr/bin:/bin'
-    const locateClaude = async () => env.CLAUDSEQ_CLAUDE ?? await findClaude(shell, loginPath)
+    const key = pathKey(env)
+    const pathValue = (WINDOWS ? '' : await loginShell(shell, 'printf %s "$PATH"')) || env[key] || (WINDOWS ? '' : '/usr/bin:/bin')
+    const locateClaude = async () => env.CLAUDSEQ_CLAUDE ?? await findClaude(shell, pathValue, env)
     const token = randomBytes(32).toString('hex')
     const bridge = createBridge({
       token,
       claudePath: await locateClaude(),
       locateClaude,
       projectsDir: projectsDirectory(env),
-      env: { ...env, PATH: loginPath },
+      env: { ...env, [key]: pathValue },
       idleMs: env.CLAUDSEQ_IDLE_MS ? Number(env.CLAUDSEQ_IDLE_MS) : undefined,
       log
     })
@@ -1090,7 +1269,48 @@ export async function serve(args = [], env = process.env) {
       process.stdin.on('error', closed)
       process.stdin.resume()
     }
+    if (args.includes('--until-panes-leave')) {
+      const grace = Number(env.CLAUDSEQ_PANE_GRACE_MS) > 0 ? Number(env.CLAUDSEQ_PANE_GRACE_MS) : PANE_GRACE_MS
+      let timer = setTimeout(() => stop('no pane connected'), grace * 3)
+      bridge.onPanes = (count) => {
+        clearTimeout(timer)
+        if (count === 0) timer = setTimeout(() => stop('every pane has left'), grace)
+      }
+    }
     return bridge
+  }
+
+  /* Start a copy of this bridge with no console and no tie to this process,
+   * wait until it answers, and leave it running. It exits 0 when a bridge
+   * answers — the copy, or one another window started at the same moment —
+   * and otherwise fails; a copy that could not start has logged why, and
+   * that line is the one the pane shows. */
+  async function detach(port) {
+    const child = spawn(process.execPath, [
+      fileURLToPath(import.meta.url), 'serve', '--until-panes-leave', ...(port === undefined ? [] : ['--port', port])
+    ], { detached: true, stdio: 'ignore', windowsHide: true, env })
+    const given = { up: false }
+    const answered = answeringBridge(stateDir, DETACH_WAIT_MS, given)
+    const ended = new Promise((settle) => {
+      child.once('error', (error) => settle({ problem: `could not start a bridge of its own: ${error.message}` }))
+      child.once('exit', (code) => settle(code === 0 ? answered.then((config) => ({ config })) : { problem: null, code }))
+    })
+    const outcome = await Promise.race([answered.then((config) => ({ config })), ended])
+    given.up = true
+    child.unref()
+    /* Another window's launcher may have started the bridge that answers;
+     * the copy started here then finds it and stops. */
+    if (outcome.config) {
+      log(outcome.config.pid === child.pid
+        ? `started a bridge of its own, pid ${child.pid}, which answers on 127.0.0.1:${outcome.config.port}`
+        : `a bridge started alongside, pid ${outcome.config.pid}, answers on 127.0.0.1:${outcome.config.port}; the one started here, pid ${child.pid}, yields to it`)
+      return null
+    }
+    const error = new Error(outcome.problem ?? (outcome.code === undefined
+      ? `the bridge it started did not answer within ${DETACH_WAIT_MS / 1000} seconds`
+      : `the bridge it started stopped as it started (exit code ${outcome.code})`))
+    error.logged = outcome.code !== undefined
+    throw error
   }
 }
 
@@ -1116,7 +1336,7 @@ if (invoked) {
   }
   const selected = commands[command]
   if (!selected) {
-    console.error('usage: claudseq-bridge.mjs serve [--port <n>] [--until-stdin-closes] | status')
+    console.error('usage: claudseq-bridge.mjs serve [--port <n>] [--until-stdin-closes | --detach] | status')
     process.exitCode = 2
   } else {
     selected().catch((error) => {

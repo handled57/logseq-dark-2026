@@ -109,8 +109,10 @@ test('no runtime script turns a string into markup or code', () => {
 test('everything written into the host document is namespaced to Claudseq', () => {
   for (const [name, source] of Object.entries(runtime)) {
     for (const attribute of source.match(/'data-[\w-]+'/g) ?? []) {
-      /* Logseq's own marker on the style it injects, read to remove it. */
-      if (attribute === "'data-injected-style'") continue
+      /* Logseq's own markers, read and never written: on the style it
+       * injects, to remove it, and on each row of a plugin's settings form,
+       * to find the setting a chooser belongs to. */
+      if (attribute === "'data-injected-style'" || attribute === "'data-key'") continue
       assert.match(attribute, /^'data-claudseq-/, `${name}: ${attribute} is not namespaced to Claudseq`)
     }
     assert.doesNotMatch(source, /data-hc-|data-passage-|data-anno-|data-able-/, `${name} touches another package's attribute`)
@@ -133,16 +135,21 @@ test('the pane keeps its state out of the graph', () => {
 test('the pane runs one command, the bridge, and changes one Logseq setting, its command allowlist', () => {
   const source = code['index.js']
   assert.equal(source.match(/'runCli'/g)?.length, 1, 'the pane runs more than the bridge')
-  assert.match(source, /\['runCli', \{\s*command: node,\s*args: `\$\{shellQuote\(bridgeScriptPath\(\)\)\} serve --until-stdin-closes`,\s*returnResult: false\s*\}\]/)
+  assert.match(source, /\['runCli', \{\s*command: node,\s*args: launchArgs\(bridgeScriptPath\(\)\),\s*returnResult: false\s*\}\]/)
   const settingCalls = source.match(/'userAppCfgs'/g)?.length ?? 0
   assert.ok(settingCalls > 0)
   assert.equal(source.match(/'userAppCfgs', 'commands-allowlist'/g)?.length, settingCalls, 'the pane touches a Logseq setting other than the allowlist')
 })
 
-test('the bridge listens on loopback only, never uses a shell, and needs nothing installed', () => {
+test('the bridge listens on loopback only, never uses a shell but for claude.cmd, and needs nothing installed', () => {
   assert.match(bridgeCode, /server\.listen\(\w+, '127\.0\.0\.1'/)
   assert.doesNotMatch(bridgeCode, /listen\([^)]*'0\.0\.0\.0'|listen\([^)]*'::'/)
   assert.doesNotMatch(bridgeCode, /shell:\s*true/)
+  /* The one shell is cmd.exe, for a batch-file claude on Windows, and its
+   * one command line is built by `cmdLine` from the claude path and argv. */
+  assert.equal(bridgeCode.match(/cmd\.exe'/g)?.length, 1, 'the bridge runs cmd.exe for something else')
+  assert.match(bridgeCode, /spawn\(process\.env\.ComSpec \|\| 'cmd\.exe', \['\/d', '\/s', '\/c', cmdLine\(file, args\)\]/)
+  assert.equal(bridgeCode.match(/cmdLine\(/g)?.length, 2, 'cmdLine is used for more than claude')
   /* `execFile` takes an argv array; `exec` takes a command line for a shell.
    * A regex's own `.exec(` is not a process. */
   assert.doesNotMatch(bridgeCode, /(?<![.\w])exec\(|execSync\(|spawnSync\(/, 'the bridge runs a command string')

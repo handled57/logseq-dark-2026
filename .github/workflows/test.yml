@@ -23,3 +23,23 @@ jobs:
         run: |
           npm run check
           git diff --check
+
+  # Claudseq starts processes, reads paths and names folders the way each
+  # platform does; its own suite runs on Windows too. Checkout keeps LF line
+  # endings so that fixtures read as they were recorded.
+  claudseq-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Keep line endings
+        run: git config --global core.autocrlf false
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test Claudseq
+        run: npm test --workspace packages/plugin-claudseq
