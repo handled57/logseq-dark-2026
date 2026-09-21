@@ -240,7 +240,7 @@ test('the build stages a local verse index only after the archive is closed', as
   assert.deepEqual(pkg.release.unpackedLocalFiles, ['resources/nrsvue.text.json'])
 
   const archived = build.indexOf('zipped?.status')
-  const staged = build.indexOf('unpackedLocalFiles')
+  const staged = build.indexOf('stageUnpackedLocalFiles(')
   assert.ok(archived >= 0, 'the build no longer archives')
   assert.ok(staged >= 0, 'the build no longer stages a local verse index')
   assert.ok(staged > archived, 'the verse index is staged before the archive is closed')
