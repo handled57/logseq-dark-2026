@@ -3,3 +3,4 @@ dist/
 .acceptance-graph/
 .DS_Store
 npm-debug.log*
+research/
